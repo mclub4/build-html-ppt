@@ -30,15 +30,18 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("Never run `npm install`", skill)
         self.assertIn("Do not run `npm install`", contract)
 
-    def test_fan_art_research_is_bounded_and_does_not_expand_review_implicitly(self) -> None:
+    def test_fan_art_targets_are_checkpoints_and_do_not_expand_review_implicitly(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
         budget = (ROOT / "references" / "fan-art-budget.md").read_text(encoding="utf-8")
-        self.assertIn("do not let open-ended asset discovery", skill)
-        self.assertIn("inside 120 minutes", contract)
-        self.assertIn("hard stop at 40 minutes", budget)
-        self.assertIn("hard stop at 50", budget)
-        self.assertIn("hard stop at 30", budget)
+        self.assertIn("checkpoints rather than hard caps", skill)
+        self.assertIn("planning targets, not forced limits", contract)
+        self.assertIn("planning targets, not hard limits", budget)
+        self.assertIn("30-40 minutes", budget)
+        self.assertIn("40-50 works", budget)
+        self.assertIn("24-30 works", budget)
+        self.assertIn("ask whether to continue discovery", budget)
+        self.assertIn("do not abruptly stop", budget)
         self.assertIn('Only `data-visual-critical="true"`', budget)
 
 

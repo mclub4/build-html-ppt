@@ -26,9 +26,9 @@ The script checks Python, Node.js, Playwright, Chromium, and screenshot capture 
 
 ## Turnaround Envelope
 
-Full Validation controls review depth, not research breadth. For an ordinary deck, target the documented 40-50 minute turnaround. Without explicit consent for exhaustive research, keep the entire task inside 120 minutes and reserve at least the final 35 minutes for settled rendering, batched AI inspection, fixes, final scoring, and required cross-review.
+Full Validation controls review depth, not research breadth. For an ordinary deck, target the documented 40-50 minute turnaround. For image-heavy work, target 90-120 minutes and aim to reserve the final 35 minutes for settled rendering, batched AI inspection, fixes, final scoring, and required cross-review. These are planning targets, not forced limits.
 
-For fan-art-heavy, image-collection, or "as many as possible" requests, `fan-art-budget.md` is mandatory. Stop fan-art search at 40 minutes or 50 candidates, whichever comes first, and reduce the selected quantity rather than consuming the validation reserve. Do not add auxiliary source or per-image review agents in bounded internal/private mode. If the user explicitly requests work likely to exceed two hours, explain the expected delay and obtain consent before switching to exhaustive research.
+For fan-art-heavy, image-collection, or "as many as possible" requests, `fan-art-budget.md` is mandatory. Check progress around 40 minutes or 50 candidates instead of stopping automatically. Freeze a strong set when coverage is sufficient; continue when further discovery is materially useful and enough validation time remains. If total work is likely to exceed two hours, explain the expected delay and ask whether to continue or finish with the current set. Do not add auxiliary source or per-image review agents in ordinary internal/private mode.
 
 ## Validation Workspace
 

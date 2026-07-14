@@ -1,6 +1,6 @@
 # Asset Discovery
 
-Use this reference when a deck needs photographs, illustrations, screenshots, wallpapers, historical material, fan work, memes, or visual evidence. Official assets remain the first pass, not the final boundary of discovery. For fan-art-heavy or "as many as possible" requests, read `fan-art-budget.md` first; its time and quantity ceilings override open-ended discovery language here.
+Use this reference when a deck needs photographs, illustrations, screenshots, wallpapers, historical material, fan work, memes, or visual evidence. Official assets remain the first pass, not the final boundary of discovery. For fan-art-heavy or "as many as possible" requests, read `fan-art-budget.md` first; its planning targets guide the breadth of discovery without acting as forced limits.
 
 ## Search Broadly By Topic
 
@@ -34,4 +34,4 @@ Use general web and image search as routing layers. Add site-specific searches w
 5. Internal or personal decks may use suitable creator-hosted fan work with visible credit when it fits the user's context. Public or commercial decks require verified reuse rights or an official, licensed, supplied, or original replacement.
 6. Convert the selected raster file to WebP and keep its original aspect ratio.
 
-Stop searching when each important visual role has at least one strong candidate and the selected set is varied enough that one image is not carrying the whole deck. Always stop earlier when the applicable fan-art time or candidate ceiling is reached.
+Normally stop searching when each important visual role has at least one strong candidate and the selected set is varied enough that one image is not carrying the whole deck. At the upper planning target, assess coverage, quality, and the time still needed for implementation and validation. Continue when more discovery would materially improve the result and the schedule remains reasonable. If total work is likely to exceed two hours, ask whether to keep searching or finish with the current set.
