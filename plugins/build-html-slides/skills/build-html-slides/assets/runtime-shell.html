@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HTML Presentation</title>
+  <style>
+    :root {
+      --stage-width: 1280;
+      --stage-height: 720;
+      --deck-bg: #e9e9e7;
+      --slide-bg: #ffffff;
+      --ink: #111111;
+      --nav-surface: rgba(17, 17, 17, 0.94);
+      --nav-border: rgba(255, 255, 255, 0.18);
+      --nav-ink: #ffffff;
+      --nav-muted: rgba(255, 255, 255, 0.58);
+      --nav-accent: #ffffff;
+      --nav-hover: rgba(255, 255, 255, 0.12);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body { background: var(--deck-bg); color: var(--ink); font-family: system-ui, sans-serif; }
+    button, input { font: inherit; }
+
+    .stage-wrap { position: fixed; inset: 0; overflow: hidden; }
+    .stage {
+      position: absolute;
+      width: 1280px;
+      height: 720px;
+      transform-origin: top left;
+      background: var(--slide-bg);
+    }
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      visibility: hidden;
+      overflow: hidden;
+      isolation: isolate;
+      opacity: 0;
+      transform: translateX(20px);
+      transition: opacity 360ms ease, transform 360ms ease, visibility 360ms;
+      background: var(--slide-bg);
+    }
+    .slide.active { z-index: 1; visibility: visible; opacity: 1; transform: none; }
+    .slide-media { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+    .slide-content { position: relative; z-index: 2; display: flex; flex: 1; min-width: 0; min-height: 0; }
+    .key-visual, .logo, .title-art, .safe-media { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+    .progress { position: fixed; top: 0; left: 0; z-index: 20; width: 0; height: 3px; background: #111111; transition: width 240ms ease; }
+    .edge { position: fixed; top: 0; bottom: 0; z-index: 5; width: 8%; cursor: pointer; }
+    .edge.left { left: 0; }
+    .edge.right { right: 0; }
+    .nav {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      height: 48px;
+      gap: 2px;
+      padding: 5px 6px;
+      border: 1px solid var(--nav-border);
+      border-radius: 18px;
+      background: var(--nav-surface);
+      color: var(--nav-ink);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
+      backdrop-filter: blur(14px);
+    }
+    .nav button {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--nav-accent);
+      cursor: pointer;
+    }
+    .nav button:hover { background: var(--nav-hover); }
+    .nav button:disabled { color: var(--nav-muted); opacity: 0.32; }
+    .nav button:focus-visible, .page-input:focus-visible { outline: 2px solid var(--nav-accent); outline-offset: 2px; }
+    .nav button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .count {
+      display: grid;
+      grid-template-columns: 32px 10px 26px;
+      place-items: center;
+      min-width: 76px;
+      height: 36px;
+      gap: 2px;
+      color: var(--nav-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .page-input, .page-separator, .page-total { align-self: center; height: 32px; margin: 0; padding: 0; line-height: 1; }
+    .page-input {
+      width: 32px;
+      border: 0;
+      border-radius: 8px;
+      appearance: textfield;
+      background: transparent;
+      color: var(--nav-accent);
+      font: 800 14px/32px system-ui, sans-serif;
+      text-align: center;
+    }
+    .page-input::-webkit-inner-spin-button, .page-input::-webkit-outer-spin-button { margin: 0; appearance: none; }
+    .page-input:hover, .page-input:focus { background: var(--nav-hover); }
+    .page-separator, .page-total { display: grid; place-items: center; width: 100%; font-size: 14px; font-weight: 800; }
+    .page-total { color: var(--nav-ink); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+    @media print {
+      html, body { overflow: visible; background: #ffffff; }
+      .stage-wrap { position: static; overflow: visible; }
+      .stage { position: relative; left: auto !important; top: auto !important; width: 1280px; height: auto; transform: none !important; }
+      .slide { position: relative; visibility: visible; width: 1280px; height: 720px; opacity: 1; transform: none; page-break-after: always; }
+      .nav, .edge, .progress { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress" id="progress"></div>
+  <div class="stage-wrap">
+    <main class="stage" id="stage" aria-live="polite">
+      <section class="slide active" data-title="Slide 1">
+        <div class="slide-media" aria-hidden="true"></div>
+        <div class="slide-content"><!-- SLIDE_1_CONTENT --></div>
+      </section>
+      <section class="slide" data-title="Slide 2">
+        <div class="slide-media" aria-hidden="true"></div>
+        <div class="slide-content"><!-- SLIDE_2_CONTENT --></div>
+      </section>
+      <section class="slide" data-title="Slide 3">
+        <div class="slide-media" aria-hidden="true"></div>
+        <div class="slide-content"><!-- SLIDE_3_CONTENT --></div>
+      </section>
+    </main>
+  </div>
+  <div class="edge left" id="edgeLeft" aria-hidden="true"></div>
+  <div class="edge right" id="edgeRight" aria-hidden="true"></div>
+  <nav class="nav" aria-label="슬라이드 탐색">
+    <button id="prev" type="button" aria-label="이전 슬라이드"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+    <div class="count" aria-label="현재 슬라이드와 전체 슬라이드 수">
+      <input class="page-input" id="pageInput" type="number" min="1" value="1" inputmode="numeric" aria-label="이동할 슬라이드 번호">
+      <span class="page-separator" aria-hidden="true">/</span>
+      <span class="page-total" id="total">3</span>
+    </div>
+    <button id="next" type="button" aria-label="다음 슬라이드"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+    <button id="full" type="button" aria-label="전체 화면"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg></button>
+  </nav>
+  <script>
+    (() => {
+      const STAGE_WIDTH = 1280;
+      const STAGE_HEIGHT = 720;
+      const stage = document.getElementById('stage');
+      const slides = [...stage.querySelectorAll('.slide')];
+      const pageInput = document.getElementById('pageInput');
+      const total = document.getElementById('total');
+      const prev = document.getElementById('prev');
+      const next = document.getElementById('next');
+      const full = document.getElementById('full');
+      const progress = document.getElementById('progress');
+      const edgeLeft = document.getElementById('edgeLeft');
+      const edgeRight = document.getElementById('edgeRight');
+      let index = 0;
+
+      const viewportSize = () => {
+        const viewport = window.visualViewport;
+        return {
+          width: viewport?.width ?? document.documentElement.clientWidth,
+          height: viewport?.height ?? document.documentElement.clientHeight,
+        };
+      };
+      const fit = () => {
+        const { width, height } = viewportSize();
+        const scale = Math.min(width / STAGE_WIDTH, height / STAGE_HEIGHT);
+        stage.style.left = `${Math.max(0, (width - STAGE_WIDTH * scale) / 2)}px`;
+        stage.style.top = `${Math.max(0, (height - STAGE_HEIGHT * scale) / 2)}px`;
+        stage.style.transform = `scale(${scale})`;
+      };
+      const show = number => {
+        index = Math.max(0, Math.min(slides.length - 1, number));
+        slides.forEach((slide, slideIndex) => {
+          const active = slideIndex === index;
+          slide.classList.toggle('active', active);
+          slide.setAttribute('aria-hidden', String(!active));
+        });
+        pageInput.value = String(index + 1);
+        total.textContent = String(slides.length);
+        progress.style.width = `${((index + 1) / slides.length) * 100}%`;
+        prev.disabled = index === 0;
+        next.disabled = index === slides.length - 1;
+        if (location.hash !== `#${index + 1}`) history.replaceState(null, '', `#${index + 1}`);
+      };
+      const go = () => {
+        const number = Number.parseInt(pageInput.value, 10);
+        if (Number.isFinite(number)) show(number - 1);
+        else pageInput.value = String(index + 1);
+      };
+
+      pageInput.max = String(slides.length);
+      pageInput.addEventListener('focus', () => pageInput.select());
+      pageInput.addEventListener('change', go);
+      pageInput.addEventListener('keydown', event => {
+        event.stopPropagation();
+        if (event.key === 'Enter') { go(); pageInput.blur(); }
+      });
+      prev.addEventListener('click', () => show(index - 1));
+      next.addEventListener('click', () => show(index + 1));
+      edgeLeft.addEventListener('click', () => show(index - 1));
+      edgeRight.addEventListener('click', () => show(index + 1));
+      full.addEventListener('click', () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
+      addEventListener('keydown', event => {
+        const active = document.activeElement;
+        if (/INPUT|TEXTAREA|SELECT/.test(active?.tagName || '') || active?.isContentEditable) return;
+        if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(event.key)) { event.preventDefault(); show(index + 1); }
+        if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(event.key)) { event.preventDefault(); show(index - 1); }
+        if (event.key === 'Home') show(0);
+        if (event.key === 'End') show(slides.length - 1);
+        if (event.key.toLowerCase() === 'f') full.click();
+        if (event.key.toLowerCase() === 'p') { pageInput.focus(); pageInput.select(); }
+      });
+      addEventListener('resize', fit);
+      addEventListener('orientationchange', fit);
+      window.visualViewport?.addEventListener('resize', fit);
+      window.visualViewport?.addEventListener('scroll', fit);
+      addEventListener('hashchange', () => show((Number.parseInt(location.hash.slice(1), 10) || 1) - 1));
+      fit();
+      show((Number.parseInt(location.hash.slice(1), 10) || 1) - 1);
+    })();
+  </script>
+</body>
+</html>

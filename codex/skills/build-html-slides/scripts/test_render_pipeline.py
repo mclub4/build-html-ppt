@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RENDERER = ROOT / "scripts" / "render_slides.js"
 VALIDATOR = ROOT / "scripts" / "validate_visual_review.py"
-TEMPLATE = ROOT / "assets" / "presentation-template.html"
+TEMPLATE = ROOT / "assets" / "runtime-shell.html"
 
 
 class RenderPipelineTests(unittest.TestCase):
@@ -35,6 +35,10 @@ class RenderPipelineTests(unittest.TestCase):
         rendered = set(manifest["render_run"]["rendered_slides"])
         for slide in manifest["slides"]:
             if slide["slide"] not in rendered:
+                continue
+            if not slide["required_ai_profiles"]:
+                self.assertEqual(slide["review_method"], "automated-geometry-only")
+                self.assertEqual(slide["status"], "automation-pass")
                 continue
             slide["reviewer"] = "render-smoke"
             slide["reviewer_ref"] = "agent-render-smoke-001"
@@ -77,7 +81,7 @@ class RenderPipelineTests(unittest.TestCase):
                 for slide in manifest["slides"]
                 for capture in slide["captures"].values()
             ))
-            self.assertIn("transition:opacity .4s", deck.read_text(encoding="utf-8"))
+            self.assertIn("transition: opacity 360ms", deck.read_text(encoding="utf-8"))
             self.complete_rendered_reviews(manifest)
             manifest_path.write_text(f"{json.dumps(manifest, ensure_ascii=False, indent=2)}\n", encoding="utf-8")
             first_validation = self.validate(deck, manifest_path)
@@ -87,7 +91,9 @@ class RenderPipelineTests(unittest.TestCase):
             reused_mtime = reused_capture.stat().st_mtime_ns
             reused_hash = manifest["slides"][2]["captures"]["normal"]["sha256"]
             deck.write_text(
-                deck.read_text(encoding="utf-8").replace("한 문장으로 꽂히는", "검증 속도를 높이는", 1),
+                deck.read_text(encoding="utf-8").replace(
+                    "<!-- SLIDE_1_CONTENT -->", "<h1>Changed slide content</h1>", 1
+                ),
                 encoding="utf-8",
             )
             incremental = subprocess.run(
@@ -127,28 +133,10 @@ class RenderPipelineTests(unittest.TestCase):
             self.assertIn("without re-rendering", finalize.stdout)
             self.assertEqual(selected_capture.stat().st_mtime_ns, selected_mtime)
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            manifest["quality_score"] = {
-                "status": "pass",
-                "reviewer": "pipeline-editor",
-                "reviewer_ref": "agent-pipeline-editor-001",
-                "dimensions": {
-                    "story": 2,
-                    "art_direction": 2,
-                    "layout_rhythm": 2,
-                    "typography": 2,
-                    "imagery": 2,
-                    "composition": 2,
-                    "evidence": 2,
-                    "presentation_utility": 2,
-                },
-                "total": 16,
-                "weakest_slides": [1, 2, 3],
-                "notes": "Final rendered deck keeps readable content, coherent pacing, and stable presentation controls.",
-            }
             manifest_path.write_text(f"{json.dumps(manifest, ensure_ascii=False, indent=2)}\n", encoding="utf-8")
             final_validation = self.validate(deck, manifest_path)
             self.assertEqual(final_validation.returncode, 0, final_validation.stdout + final_validation.stderr)
-            self.assertIn("with final quality score", final_validation.stdout)
+            self.assertIn("without quality scoring", final_validation.stdout)
 
     def test_failed_image_geometry_blocks_review_batches(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

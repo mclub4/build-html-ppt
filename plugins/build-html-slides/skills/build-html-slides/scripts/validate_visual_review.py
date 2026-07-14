@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import os
 import re
 import subprocess
@@ -259,8 +258,6 @@ def validate_quality_score(
     total = sum(values)
     if score.get("total") != total:
         errors.append(f"quality_score total must equal dimension sum: {total}")
-    if mode == "quick" and (total < 16 or min(values) == 0):
-        errors.append("quick quality_score requires at least 16/24 with no zero")
     if mode == "full" and (total < 20 or min(values) < 2):
         errors.append("full quality_score requires at least 20/24 with every dimension at least 2")
     weakest = score.get("weakest_slides")
@@ -337,12 +334,16 @@ def main() -> int:
         return report([f"invalid review manifest: {exc}"])
     if not isinstance(manifest, dict):
         return report(["review manifest root must be an object"])
-    if manifest.get("schema_version") != 4:
-        errors.append("schema_version must be 4; regenerate evidence with render_slides.js")
+    if manifest.get("schema_version") != 5:
+        errors.append("schema_version must be 5; regenerate evidence with render_slides.js")
     mode = manifest.get("mode")
     if mode not in {"quick", "full"}:
         errors.append("mode must be 'quick' or 'full'")
         mode = "quick"
+    review_risk = manifest.get("review_risk")
+    if review_risk not in {"standard", "high"}:
+        errors.append("review_risk must be 'standard' or 'high'")
+        review_risk = "standard"
     phase = manifest.get("phase")
     if phase not in {"iteration", "final"}:
         errors.append("phase must be 'iteration' or 'final'")
@@ -459,6 +460,31 @@ def main() -> int:
         errors.append("automation_gate warnings must be an array")
         automation_warnings = []
 
+    expected_ai_profiles: dict[int, list[str]] = {}
+    for number in sorted(rendered_set):
+        expected_critical = number in {1, len(titles)} or bool(
+            slide_parser.slides[number - 1]["visual_critical"]
+        )
+        required_profiles: set[str] = set()
+        if mode == "full":
+            required_profiles.add("normal")
+            if responsive:
+                required_profiles.update(("tablet", "mobile"))
+        if expected_critical:
+            required_profiles.update(profiles)
+        slide_warning_profiles = {
+            warning.get("profile")
+            for warning in automation_warnings
+            if isinstance(warning, dict)
+            and warning.get("slide") == number
+            and warning.get("profile") in profiles
+        }
+        if slide_warning_profiles:
+            required_profiles.add("normal")
+            required_profiles.update(slide_warning_profiles)
+        expected_ai_profiles[number] = [profile for profile in profiles if profile in required_profiles]
+    expected_ai_slides = {number for number, required in expected_ai_profiles.items() if required}
+
     review_batches = manifest.get("review_batches")
     if not isinstance(review_batches, list):
         errors.append("review_batches must be an array")
@@ -487,8 +513,8 @@ def main() -> int:
             if number in batch_by_slide:
                 errors.append(f"slide {number} appears in more than one review batch")
             batch_by_slide[number] = (batch_id, capture_profiles.get(str(number)))
-    if set(batch_by_slide) != rendered_set:
-        errors.append("review_batches must partition the refreshed slides exactly")
+    if set(batch_by_slide) != expected_ai_slides:
+        errors.append("review_batches must partition exactly the refreshed slides routed to AI review")
 
     records = manifest.get("slides")
     if not isinstance(records, list):
@@ -530,11 +556,22 @@ def main() -> int:
 
         reviewer = str(record.get("reviewer", "")).strip()
         reviewer_ref = str(record.get("reviewer_ref", "")).strip()
-        primary_refs[number] = reviewer_ref
-        if not reviewer or len(reviewer_ref) < 8 or reviewer_ref == reviewer:
-            errors.append(f"slide {number} needs reviewer and stable reviewer_ref")
-        if record.get("review_method") != "vision-batched-full-size":
-            errors.append(f"slide {number} review_method must be 'vision-batched-full-size'")
+        current_ai_review = number in expected_ai_slides
+        current_automation_only = number in rendered_set and not current_ai_review and mode == "quick"
+        automation_only = current_automation_only or (
+            number not in rendered_set and record.get("review_method") == "automated-geometry-only"
+        )
+        if automation_only:
+            if reviewer or reviewer_ref:
+                errors.append(f"quick slide {number} routed to automation only must not claim an AI reviewer")
+            if record.get("review_method") != "automated-geometry-only":
+                errors.append(f"quick slide {number} must use automated-geometry-only review")
+        else:
+            primary_refs[number] = reviewer_ref
+            if not reviewer or len(reviewer_ref) < 8 or reviewer_ref == reviewer:
+                errors.append(f"slide {number} needs reviewer and stable reviewer_ref")
+            if record.get("review_method") != "vision-batched-full-size":
+                errors.append(f"slide {number} review_method must be 'vision-batched-full-size'")
 
         captures = record.get("captures")
         if not isinstance(captures, dict) or tuple(captures) != profiles:
@@ -610,53 +647,50 @@ def main() -> int:
             expected_critical = number in {1, len(titles)} or bool(slide_parser.slides[number - 1]["visual_critical"])
             if record.get("visual_critical") is not expected_critical:
                 errors.append(f"slide {number} visual_critical does not match the HTML/cover/closing contract")
-            required_profiles = {"normal"}
-            if responsive:
-                required_profiles.update(("tablet", "mobile"))
-            if expected_critical:
-                required_profiles.update(profiles)
-            for warning in automation_warnings:
-                if isinstance(warning, dict) and warning.get("slide") == number and warning.get("profile") in profiles:
-                    required_profiles.add(warning["profile"])
-            ordered_required = [profile for profile in profiles if profile in required_profiles]
+            ordered_required = expected_ai_profiles[number]
             if record.get("required_ai_profiles") != ordered_required:
                 errors.append(f"slide {number} required_ai_profiles do not match adaptive review routing")
-            if inspected_profiles != ordered_required:
-                errors.append(f"slide {number} AI review must inspect its adaptive profile set once")
-            batch_id, batch_profiles = batch_by_slide.get(number, ("", None))
-            if record.get("review_batch_id") != batch_id or batch_profiles != ordered_required:
-                errors.append(f"slide {number} review batch does not bind its adaptive capture set")
-            observation = record.get("observation")
-            if not valid_observation(observation):
-                errors.append(f"slide {number} needs one concrete slide-level vision observation")
+            if current_automation_only:
+                if inspected_profiles != [] or record.get("review_batch_id") or record.get("observation"):
+                    errors.append(f"quick slide {number} automation-only record must not claim vision inspection")
+                if record.get("checks") != {} or record.get("status") != "automation-pass":
+                    errors.append(f"quick slide {number} automation-only record must carry automation-pass status")
             else:
-                observations.append(observation.strip())
-            checks = record.get("checks")
-            required_checks = CHECKS_BY_CHANGE[scope]
-            if not isinstance(checks, dict) or tuple(checks) != required_checks:
-                errors.append(f"slide {number} checks must match its {scope} review scope exactly")
-            else:
-                for check in required_checks:
-                    if str(checks.get(check, "")).lower() != "pass":
-                        errors.append(f"slide {number} check did not pass: {check}")
-        if str(record.get("status", "")).lower() != "pass":
-            errors.append(f"slide {number} overall status did not pass")
+                if inspected_profiles != ordered_required:
+                    errors.append(f"slide {number} AI review must inspect its adaptive profile set once")
+                batch_id, batch_profiles = batch_by_slide.get(number, ("", None))
+                if record.get("review_batch_id") != batch_id or batch_profiles != ordered_required:
+                    errors.append(f"slide {number} review batch does not bind its adaptive capture set")
+                observation = record.get("observation")
+                if not valid_observation(observation):
+                    errors.append(f"slide {number} needs one concrete slide-level vision observation")
+                else:
+                    observations.append(observation.strip())
+                checks = record.get("checks")
+                required_checks = CHECKS_BY_CHANGE[scope]
+                if not isinstance(checks, dict) or tuple(checks) != required_checks:
+                    errors.append(f"slide {number} checks must match its {scope} review scope exactly")
+                else:
+                    for check in required_checks:
+                        if str(checks.get(check, "")).lower() != "pass":
+                            errors.append(f"slide {number} check did not pass: {check}")
+        expected_status = "automation-pass" if automation_only else "pass"
+        if str(record.get("status", "")).lower() != expected_status:
+            errors.append(f"slide {number} overall status must be {expected_status}")
     if len(observations) != len(set(observations)):
         errors.append("rendered slides must not reuse the same AI observation")
 
     distinct_primary_refs = {reference for reference in primary_refs.values() if reference}
-    minimum_reviewers = 1 if mode == "quick" else max(2, math.ceil(len(titles) / 6))
+    minimum_reviewers = 1 if mode == "quick" else (3 if review_risk == "high" else 2)
     if len(distinct_primary_refs) < minimum_reviewers:
         errors.append(f"{mode} validation requires at least {minimum_reviewers} distinct primary reviewer_ref values")
     if mode == "full" or len(distinct_primary_refs) > 1:
         for reference in distinct_primary_refs:
             assigned = sorted(number for number, value in primary_refs.items() if value == reference)
-            if len(assigned) > 6:
-                errors.append(f"reviewer_ref {reference!r} has more than six primary slides")
             if assigned and assigned != list(range(assigned[0], assigned[-1] + 1)):
                 errors.append(f"reviewer_ref {reference!r} slide assignment is not contiguous")
 
-    if phase == "final":
+    if phase == "final" and mode == "full":
         validate_quality_score(manifest, mode, len(titles), distinct_primary_refs, errors)
 
     cross_reviews = manifest.get("cross_reviews")
@@ -677,7 +711,9 @@ def main() -> int:
             continue
         cross_by_slide[number] = review
     required_cross = {1, len(titles)} | {
-        index for index, slide in enumerate(slide_parser.slides, 1) if bool(slide["critical"])
+        index
+        for index, slide in enumerate(slide_parser.slides, 1)
+        if bool(slide["critical"]) or bool(slide["visual_critical"])
     }
     if phase == "final" and mode == "full":
         for number in sorted(required_cross - set(cross_by_slide)):
@@ -718,7 +754,7 @@ def main() -> int:
         validate_current_fingerprints(args.deck.resolve(), manifest, errors)
     if errors:
         return report(errors)
-    score_message = " with final quality score" if phase == "final" else " without repeated quality scoring"
+    score_message = " with final quality score" if phase == "final" and mode == "full" else " without quality scoring"
     print(
         f"OK: {args.manifest} - {len(rendered_set)} refreshed slides use adaptive AI review in "
         f"{len(review_batches)} batch(es) with {len(profiles)} retained profiles{score_message}"

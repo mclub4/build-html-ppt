@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "scripts" / "validate_interactions.py"
-TEMPLATE = ROOT / "assets" / "presentation-template.html"
+TEMPLATE = ROOT / "assets" / "runtime-shell.html"
 
 
 class InteractionTests(unittest.TestCase):
@@ -32,7 +32,7 @@ class InteractionTests(unittest.TestCase):
 
     def test_text_arrow_navigation_fails(self) -> None:
         html = TEMPLATE.read_text(encoding="utf-8").replace(
-            '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>',
+            '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>',
             "←",
             1,
         )

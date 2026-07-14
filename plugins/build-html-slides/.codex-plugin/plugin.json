@@ -1,6 +1,6 @@
 {
   "name": "build-html-slides",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Create art-directed HTML presentations with presenter notes and adaptive visual QA.",
   "author": {
     "name": "HYUNJIN CHO",
@@ -20,7 +20,7 @@
   "interface": {
     "displayName": "Build HTML Slides",
     "shortDescription": "Create HTML decks with notes and adaptive visual QA.",
-    "longDescription": "Build offline-portable HTML presentations with audience-aware story routing, topic-aware themes, WebP imagery, presenter notes, source caching, viewport-safe scaling, crop protection, and adaptive Chromium visual review.",
+  "longDescription": "Build offline-portable HTML presentations with audience-aware story routing, a neutral 1280x720 runtime shell, topic-aware themes, WebP imagery, presenter notes, source caching, viewport-safe scaling, crop protection, and proportional Chromium visual review.",
     "developerName": "HYUNJIN CHO",
     "category": "Productivity",
     "capabilities": [

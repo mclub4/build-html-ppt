@@ -46,7 +46,8 @@ function usage(message) {
   if (message) process.stderr.write(`ERROR: ${message}\n`);
   process.stderr.write(
     'usage: node render_slides.js DECK.html REVIEW_DIR --mode quick|full '
-    + '[--slides 3,5-7] [--change-type all|text|image|navigation] [--responsive] [--final]\n'
+    + '[--review-risk standard|high] [--slides 3,5-7] '
+    + '[--change-type all|text|image|navigation] [--responsive] [--final]\n'
     + '       node render_slides.js DECK.html REVIEW_DIR --finalize\n'
     + '       node render_slides.js --check\n'
     + '       node render_slides.js --fingerprints DECK.html\n'
@@ -96,12 +97,15 @@ function parseArguments(argv) {
   let slides = null;
   let changeType = 'all';
   let responsive = false;
+  let reviewRisk = 'standard';
   let phase = 'iteration';
   let finalizeOnly = false;
   for (let index = 2; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--mode' && argv[index + 1]) {
       mode = argv[++index];
+    } else if (argument === '--review-risk' && argv[index + 1]) {
+      reviewRisk = argv[++index];
     } else if (argument === '--slides' && argv[index + 1]) {
       slides = parseSlideSelection(argv[++index]);
     } else if (argument === '--change-type' && argv[index + 1]) {
@@ -118,6 +122,7 @@ function parseArguments(argv) {
     }
   }
   if (!['quick', 'full'].includes(mode)) usage(`mode must be quick or full: ${mode}`);
+  if (!['standard', 'high'].includes(reviewRisk)) usage(`review risk must be standard or high: ${reviewRisk}`);
   if (!CHECKS_BY_CHANGE[changeType]) usage(`invalid change type: ${changeType}`);
   if (!fs.existsSync(deck) || !fs.statSync(deck).isFile()) usage(`deck not found: ${deck}`);
   const protectedPaths = new Set([path.parse(output).root, os.homedir(), process.cwd(), path.dirname(deck), deck]);
@@ -125,7 +130,7 @@ function parseArguments(argv) {
     usage(`review directory must be a dedicated disposable child path: ${output}`);
   }
   if (finalizeOnly && slides) usage('--finalize cannot be combined with --slides');
-  return { deck, output, mode, slides, changeType, responsive, phase, finalizeOnly };
+  return { deck, output, mode, reviewRisk, slides, changeType, responsive, phase, finalizeOnly };
 }
 
 function profileNames(responsive) {
@@ -261,7 +266,11 @@ async function main() {
   if ((args.slides || args.finalizeOnly) && !existing) {
     usage('--slides/--finalize requires an existing review.json from an earlier full render');
   }
-  if (args.finalizeOnly) args.responsive = existing.responsive === true;
+  if (args.finalizeOnly) {
+    args.mode = existing.mode;
+    args.responsive = existing.responsive === true;
+    args.reviewRisk = existing.review_risk || 'standard';
+  }
   const profiles = profileNames(args.responsive);
 
   const browser = await playwright.chromium.launch({ headless: true });
@@ -291,7 +300,9 @@ async function main() {
     const existingProfiles = existing ? Object.keys(existing.viewports || {}) : [];
     const existingTitles = existing?.slides?.map(record => record.title) || [];
     const compatible = existing
-      && existing.schema_version === 4
+      && existing.schema_version === 5
+      && existing.mode === args.mode
+      && existing.review_risk === args.reviewRisk
       && JSON.stringify(existingProfiles) === JSON.stringify(profiles)
       && JSON.stringify(existingTitles) === JSON.stringify(fingerprints.titles);
     const globalChanged = compatible
@@ -320,7 +331,10 @@ async function main() {
         notes: '',
       };
       fs.writeFileSync(path.join(args.output, 'review.json'), `${JSON.stringify(existing, null, 2)}\n`);
-      process.stdout.write(`OK: finalized review phase without re-rendering; complete quality_score once\n${path.join(args.output, 'review.json')}\n`);
+      const nextStep = existing.mode === 'full'
+        ? 'complete quality_score once'
+        : 'quick mode requires no quality score';
+      process.stdout.write(`OK: finalized review phase without re-rendering; ${nextStep}\n${path.join(args.output, 'review.json')}\n`);
       return;
     }
 
@@ -433,18 +447,30 @@ async function main() {
   const responsiveVisionProfiles = args.responsive ? RESPONSIVE_PROFILES : [];
   for (const number of renderedSlides) {
     const record = records[number - 1];
-    const required = new Set(['normal', ...responsiveVisionProfiles]);
+    const slideWarnings = automationWarnings.filter(warning => warning.slide === number);
+    const required = new Set();
+    if (args.mode === 'full') {
+      required.add('normal');
+      responsiveVisionProfiles.forEach(profile => required.add(profile));
+    }
     if (record.visual_critical) profiles.forEach(profile => required.add(profile));
-    automationWarnings
-      .filter(warning => warning.slide === number)
-      .forEach(warning => required.add(warning.profile));
+    if (slideWarnings.length) {
+      required.add('normal');
+      slideWarnings.forEach(warning => required.add(warning.profile));
+    }
     record.required_ai_profiles = profiles.filter(profile => required.has(profile));
+    if (args.mode === 'quick' && !record.required_ai_profiles.length) {
+      record.review_method = 'automated-geometry-only';
+      record.checks = {};
+      record.status = 'automation-pass';
+    }
   }
 
   const reviewBatches = [];
+  const aiReviewSlides = renderedSlides.filter(number => records[number - 1].required_ai_profiles.length);
   if (!automationFailures.length) {
-    for (let offset = 0; offset < renderedSlides.length; offset += REVIEW_BATCH_SIZE) {
-      const slides = renderedSlides.slice(offset, offset + REVIEW_BATCH_SIZE);
+    for (let offset = 0; offset < aiReviewSlides.length; offset += REVIEW_BATCH_SIZE) {
+      const slides = aiReviewSlides.slice(offset, offset + REVIEW_BATCH_SIZE);
       const id = `batch-${String(reviewBatches.length + 1).padStart(2, '0')}`;
       const captureProfiles = {};
       for (const number of slides) {
@@ -455,8 +481,9 @@ async function main() {
     }
   }
   const manifest = {
-    schema_version: 4,
+    schema_version: 5,
     mode: args.mode,
+    review_risk: args.reviewRisk,
     phase: args.phase,
     responsive: args.responsive,
     change_type: strategy === 'full' ? 'all' : args.changeType,

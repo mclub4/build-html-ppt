@@ -122,7 +122,7 @@ $build-html-slides
 수정된 슬라이드만 다시 렌더링해서 잘림과 비율을 꼼꼼히 검토해줘.
 ```
 
-검증을 명시하지 않은 일반 수정은 빠른 **Edit Only**로 처리합니다. "정밀 검토", "최종본", "꼼꼼히 검증"처럼 요청하면 Playwright/Chromium 준비 상태를 먼저 확인한 뒤 전체 검증 계약을 적용합니다.
+일반 수정은 새 검증 근거가 필요한 요청이 아니라면 빠른 **Edit Only**로 처리합니다. 새 덱은 단어 몇 개를 정적으로 매칭하지 않고, 사용 목적·배포 범위·결과의 중요도·원하는 속도를 종합해 Quick Draft 또는 Full Validation을 선택합니다.
 
 ## 함께 쓰면 좋은 스킬
 
@@ -139,7 +139,7 @@ npm run check
 npm run check:browser
 npm run test:unit  # 빠른 결정적 검증
 npm run test:e2e   # 실제 Chromium 렌더 파이프라인
-npm test           # 위 검증을 포함한 전체 38개 테스트
+npm test           # 위 검증을 포함한 전체 40개 테스트
 ```
 
 단독 스킬을 수정한 뒤 플러그인 배포본과 동기화합니다.

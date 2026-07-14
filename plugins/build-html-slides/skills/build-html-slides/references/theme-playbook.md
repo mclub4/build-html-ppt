@@ -90,7 +90,7 @@ For a theme like the trust-boundary reference:
 
 ## Default-template escape check
 
-Before the first render, compare the deck against `assets/presentation-template.html`.
+Before the first render, confirm that `assets/runtime-shell.html` supplied only the runtime and did not become the deck's art direction.
 
 - No demo copy remains.
 - The demo dark-blue/purple palette is gone unless the topic independently calls for it.

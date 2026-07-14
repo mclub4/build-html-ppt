@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression tests for adaptive visual-review manifest schema version 4."""
+"""Regression tests for adaptive visual-review manifest schema version 5."""
 
 from __future__ import annotations
 
@@ -85,10 +85,10 @@ class VisualReviewTests(unittest.TestCase):
     def profiles(self, responsive: bool) -> tuple[str, ...]:
         return RESPONSIVE_PROFILES if responsive else BASE_PROFILES
 
-    def reviewer_for(self, number: int, count: int, mode: str) -> tuple[str, str]:
+    def reviewer_for(self, number: int, count: int, mode: str, review_risk: str = "standard") -> tuple[str, str]:
         if mode == "quick":
             return "visual-a", "agent-ref-a"
-        groups = max(2, (count + 5) // 6)
+        groups = 3 if review_risk == "high" else 2
         group_size = (count + groups - 1) // groups
         group = min((number - 1) // group_size, groups - 1)
         letter = chr(ord("a") + group)
@@ -102,8 +102,9 @@ class VisualReviewTests(unittest.TestCase):
         responsive: bool,
         scope: str = "all",
         refreshed: bool = True,
+        review_risk: str = "standard",
     ) -> dict:
-        reviewer, reviewer_ref = self.reviewer_for(number, count, mode)
+        reviewer, reviewer_ref = self.reviewer_for(number, count, mode, review_risk)
         source_hash = hashlib.sha256(f"slide-{number}".encode()).hexdigest()
         captures = {}
         for profile in self.profiles(responsive):
@@ -168,39 +169,48 @@ class VisualReviewTests(unittest.TestCase):
         changed: list[int] | None = None,
         scope: str = "all",
         critical: int | None = None,
+        review_risk: str = "standard",
     ) -> dict:
         rendered = rendered or list(range(1, count + 1))
         requested = requested or list(rendered)
         changed = changed or list(rendered)
         rendered_set = set(rendered)
         records = [
-            self.record(number, count, mode, responsive, scope if number in rendered_set else "all", number in rendered_set)
+            self.record(
+                number, count, mode, responsive, scope if number in rendered_set else "all",
+                number in rendered_set, review_risk,
+            )
             for number in range(1, count + 1)
         ]
         profiles = self.profiles(responsive)
         for record in records:
             number = record["slide"]
             is_critical = number in {1, count} or number == critical
-            required = list(profiles) if is_critical else ["normal"]
-            if responsive and not is_critical:
-                required.extend(["tablet", "mobile"])
+            required = list(profiles) if is_critical else (["normal", *("tablet", "mobile")] if mode == "full" and responsive else (["normal"] if mode == "full" else []))
             record["visual_critical"] = is_critical
             record["required_ai_profiles"] = required
             record["inspected_profiles"] = required
+            if mode == "quick" and not required:
+                record["reviewer"] = ""
+                record["reviewer_ref"] = ""
+                record["review_method"] = "automated-geometry-only"
+                record["observation"] = ""
+                record["checks"] = {}
+                record["status"] = "automation-pass"
         slide_hashes = {str(record["slide"]): record["source_sha256"] for record in records}
         global_hash = hashlib.sha256(b"global").hexdigest()
         score_value = 2 if mode == "quick" else 3
         quality = {
-            "status": "pass" if phase == "final" else "pending",
-            "reviewer": "editor-a" if phase == "final" else "",
-            "reviewer_ref": "editor-ref-a" if phase == "final" else "",
-            "dimensions": {name: score_value if phase == "final" else 0 for name in (
+            "status": "pass" if phase == "final" and mode == "full" else "pending",
+            "reviewer": "editor-a" if phase == "final" and mode == "full" else "",
+            "reviewer_ref": "editor-ref-a" if phase == "final" and mode == "full" else "",
+            "dimensions": {name: score_value if phase == "final" and mode == "full" else 0 for name in (
                 "story", "art_direction", "layout_rhythm", "typography",
                 "imagery", "composition", "evidence", "presentation_utility",
             )},
-            "total": score_value * 8 if phase == "final" else 0,
-            "weakest_slides": list(range(1, min(3, count) + 1)) if phase == "final" else [],
-            "notes": "Final rendered deck has coherent pacing, readable evidence, and stable presentation utility." if phase == "final" else "",
+            "total": score_value * 8 if phase == "final" and mode == "full" else 0,
+            "weakest_slides": list(range(1, min(3, count) + 1)) if phase == "final" and mode == "full" else [],
+            "notes": "Final rendered deck has coherent pacing, readable evidence, and stable presentation utility." if phase == "final" and mode == "full" else "",
         }
         cross_reviews = []
         if phase == "final" and mode == "full":
@@ -209,8 +219,9 @@ class VisualReviewTests(unittest.TestCase):
                 required.add(critical)
             cross_reviews = [self.cross_review(records[number - 1], responsive) for number in sorted(required)]
         review_batches = []
-        for offset in range(0, len(rendered), 4):
-            batch_slides = rendered[offset : offset + 4]
+        ai_reviewed = [number for number in rendered if records[number - 1]["required_ai_profiles"]]
+        for offset in range(0, len(ai_reviewed), 4):
+            batch_slides = ai_reviewed[offset : offset + 4]
             batch_id = f"batch-{len(review_batches) + 1:02}"
             for number in batch_slides:
                 records[number - 1]["review_batch_id"] = batch_id
@@ -223,8 +234,9 @@ class VisualReviewTests(unittest.TestCase):
                 "status": "pending",
             })
         return {
-            "schema_version": 4,
+            "schema_version": 5,
             "mode": mode,
+            "review_risk": review_risk,
             "phase": phase,
             "responsive": responsive,
             "change_type": scope,
@@ -311,7 +323,7 @@ class VisualReviewTests(unittest.TestCase):
         deck = deck_for(2)
         result = self.validate(deck, self.manifest(deck))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("without repeated quality scoring", result.stdout)
+        self.assertIn("without quality scoring", result.stdout)
 
     def test_final_full_manifest_passes(self) -> None:
         deck = deck_for(3, critical=2)
@@ -341,8 +353,8 @@ class VisualReviewTests(unittest.TestCase):
         self.assertIn("one concrete slide-level vision observation", result.stdout)
 
     def test_adaptive_profiles_must_be_inspected_in_one_review(self) -> None:
-        deck = deck_for(3)
-        manifest = self.manifest(deck, count=3)
+        deck = deck_for(3, critical=2)
+        manifest = self.manifest(deck, count=3, critical=2)
         manifest["slides"][1]["inspected_profiles"] = ["normal", "short"]
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
@@ -391,7 +403,27 @@ class VisualReviewTests(unittest.TestCase):
         manifest["slides"][2]["checks"]["crop"] = "pass"
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("checks must match its text review scope exactly", result.stdout)
+        self.assertIn("automation-only record must carry automation-pass status", result.stdout)
+
+    def test_quick_routes_only_critical_slides_to_ai(self) -> None:
+        deck = deck_for(5)
+        manifest = self.manifest(deck, count=5)
+        self.assertEqual([batch["slides"] for batch in manifest["review_batches"]], [[1, 5]])
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_high_risk_full_requires_three_reviewers(self) -> None:
+        deck = deck_for(9)
+        manifest = self.manifest(deck, count=9, mode="full", review_risk="high")
+        manifest["slides"][6]["reviewer"] = "visual-b"
+        manifest["slides"][6]["reviewer_ref"] = "agent-ref-b"
+        manifest["slides"][7]["reviewer"] = "visual-b"
+        manifest["slides"][7]["reviewer_ref"] = "agent-ref-b"
+        manifest["slides"][8]["reviewer"] = "visual-b"
+        manifest["slides"][8]["reviewer_ref"] = "agent-ref-b"
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("requires at least 3 distinct primary reviewer_ref", result.stdout)
 
     def test_incremental_render_requires_neighbors(self) -> None:
         deck = deck_for(5)
@@ -422,7 +454,7 @@ class VisualReviewTests(unittest.TestCase):
 
     def test_final_phase_requires_quality_score(self) -> None:
         deck = deck_for(2)
-        manifest = self.manifest(deck, phase="final")
+        manifest = self.manifest(deck, mode="full", phase="final")
         manifest["quality_score"]["status"] = "pending"
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)

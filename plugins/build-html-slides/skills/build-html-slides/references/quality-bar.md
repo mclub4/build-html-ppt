@@ -63,7 +63,7 @@ Score each dimension from 0 to 3 on rendered slides.
 | Evidence | unsupported or detached | present but weak | integrated sources | evidence strengthens the visual argument |
 | Presentation utility | broken or awkward | functional | smooth controls and notes | rehearsal-ready and audience-aware |
 
-After the render/fix loop is settled, run `--finalize` and score exactly once. Quick Draft must score at least 16/24 with no zero. Full Validation must score at least 20/24 with no dimension below 2. Record all eight dimensions, the calculated total, a stable editor `reviewer_ref`, concrete notes, and the three weakest slides (or every slide when fewer than three) in `review.json`; `validate_visual_review.py` enforces the thresholds and arithmetic only in final phase. A passing structural validator does not compensate for a failing visual score.
+This rubric is used only in Full Validation. After the render/fix loop is settled, run `--finalize` and score exactly once. Require at least 20/24 with every dimension at least 2. Record all eight dimensions, the calculated total, a stable independent editor `reviewer_ref`, concrete notes, and the three weakest slides (or every slide when fewer than three) in `review.json`. Quick Draft does not calculate this score. A passing structural validator does not compensate for a failing visual score.
 
 ## Blocking quality failures
 
@@ -75,5 +75,5 @@ After the render/fix loop is settled, run `--finalize` and score exactly once. Q
 - A named mixed audience receives a generic topic order, or must endure specialist detail before understanding the shared stakes, decision, or relevance.
 - Raster assets are not WebP, except that SVG remains preferred for true vector content.
 - Reviewers approve from HTML source without inspecting settled rendered slides.
-- Any refreshed slide lacks the three default Chromium evidence profiles (plus requested responsive profiles), hash-bound metadata, a passing pre-vision text/control/image geometry gate, valid adaptive `required_ai_profiles`, review-batch membership, one full-size vision observation per slide, an assigned stable reviewer reference, or a passing change-type verdict.
+- Full Validation lacks all-slide AI coverage, or a Quick Draft AI-routed slide lacks its adaptive profiles, review-batch membership, concrete observation, stable reviewer reference, and passing change-type verdict.
 - Full Validation lacks an independent hash-bound cross-review for the cover, closing, or a marked critical visual/diagram/data slide.

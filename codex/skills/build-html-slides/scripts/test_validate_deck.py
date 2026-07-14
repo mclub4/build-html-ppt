@@ -12,7 +12,7 @@ from pathlib import Path
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 VALIDATOR = SKILL_ROOT / "scripts" / "validate_deck.py"
 GEOMETRY_CHECK = SKILL_ROOT / "scripts" / "measure_geometry.js"
-TEMPLATE = SKILL_ROOT / "assets" / "presentation-template.html"
+TEMPLATE = SKILL_ROOT / "assets" / "runtime-shell.html"
 EMPTY_MEDIA = '<div class="slide-media" aria-hidden="true"></div>'
 
 
@@ -90,7 +90,7 @@ class ValidateDeckTests(unittest.TestCase):
 
     def test_direct_inner_width_scaling_fails_even_with_visual_viewport(self) -> None:
         html = TEMPLATE.read_text(encoding="utf-8").replace(
-            "(()=>{", "(()=>{const legacyScale=Math.min(innerWidth/1920,innerHeight/1080);", 1
+            "(() => {", "(() => { const legacyScale=Math.min(innerWidth/1920,innerHeight/1080);", 1
         )
         result = self.validate(html)
         self.assertEqual(result.returncode, 1)
@@ -98,9 +98,9 @@ class ValidateDeckTests(unittest.TestCase):
 
     def test_constant_based_inner_width_scaling_fails(self) -> None:
         html = TEMPLATE.read_text(encoding="utf-8").replace(
-            "(()=>{",
-            "(()=>{const STAGE_WIDTH=1920;const STAGE_HEIGHT=1080;"
-            "const sx=window.innerWidth/STAGE_WIDTH;const sy=window.innerHeight/STAGE_HEIGHT;",
+            "(() => {",
+            "(() => { const LEGACY_WIDTH=1920;const LEGACY_HEIGHT=1080;"
+            "const sx=window.innerWidth/LEGACY_WIDTH;const sy=window.innerHeight/LEGACY_HEIGHT;",
             1,
         )
         result = self.validate(html)

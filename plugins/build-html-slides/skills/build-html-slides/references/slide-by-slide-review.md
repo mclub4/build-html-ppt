@@ -1,170 +1,65 @@
-# Slide-by-Slide Render Review
+# Slide-By-Slide Review
 
-Review settled Chromium output, not HTML source. Keep the process proportional: retain three default profiles, block AI review on deterministic geometry failures, batch up to four slides per vision call, route stress profiles adaptively, rerender incrementally after edits, and score quality once after the deck is settled.
+Read `validation-contract.md` first. That file decides which slides and profiles require AI inspection. This file explains how to inspect them and fill `review.json` without overstating evidence.
 
-## Tool preflight
+## Before Vision
 
-For Full Validation, run this before substantial work:
+Run the renderer for the selected mode. Do not open captures while `automation_gate.status` is failing. Fix text bounds, control geometry, image load/aspect/resolution, or other deterministic failures first.
 
-```bash
-node scripts/render_slides.js --check
-```
+Every slide still retains all canonical captures. Only slides listed in `review_batches` require AI review. In Quick Draft, ordinary slides without warnings remain `automated-geometry-only`; do not add reviewer labels or observations to them.
 
-If it fails, report the exact missing component and ask before installing Node.js, Playwright, Chromium, or browser dependencies. Re-run the check after an approved installation.
+## Batch Procedure
 
-## Capture profiles
+For each generated batch of at most four slides:
 
-The default evidence set is always three profiles:
+1. Open exactly the full-size PNGs listed in each slide's `required_ai_profiles`.
+2. Inspect the images, not only HTML source, a contact sheet, or DOM metrics.
+3. Keep one concrete observation and one verdict per slide, even when several profiles were opened.
+4. Copy `required_ai_profiles` to `inspected_profiles` only after actual inspection.
+5. Fill only the checks required by `review_scope`.
+6. Record a readable reviewer label and stable run-specific `reviewer_ref`.
 
-| Profile | CSS viewport | PNG | Purpose |
-|---|---:|---:|---|
-| `normal` | 1920x1080 | 1920x1080 | primary desktop composition |
-| `short` | 1366x650 | 1366x650 | browser chrome and short-height stress |
-| `zoom150` | 1280x720 | 1920x1080 | 150% zoom/display-scaling stress |
+Use contact sheets only to notice deck-wide rhythm, repetition, or density. They do not replace slide-level inspection.
 
-Only add `--responsive` when the user requests mobile/tablet support. It appends `tablet` 1024x768 and `mobile` 390x844. Do not run responsive profiles for an ordinary presentation.
+## Visual Checks
 
-The renderer disables transitions and animations only inside the Playwright validation page, waits two animation frames, and captures the settled state. The final HTML keeps its authored animations.
+For `all` scope:
 
-All three default PNGs remain evidence. AI inspects `normal` for every slide. It also inspects `short` and `zoom150` for the cover, closing, a slide explicitly marked `data-visual-critical="true"`, or a profile with an automated warning. Requested `tablet` and `mobile` profiles are always included in AI review. Use the marker only for genuinely high-risk crops, diagrams, dense data, or layout dependencies; do not mark every slide critical.
+- `crop`: meaningful content remains fully visible;
+- `aspect_ratio`: images, logos, screenshots, and diagrams are not stretched;
+- `resolution`: raster detail is adequate at displayed size;
+- `overflow`: text and components remain inside their intended regions;
+- `occlusion`: media and decoration do not obscure copy or controls;
+- `text`: copy is readable and visually coherent;
+- `text_bounds`: text remains inside its box, cell, button, badge, column, and safe area;
+- `controls`: navigation and interactive elements are centered, readable, and usable.
 
-## Initial and incremental rendering
+Text-only changes use `text` and `text_bounds`; image-only changes use crop, aspect ratio, and resolution; navigation-only changes use controls.
 
-Create the initial evidence set:
+## Concrete Observations
 
-```bash
-node scripts/render_slides.js OUTPUT.html REVIEW_DIR --mode quick
-node scripts/render_slides.js OUTPUT.html REVIEW_DIR --mode full
-```
+Write what was visibly checked on that slide. Good observations name the composition and the result, for example:
 
-After an edit, render only the changed slide and its immediate neighbors:
+> The two-line Korean title remains inside the left safe column, while the contained product image keeps all four edges and the bottom-right controls stay clear.
 
-```bash
-node scripts/render_slides.js OUTPUT.html REVIEW_DIR --mode full --slides 5 --change-type text
-node scripts/render_slides.js OUTPUT.html REVIEW_DIR --mode full --slides 5,9 --change-type image
-node scripts/render_slides.js OUTPUT.html REVIEW_DIR --mode full --slides 2 --change-type navigation
-```
+Do not reuse generic approval text across slides. Do not claim a model or person inspected evidence unless that inspection actually occurred.
 
-`--slides 5` refreshes slides 4, 5, and 6. The renderer also compares current source fingerprints with the previous manifest and automatically includes changed slides omitted from the command. A global CSS, shell, or runtime change forces a full rerender because it can affect every slide. Unchanged slide captures retain their prior PNGs and review records.
+## Fix Loop
 
-Use the narrowest truthful change type:
+After a scoped edit, rerender the changed slide and immediate neighbors with `--slides` and the matching `--change-type`. A global style/runtime change forces a full render. Reopen only the refreshed slides routed to AI review, then rerun `validate_visual_review.py`.
 
-- `text`: `text`, `text_bounds`
-- `image`: `crop`, `aspect_ratio`, `resolution`
-- `navigation`: `controls`
-- `all`: every visual check; use for initial builds, layout/theme changes, or mixed changes
+## Full Validation Final Pass
 
-## Automated gate before vision
+After all findings are settled:
 
-The renderer checks the scoped geometry before creating `review_batches`:
+1. run `--finalize`;
+2. have an independent presentation editor score the deck once with `quality-bar.md`;
+3. add independent cross-reviews for cover, closing, and explicitly critical slides;
+4. bind cross-reviews to current capture hashes;
+5. run the visual-review validator again.
 
-- `text_bounds`: rendered glyphs remain inside their slide and intended containers;
-- `controls`: navigation and counters exist, fit, and remain centered;
-- `image_geometry`: raster files load, meaningful image boxes stay in bounds, aspect ratios are not stretched, and effective pixel density is acceptable.
+Quick Draft skips quality scoring and cross-review.
 
-A gate failure exits nonzero and leaves details in `automation_gate.failures`. Fix those issues and rerender before opening any PNG. Warnings do not block review; they add the affected profile to that slide's `required_ai_profiles`.
+## Evidence Limits
 
-## Batched AI review with per-slide verdicts
-
-Use the generated `review_batches`; each contains at most four slides. A single vision call may open the listed full-size capture sets for all slides in that batch. For every slide listed in `render_run.rendered_slides`:
-
-1. Open exactly the PNGs listed in its `required_ai_profiles`.
-2. Write one concrete `observation` for that slide, even when several slides share the call.
-3. Copy `required_ai_profiles` to `inspected_profiles` after actual inspection.
-4. Pass only the checks required by that slide's `review_scope`.
-5. Set the slide `status` to `pass` only when the group is acceptable.
-
-Do not reuse one observation across slides or write one observation per profile. Geometry can reject a slide but cannot visually approve image crops, occlusion, contrast, or readability.
-
-## Evidence integrity
-
-Schema version 4 binds each capture and adaptive review route to:
-
-- its PNG SHA-256;
-- active slide number and exact `data-title`;
-- canonical viewport metadata;
-- the renderer run ID;
-- the slide source and local-asset fingerprint;
-- deterministic text/control/image geometry when required by `review_scope`;
-- a passing pre-vision automation gate;
-- a review batch ID and exact required AI profile set.
-
-`validate_visual_review.py` decodes PNGs and quickly launches Chromium only to recompute source fingerprints. It does not rerender and compare every slide. Unchanged evidence is accepted only when the slide fingerprint is unchanged and no global style/runtime fingerprint changed.
-
-## Manifest shape
-
-The renderer creates `REVIEW_DIR/review.json`. Complete the pending review fields; do not hand-create capture metadata.
-
-```json
-{
-  "schema_version": 4,
-  "mode": "full",
-  "phase": "iteration",
-  "responsive": false,
-  "change_type": "text",
-  "render_run": {
-    "strategy": "incremental",
-    "requested_slides": [5],
-    "rendered_slides": [4, 5, 6],
-    "directly_changed_slides": [5],
-    "reused_slides": [1, 2, 3, 7, 8],
-    "animations_disabled": true
-  },
-  "automation_gate": {
-    "status": "pass",
-    "checks": ["text_bounds"],
-    "failures": [],
-    "warnings": []
-  },
-  "review_batches": [{
-    "id": "batch-01",
-    "slides": [4, 5, 6],
-    "capture_profiles": {"4": ["normal"], "5": ["normal"], "6": ["normal"]}
-  }],
-  "slides": [{
-    "slide": 5,
-    "title": "Exact data-title",
-    "review_scope": "text",
-    "reviewer": "visual-a",
-    "reviewer_ref": "agent-run-visual-a",
-    "review_batch_id": "batch-01",
-    "review_method": "vision-batched-full-size",
-    "captures": {
-      "normal": {"path": "normal/slide-05.png", "sha256": "generated hash"},
-      "short": {"path": "short/slide-05.png", "sha256": "generated hash"},
-      "zoom150": {"path": "zoom150/slide-05.png", "sha256": "generated hash"}
-    },
-    "required_ai_profiles": ["normal"],
-    "inspected_profiles": ["normal"],
-    "observation": "Opened the normal render in batch-01; the revised title remains inside its intended column with clear hierarchy.",
-    "checks": {"text": "pass", "text_bounds": "pass"},
-    "status": "pass",
-    "notes": []
-  }],
-  "quality_score": {"status": "pending"}
-}
-```
-
-Validate each iteration:
-
-```bash
-python3 scripts/validate_visual_review.py OUTPUT.html REVIEW_DIR/review.json
-```
-
-## Final quality pass
-
-After all fixes and slide-level reviews pass, switch the manifest to final phase without rendering again:
-
-```bash
-node scripts/render_slides.js OUTPUT.html REVIEW_DIR --finalize
-```
-
-Then calculate the quality rubric once, fill `quality_score`, add required Full Validation cross-reviews for the cover, closing, and marked critical slides, and run the validator once more. `--finalize` refuses to proceed if the HTML, a slide, a local asset, or global runtime changed after review.
-
-## Fix loop
-
-1. Fix a failed or suspicious slide.
-2. Run `--slides` with the matching `--change-type`; immediate neighbors are included automatically.
-3. Review the refreshed slides once each and update only their records.
-4. Validate the iteration.
-5. Calculate the 24-point score only once, after `--finalize`.
+The validator checks capture origin, dimensions, PNG validity, hashes, current source fingerprints, adaptive routing, batch membership, geometry, and review-record structure. Reviewer names and observations are declarations, not cryptographic proof of a vision call. Report the result as evidence-consistent review, not independently attested inspection.
