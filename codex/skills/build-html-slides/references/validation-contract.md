@@ -4,7 +4,7 @@ This file is the single source of truth for validation modes, render profiles, A
 
 ## Choose By Intent
 
-Interpret the user's desired confidence, turnaround, distribution, and consequences. Do not classify requests with a keyword list, regular expression, or substring heuristic.
+New-deck creation requires an explicit user choice between Quick Draft and Full Validation. If the user has not already chosen, present both modes with their validation scope and relative turnaround, ask once, and stop before research, drafting, file creation, or asset generation. Do not silently infer the mode. Recognize an explicit choice from meaning and context rather than a keyword list, regular expression, or substring heuristic.
 
 | Mode | Use when | New evidence |
 | --- | --- | --- |
@@ -12,17 +12,17 @@ Interpret the user's desired confidence, turnaround, distribution, and consequen
 | Quick Draft | The user prioritizes iteration or a first usable version | Automated geometry for every slide; adaptive AI subset |
 | Full Validation | The deck is intended for delivery, publication, or a consequential decision, or strong assurance is requested | Automated geometry and AI review for every slide, independent review, final score |
 
-Ask once only when the intent remains genuinely ambiguous and the cost difference is material.
+Edit Only applies to an existing deck revision when the user asks for a change without requesting new validation evidence. It is not a substitute for asking the required new-deck mode question.
 
-## Tool Preflight
+## Tool Preflight And Installation Consent
 
-Full Validation starts with:
+After the user chooses Quick Draft or Full Validation, run this shared preflight before substantive work:
 
 ```bash
-node scripts/render_slides.js --check
+python3 scripts/check_environment.py
 ```
 
-If it fails, report the exact missing component or browser launch error. Ask before installing Node.js, Playwright, Chromium, or system dependencies. Do not claim Full Validation until the preflight passes.
+The script checks Python, Node.js, Playwright, Chromium, and screenshot capture without installing anything. If it fails, report the exact missing or incompatible components and ask whether the user wants them installed. Stop until the user gives explicit consent unless that consent was already part of the request. Do not run `npm install`, `npx playwright install`, an OS package manager, or elevated installation commands first. After approved installation, rerun the preflight. Do not begin either rendered mode until it passes.
 
 ## Validation Workspace
 

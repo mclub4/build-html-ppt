@@ -125,7 +125,7 @@ function parseArguments(argv) {
   const explicitOutput = argv[1] && !argv[1].startsWith('--');
   const output = explicitOutput ? path.resolve(argv[1]) : defaultReviewDirectory(deck);
   const optionStart = explicitOutput ? 2 : 1;
-  let mode = 'full';
+  let mode = null;
   let slides = null;
   let changeType = 'all';
   let responsive = false;
@@ -153,7 +153,8 @@ function parseArguments(argv) {
       usage(`unknown argument: ${argument}`);
     }
   }
-  if (!['quick', 'full'].includes(mode)) usage(`mode must be quick or full: ${mode}`);
+  if (mode !== null && !['quick', 'full'].includes(mode)) usage(`mode must be quick or full: ${mode}`);
+  if (!finalizeOnly && mode === null) usage('--mode quick|full is required; select the user-approved mode explicitly');
   if (!['standard', 'high'].includes(reviewRisk)) usage(`review risk must be standard or high: ${reviewRisk}`);
   if (!CHECKS_BY_CHANGE[changeType]) usage(`invalid change type: ${changeType}`);
   if (!fs.existsSync(deck) || !fs.statSync(deck).isFile()) usage(`deck not found: ${deck}`);

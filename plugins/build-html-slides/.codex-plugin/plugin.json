@@ -1,6 +1,6 @@
 {
   "name": "build-html-slides",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Create art-directed HTML presentations with presenter notes and adaptive visual QA.",
   "author": {
     "name": "HYUNJIN CHO",

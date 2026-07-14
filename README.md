@@ -198,7 +198,15 @@ $build-html-slides
 수정된 슬라이드만 다시 렌더링해서 잘림과 비율을 꼼꼼히 검토해줘.
 ```
 
-일반 수정은 새 검증 근거가 필요한 요청이 아니라면 빠른 **Edit Only**로 처리합니다. 새 덱은 단어 몇 개를 정적으로 매칭하지 않고, 사용 목적·배포 범위·결과의 중요도·원하는 속도를 종합해 Quick Draft 또는 Full Validation을 선택합니다.
+일반 수정은 새 검증 근거가 필요한 요청이 아니라면 빠른 **Edit Only**로 처리합니다. 새 덱은 사용자가 모드를 이미 지정하지 않은 이상 작업을 시작하기 전에 Quick Draft와 Full Validation의 차이를 제시하고 어떤 모드로 만들지 먼저 확인합니다.
+
+모드가 정해지면 Quick Draft와 Full Validation 모두 공통 환경 검사를 실행합니다.
+
+```bash
+python3 codex/skills/build-html-slides/scripts/check_environment.py
+```
+
+Python, Node.js, Playwright 또는 Chromium이 없거나 호환되지 않으면 누락 항목을 먼저 알리고 설치 여부를 묻습니다. 사용자가 동의하기 전에는 패키지 설치나 시스템 변경을 실행하지 않습니다.
 
 ## 작업 파일 위치
 

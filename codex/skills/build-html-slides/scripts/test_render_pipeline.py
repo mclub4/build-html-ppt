@@ -58,6 +58,19 @@ class RenderPipelineTests(unittest.TestCase):
             check=False,
         )
 
+    def test_renderer_requires_explicit_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            deck = Path(temporary) / "deck.html"
+            deck.write_text(TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 2)
+            self.assertIn("user-approved mode", render.stderr)
+
     def test_full_then_incremental_render_validates(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

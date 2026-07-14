@@ -34,15 +34,23 @@ An explicit legacy `REVIEW_DIR` remains supported when integration with another 
 
 ## Decide The Work Mode
 
-Read `references/validation-contract.md` before substantial work. Choose the mode from the user's intent and context, not from a keyword table or substring matching.
+Read `references/validation-contract.md` before substantial work.
+
+For every new deck, require an explicit mode choice before researching, drafting, creating files, or generating assets. If the user already chose Quick Draft or Full Validation, proceed with that mode. Otherwise, stop and present both options with their validation scope and relative turnaround, then ask the user to choose. Do not silently infer a mode, even when one appears likely from context. Interpret an explicit choice semantically rather than with a keyword table or substring parser.
 
 - **Edit Only**: ordinary revisions where the user primarily wants a change, not new assurance. Make the requested edit and do not create a new render or validation pass. Update notes when the story, claim, order, or talk track changed. Disclose that the revision was not re-rendered.
 - **Quick Draft**: the user prioritizes iteration, exploration, a first usable version, or short turnaround. Keep design ambition high, but use deterministic checks as the main safety net. Render every slide at the three canonical profiles; AI inspects only cover, closing, explicitly critical, and warning-triggered slides. Do not run a quality score or multi-agent final review.
 - **Full Validation**: the output is intended for real delivery, publication, a consequential decision, or the user asks for strong assurance. Render all slides, inspect every slide with AI, score the settled deck once, and use independent reviewers.
 
-Infer whether Full Validation is standard or high risk from consequences, factual uncertainty, technical or visual complexity, audience sensitivity, and distribution scope. Do not infer it from a fixed list of phrases. Standard Full Validation uses two primary reviewers; high risk uses three. If intent is genuinely ambiguous and the cost difference matters, explain the tradeoff and ask once.
+After the user chooses Full Validation, infer standard or high review risk from consequences, factual uncertainty, technical or visual complexity, audience sensitivity, and distribution scope. Standard Full Validation uses two primary reviewers; high risk uses three. Ask only if that risk level itself remains materially ambiguous.
 
-Before Full Validation, run `node scripts/render_slides.js --check`. If tooling is missing, report the exact failure and ask before installing Node.js, Playwright, Chromium, or system packages.
+After the user chooses Quick Draft or Full Validation, run this preflight before substantive work:
+
+```bash
+python3 scripts/check_environment.py
+```
+
+The preflight never installs software. If it fails, report the exact missing or incompatible components and ask whether the user wants them installed. Stop until the user answers unless the original request already gave explicit installation consent. Never run `npm install`, `npx playwright install`, an OS package manager, or elevated installation commands without that consent. Install only the approved missing components, rerun the preflight, and start deck work only after it passes.
 
 ## Build Workflow
 
@@ -129,4 +137,5 @@ For Edit Only, explicitly state that no new render or validation was run. Never 
 - `references/source-locality.md`: region-specific factual sourcing.
 - `scripts/validate_deck.py`, `validate_speaker_notes.py`, `validate_image_reuse.py`, and `validate_interactions.py`: deterministic deliverable checks.
 - `scripts/render_slides.js` and `validate_visual_review.py`: Chromium evidence and adaptive review validation.
+- `scripts/check_environment.py`: non-mutating Python, Node.js, Playwright, and Chromium preflight.
 - `scripts/source_cache.py`: hash-bound raster provenance cache.
