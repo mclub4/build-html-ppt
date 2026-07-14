@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression tests for adaptive visual-review manifest schema version 5."""
+"""Regression tests for adaptive visual-review manifest schema version 6."""
 
 from __future__ import annotations
 
@@ -28,19 +28,25 @@ PROFILE_SPECS = {
 BASE_PROFILES = ("normal", "short", "zoom150")
 RESPONSIVE_PROFILES = BASE_PROFILES + ("tablet", "mobile")
 CHECKS_BY_CHANGE = {
-    "all": ("crop", "aspect_ratio", "resolution", "overflow", "occlusion", "text", "text_bounds", "density", "controls"),
+    "all": ("crop", "aspect_ratio", "resolution", "content_match", "overflow", "occlusion", "text", "text_bounds", "density", "controls"),
     "text": ("text", "text_bounds", "density"),
-    "image": ("crop", "aspect_ratio", "resolution"),
+    "image": ("crop", "aspect_ratio", "resolution", "content_match"),
     "navigation": ("controls",),
 }
 
 
-def deck_for(count: int, critical: int | None = None) -> str:
+def checks_for(scope: str, identity: bool = False) -> tuple[str, ...]:
+    checks = CHECKS_BY_CHANGE[scope]
+    return checks + (("identity",) if identity and scope in {"all", "image"} else ())
+
+
+def deck_for(count: int, critical: int | None = None, identity: int | None = None) -> str:
     slides = []
     for number in range(1, count + 1):
         content = '<div class="diagram"></div>' if number == critical else ""
         visual_critical = ' data-visual-critical="true"' if number == critical else ""
-        slides.append(f'<section class="slide" data-title="Slide {number}"{visual_critical}>{content}</section>')
+        identity_required = ' data-identity-review="required"' if number == identity else ""
+        slides.append(f'<section class="slide" data-title="Slide {number}"{visual_critical}{identity_required}>{content}</section>')
     return f"<!doctype html><html><body>{''.join(slides)}</body></html>"
 
 
@@ -103,6 +109,7 @@ class VisualReviewTests(unittest.TestCase):
         scope: str = "all",
         refreshed: bool = True,
         review_risk: str = "standard",
+        identity: bool = False,
     ) -> dict:
         reviewer, reviewer_ref = self.reviewer_for(number, count, mode, review_risk)
         source_hash = hashlib.sha256(f"slide-{number}".encode()).hexdigest()
@@ -137,7 +144,25 @@ class VisualReviewTests(unittest.TestCase):
             "required_ai_profiles": ["normal"],
             "inspected_profiles": ["normal"],
             "observation": f"Opened slide {number} across all required profiles once; visible text, media, and controls remain clear.",
-            "checks": {name: "pass" for name in CHECKS_BY_CHANGE[scope]},
+            "identity_required": identity,
+            "identity_targets": ([{
+                "target_id": f"slide-{number}-identity-1",
+                "subject_id": "series:character-a",
+                "subject_name": "Character A / 캐릭터 A",
+                "mode": "primary",
+                "cues": ["red hair", "star-shaped badge"],
+                "asset_path": "assets/character-a.webp",
+                "asset_sha256": hashlib.sha256(b"candidate-image").hexdigest(),
+                "reference_path": "assets/identity/character-a-official.webp",
+                "reference_sha256": hashlib.sha256(b"reference-image").hexdigest(),
+            }] if identity else []),
+            "identity_review": ([{
+                "target_id": f"slide-{number}-identity-1",
+                "subject_name": "Character A / 캐릭터 A",
+                "verdict": "pass",
+                "observation": "Candidate and official reference share the red hair and star-shaped badge with no conflicting identity cues.",
+            }] if identity and scope in {"all", "image"} else []),
+            "checks": {name: "pass" for name in checks_for(scope, identity)},
             "status": "pass",
             "notes": [],
         }
@@ -154,7 +179,8 @@ class VisualReviewTests(unittest.TestCase):
             "capture_sha256": {
                 profile: record["captures"][profile]["sha256"] for profile in record["required_ai_profiles"]
             },
-            "checks": {name: "pass" for name in CHECKS_BY_CHANGE[record["review_scope"]]},
+            "checks": {name: "pass" for name in checks_for(record["review_scope"], record["identity_required"])},
+            "identity_review": json.loads(json.dumps(record["identity_review"])),
             "status": "pass",
         }
 
@@ -171,6 +197,7 @@ class VisualReviewTests(unittest.TestCase):
         scope: str = "all",
         critical: int | None = None,
         review_risk: str = "standard",
+        identity: int | None = None,
     ) -> dict:
         rendered = rendered or list(range(1, count + 1))
         requested = requested or list(rendered)
@@ -179,7 +206,7 @@ class VisualReviewTests(unittest.TestCase):
         records = [
             self.record(
                 number, count, mode, responsive, scope if number in rendered_set else "all",
-                number in rendered_set, review_risk,
+                number in rendered_set, review_risk, number == identity,
             )
             for number in range(1, count + 1)
         ]
@@ -187,7 +214,8 @@ class VisualReviewTests(unittest.TestCase):
         for record in records:
             number = record["slide"]
             is_critical = number in {1, count} or number == critical
-            required = list(profiles) if is_critical else (["normal", *("tablet", "mobile")] if mode == "full" and responsive else (["normal"] if mode == "full" else []))
+            identity_review = number == identity and record["review_scope"] in {"all", "image"}
+            required = list(profiles) if is_critical else (["normal", *("tablet", "mobile")] if mode == "full" and responsive else (["normal"] if mode == "full" or identity_review else []))
             record["visual_critical"] = is_critical
             record["required_ai_profiles"] = required
             record["inspected_profiles"] = required
@@ -235,7 +263,7 @@ class VisualReviewTests(unittest.TestCase):
                 "status": "pending",
             })
         return {
-            "schema_version": 5,
+            "schema_version": 6,
             "mode": mode,
             "review_risk": review_risk,
             "phase": phase,
@@ -294,6 +322,15 @@ class VisualReviewTests(unittest.TestCase):
             review = root / "review.json"
             deck.write_text(deck_text, encoding="utf-8")
             review.write_text(json.dumps(manifest), encoding="utf-8")
+            for record in manifest.get("slides", []):
+                for target in record.get("identity_targets", []):
+                    for kind, payload in (("asset", b"candidate-image"), ("reference", b"reference-image")):
+                        relative = target.get(f"{kind}_path")
+                        if not relative:
+                            continue
+                        identity_path = root / relative
+                        identity_path.parent.mkdir(parents=True, exist_ok=True)
+                        identity_path.write_bytes(payload)
             written: set[str] = set()
             for record in manifest.get("slides", []):
                 for profile, capture in record.get("captures", {}).items():
@@ -421,6 +458,33 @@ class VisualReviewTests(unittest.TestCase):
         self.assertEqual([batch["slides"] for batch in manifest["review_batches"]], [[1, 5]])
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_quick_routes_identity_slide_and_accepts_grounded_review(self) -> None:
+        deck = deck_for(5, identity=3)
+        manifest = self.manifest(deck, count=5, identity=3)
+        self.assertEqual([batch["slides"] for batch in manifest["review_batches"]], [[1, 3, 5]])
+        self.assertEqual(manifest["slides"][2]["required_ai_profiles"], ["normal"])
+        self.assertIn("identity", manifest["slides"][2]["checks"])
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_identity_slide_rejects_missing_target_verdict(self) -> None:
+        deck = deck_for(3, identity=2)
+        manifest = self.manifest(deck, count=3, identity=2)
+        manifest["slides"][1]["identity_review"] = []
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("must cover every identity target exactly once", result.stdout)
+
+    def test_identity_slide_rejects_candidate_as_reference(self) -> None:
+        deck = deck_for(3, identity=2)
+        manifest = self.manifest(deck, count=3, identity=2)
+        target = manifest["slides"][1]["identity_targets"][0]
+        target["reference_path"] = target["asset_path"]
+        target["reference_sha256"] = target["asset_sha256"]
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("cannot use its candidate as the reference", result.stdout)
 
     def test_high_risk_full_requires_three_reviewers(self) -> None:
         deck = deck_for(9)

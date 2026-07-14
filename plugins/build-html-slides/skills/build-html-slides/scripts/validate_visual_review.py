@@ -31,9 +31,9 @@ PROFILE_SPECS = {
 BASE_PROFILES = ("normal", "short", "zoom150")
 RESPONSIVE_PROFILES = BASE_PROFILES + ("tablet", "mobile")
 CHECKS_BY_CHANGE = {
-    "all": ("crop", "aspect_ratio", "resolution", "overflow", "occlusion", "text", "text_bounds", "density", "controls"),
+    "all": ("crop", "aspect_ratio", "resolution", "content_match", "overflow", "occlusion", "text", "text_bounds", "density", "controls"),
     "text": ("text", "text_bounds", "density"),
-    "image": ("crop", "aspect_ratio", "resolution"),
+    "image": ("crop", "aspect_ratio", "resolution", "content_match"),
     "navigation": ("controls",),
 }
 AUTOMATION_CHECKS_BY_CHANGE = {
@@ -68,6 +68,7 @@ class SlideParser(HTMLParser):
             self.current = {
                 "title": (values.get("data-title") or "").strip(),
                 "visual_critical": values.get("data-visual-critical") == "true",
+                "identity_required": values.get("data-identity-review") == "required",
             }
             self.slides.append(self.current)
             self.slide_depth = len(self.stack)
@@ -119,6 +120,100 @@ def valid_hash(value: object) -> bool:
 
 def valid_observation(value: object) -> bool:
     return isinstance(value, str) and len(value.strip()) >= 20 and len(set(value.strip().split())) >= 3
+
+
+def required_checks(scope: str, identity_required: bool) -> tuple[str, ...]:
+    checks = CHECKS_BY_CHANGE[scope]
+    if identity_required and scope in {"all", "image"}:
+        return checks + ("identity",)
+    return checks
+
+
+def validate_identity_targets(
+    record: dict,
+    deck_root: Path,
+    number: int,
+    identity_required: bool,
+    errors: list[str],
+) -> dict[str, dict]:
+    targets = record.get("identity_targets")
+    if not isinstance(targets, list):
+        errors.append(f"slide {number} identity_targets must be an array")
+        return {}
+    if not identity_required:
+        if targets or record.get("identity_review") not in ([], None):
+            errors.append(f"slide {number} without identity review must not carry identity evidence")
+        return {}
+    if not targets:
+        errors.append(f"slide {number} requires at least one identity target")
+        return {}
+
+    by_id: dict[str, dict] = {}
+    for position, target in enumerate(targets, 1):
+        if not isinstance(target, dict):
+            errors.append(f"slide {number} identity target {position} must be an object")
+            continue
+        target_id = str(target.get("target_id", "")).strip()
+        if not re.fullmatch(rf"slide-{number}-identity-[1-9]\d*", target_id) or target_id in by_id:
+            errors.append(f"slide {number} identity target {position} has an invalid or duplicate target_id")
+            continue
+        by_id[target_id] = target
+        if not str(target.get("subject_id", "")).strip() or not str(target.get("subject_name", "")).strip():
+            errors.append(f"slide {number} identity target {target_id} needs subject_id and subject_name")
+        if target.get("mode") not in {"primary", "contains"}:
+            errors.append(f"slide {number} identity target {target_id} mode must be primary or contains")
+        cues = target.get("cues")
+        if not isinstance(cues, list) or len(cues) < 2 or any(not str(cue).strip() for cue in cues):
+            errors.append(f"slide {number} identity target {target_id} needs at least two identity cues")
+
+        resolved: dict[str, Path] = {}
+        for kind in ("asset", "reference"):
+            relative = target.get(f"{kind}_path")
+            if not isinstance(relative, str) or not relative.strip():
+                errors.append(f"slide {number} identity target {target_id} is missing {kind}_path")
+                continue
+            candidate = (deck_root / relative).resolve()
+            if not candidate.is_relative_to(deck_root) or not candidate.is_file():
+                errors.append(f"slide {number} identity target {target_id} {kind}_path is not a local bundle file")
+                continue
+            resolved[kind] = candidate
+            supplied_hash = target.get(f"{kind}_sha256")
+            if not valid_hash(supplied_hash) or supplied_hash != sha256(candidate):
+                errors.append(f"slide {number} identity target {target_id} {kind}_sha256 mismatch")
+        if resolved.get("asset") == resolved.get("reference") or (
+            valid_hash(target.get("asset_sha256"))
+            and target.get("asset_sha256") == target.get("reference_sha256")
+        ):
+            errors.append(f"slide {number} identity target {target_id} cannot use its candidate as the reference")
+    return by_id
+
+
+def validate_identity_review(
+    entries: object,
+    targets: dict[str, dict],
+    number: int,
+    label: str,
+    errors: list[str],
+) -> None:
+    if not isinstance(entries, list):
+        errors.append(f"{label} slide {number} identity_review must be an array")
+        return
+    by_id = {
+        str(entry.get("target_id", "")): entry
+        for entry in entries
+        if isinstance(entry, dict)
+    }
+    if set(by_id) != set(targets) or len(entries) != len(targets):
+        errors.append(f"{label} slide {number} identity_review must cover every identity target exactly once")
+        return
+    for target_id, target in targets.items():
+        entry = by_id[target_id]
+        if entry.get("subject_name") != target.get("subject_name"):
+            errors.append(f"{label} slide {number} identity review {target_id} subject_name mismatch")
+        if str(entry.get("verdict", "")).lower() != "pass":
+            errors.append(f"{label} slide {number} identity review {target_id} did not pass")
+        if not valid_observation(entry.get("observation")):
+            errors.append(f"{label} slide {number} identity review {target_id} needs visible cue-based reasoning")
 
 
 def paeth(left: int, up: int, upper_left: int) -> int:
@@ -357,8 +452,8 @@ def main() -> int:
         return report([f"invalid review manifest: {exc}"])
     if not isinstance(manifest, dict):
         return report(["review manifest root must be an object"])
-    if manifest.get("schema_version") != 5:
-        errors.append("schema_version must be 5; regenerate evidence with render_slides.js")
+    if manifest.get("schema_version") != 6:
+        errors.append("schema_version must be 6; regenerate evidence with render_slides.js")
     mode = manifest.get("mode")
     if mode not in {"quick", "full"}:
         errors.append("mode must be 'quick' or 'full'")
@@ -495,6 +590,8 @@ def main() -> int:
                 required_profiles.update(("tablet", "mobile"))
         if expected_critical:
             required_profiles.update(profiles)
+        if bool(slide_parser.slides[number - 1]["identity_required"]) and change_type in {"all", "image"}:
+            required_profiles.add("normal")
         slide_warning_profiles = {
             warning.get("profile")
             for warning in automation_warnings
@@ -576,6 +673,12 @@ def main() -> int:
         if scope not in CHECKS_BY_CHANGE:
             errors.append(f"slide {number} review_scope must be all, text, image, or navigation")
             scope = "all"
+        expected_identity_required = bool(slide_parser.slides[number - 1]["identity_required"])
+        if record.get("identity_required") is not expected_identity_required:
+            errors.append(f"slide {number} identity_required does not match the HTML contract")
+        identity_targets = validate_identity_targets(
+            record, args.deck.parent.resolve(), number, expected_identity_required, errors
+        )
 
         reviewer = str(record.get("reviewer", "")).strip()
         reviewer_ref = str(record.get("reviewer_ref", "")).strip()
@@ -693,13 +796,19 @@ def main() -> int:
                 else:
                     observations.append(observation.strip())
                 checks = record.get("checks")
-                required_checks = CHECKS_BY_CHANGE[scope]
-                if not isinstance(checks, dict) or tuple(checks) != required_checks:
+                expected_checks = required_checks(scope, expected_identity_required)
+                if not isinstance(checks, dict) or tuple(checks) != expected_checks:
                     errors.append(f"slide {number} checks must match its {scope} review scope exactly")
                 else:
-                    for check in required_checks:
+                    for check in expected_checks:
                         if str(checks.get(check, "")).lower() != "pass":
                             errors.append(f"slide {number} check did not pass: {check}")
+                if expected_identity_required and scope in {"all", "image"}:
+                    validate_identity_review(
+                        record.get("identity_review"), identity_targets, number, "primary review", errors
+                    )
+                elif record.get("identity_review") not in ([], None):
+                    errors.append(f"slide {number} identity_review is out of scope for a {scope} change")
         expected_status = "automation-pass" if automation_only else "pass"
         if str(record.get("status", "")).lower() != expected_status:
             errors.append(f"slide {number} overall status must be {expected_status}")
@@ -768,11 +877,21 @@ def main() -> int:
             errors.append(f"cross review slide {number} capture hashes do not match current evidence")
         scope = by_number.get(number, {}).get("review_scope", "all")
         checks = review.get("checks")
-        required_checks = CHECKS_BY_CHANGE.get(scope, CHECKS_BY_CHANGE["all"])
-        if not isinstance(checks, dict) or tuple(checks) != required_checks or any(
-            str(checks.get(check, "")).lower() != "pass" for check in required_checks
+        identity_required = bool(by_number.get(number, {}).get("identity_required"))
+        expected_checks = required_checks(scope, identity_required)
+        if not isinstance(checks, dict) or tuple(checks) != expected_checks or any(
+            str(checks.get(check, "")).lower() != "pass" for check in expected_checks
         ):
             errors.append(f"cross review slide {number} checks did not pass its review scope")
+        if identity_required and scope in {"all", "image"}:
+            targets = {
+                str(target.get("target_id")): target
+                for target in by_number.get(number, {}).get("identity_targets", [])
+                if isinstance(target, dict)
+            }
+            validate_identity_review(
+                review.get("identity_review"), targets, number, "cross review", errors
+            )
         if str(review.get("status", "")).lower() != "pass":
             errors.append(f"cross review slide {number} overall status did not pass")
 

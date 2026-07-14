@@ -5,6 +5,9 @@
   const warnings = [];
   if (!active) return { ok: false, checked: 0, issues: ['Missing active slide'], warnings: [] };
 
+  const identityRequired = active.dataset.identityReview === 'required';
+  const identityModes = new Set(['primary', 'contains']);
+
   const round = value => Math.round(value * 100) / 100;
   const rendered = element => {
     const style = getComputedStyle(element);
@@ -27,13 +30,36 @@
     const name = label(element, index);
     const decorative = element.closest('[aria-hidden="true"], .slide-media') !== null
       || element.getAttribute('alt') === '';
+    const sourceUrl = element.currentSrc || element.src || element.getAttribute('href') || '';
+    const subjectId = (element.dataset.subjectId || '').trim();
+    const subjectName = (element.dataset.subjectName || '').trim();
+    const identityReference = (element.dataset.identityReference || '').trim();
+    const identityCues = (element.dataset.identityCues || '')
+      .split(';').map(value => value.trim()).filter(Boolean);
+    const identityMode = (element.dataset.identityMode || 'primary').trim();
     const item = {
       name,
       width: round(rect.width),
       height: round(rect.height),
       decorative,
       objectFit: style.objectFit || 'fill',
+      sourceUrl,
+      identity: {
+        subjectId,
+        subjectName,
+        referenceUrl: identityReference ? new URL(identityReference, document.baseURI).href : '',
+        cues: identityCues,
+        mode: identityMode,
+      },
     };
+
+    if (identityRequired && !decorative) {
+      if (!subjectId) issues.push(`${name}: identity review requires data-subject-id`);
+      if (!subjectName) issues.push(`${name}: identity review requires data-subject-name`);
+      if (!identityReference) issues.push(`${name}: identity review requires data-identity-reference`);
+      if (identityCues.length < 2) issues.push(`${name}: identity review requires at least two semicolon-separated identity cues`);
+      if (!identityModes.has(identityMode)) issues.push(`${name}: data-identity-mode must be primary or contains`);
+    }
 
     if (rect.width <= 0 || rect.height <= 0) {
       issues.push(`${name}: image has no rendered size`);
@@ -82,9 +108,14 @@
     items.push(item);
   }
 
+  if (identityRequired && !items.some(item => !item.decorative && item.identity.subjectId)) {
+    issues.push('Identity review requires at least one annotated non-decorative image');
+  }
+
   return {
     ok: issues.length === 0,
     checked: elements.length,
+    identityRequired,
     issues: [...new Set(issues)],
     warnings: [...new Set(warnings)],
     items,

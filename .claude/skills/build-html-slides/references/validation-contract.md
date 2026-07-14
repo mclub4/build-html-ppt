@@ -63,8 +63,9 @@ AI inspects only:
 - cover and closing slides;
 - slides explicitly marked `data-visual-critical="true"`;
 - slides and profiles named by automation warnings.
+- slides marked `data-identity-review="required"` for `all` or `image` review scope.
 
-Critical slides inspect every generated profile. A warning-triggered ordinary slide inspects `normal` plus the warned profiles. Other slides retain hash-bound captures and geometry results with `review_method: automated-geometry-only`; they must not claim an AI reviewer or observation.
+Critical slides inspect every generated profile. A warning-triggered ordinary slide inspects `normal` plus the warned profiles. Identity-required slides inspect at least `normal`, including Quick Draft, and require local canonical references plus per-target cue-based verdicts. Missing identity metadata or reference files blocks AI review before batching. Other slides retain hash-bound captures and geometry results with `review_method: automated-geometry-only`; they must not claim an AI reviewer or observation.
 
 Quick Draft does not calculate the 24-point quality score, run independent cross-reviews, or require multiple reviewer agents. Report the AI-inspected subset separately from all-slide automated coverage.
 

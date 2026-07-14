@@ -12,11 +12,11 @@ Every slide still retains all canonical captures. Only slides listed in `review_
 
 For each generated batch of at most four slides:
 
-1. Open exactly the full-size PNGs listed in each slide's `required_ai_profiles`.
+1. Open exactly the full-size PNGs listed in each slide's `required_ai_profiles`. When `identity_required` is true, also open every local `identity_targets[].reference_path`.
 2. Inspect the images, not only HTML source, a contact sheet, or DOM metrics.
 3. Keep one concrete observation and one verdict per slide, even when several profiles were opened.
 4. Copy `required_ai_profiles` to `inspected_profiles` only after actual inspection.
-5. Fill only the checks required by `review_scope`.
+5. Fill only the checks required by `review_scope`. Complete each `identity_review` entry from pixel comparison, never from labels or filenames.
 6. Record a readable reviewer label and stable run-specific `reviewer_ref`.
 
 Use contact sheets only to notice deck-wide rhythm, repetition, or density. They do not replace slide-level inspection.
@@ -28,14 +28,16 @@ For `all` scope:
 - `crop`: meaningful content remains fully visible;
 - `aspect_ratio`: images, logos, screenshots, and diagrams are not stretched;
 - `resolution`: raster detail is adequate at displayed size;
+- `content_match`: each meaningful image actually depicts and supports the slide's claimed subject, event, product, place, or concept; labels are not evidence;
 - `overflow`: text and components remain inside their intended regions;
 - `occlusion`: media and decoration do not obscure copy or controls;
 - `text`: copy is readable and visually coherent;
 - `text_bounds`: text remains inside its box, cell, button, badge, column, and safe area;
 - `density`: cards, panels, and decorative shapes justify their area and do not leave sparse copy stranded in oversized empty boxes;
 - `controls`: navigation and interactive elements are centered, readable, and usable.
+- `identity`: on `data-identity-review="required"` slides, every candidate matches its canonical reference and the intended character/person variant.
 
-Text-only changes use `text`, `text_bounds`, and `density`; image-only changes use crop, aspect ratio, and resolution; navigation-only changes use controls.
+Text-only changes use `text`, `text_bounds`, and `density`; image-only changes use crop, aspect ratio, resolution, and content match; navigation-only changes use controls. Identity-required `all` and `image` reviews also include `identity` and one cue-based `identity_review` entry per target.
 
 ## Concrete Observations
 

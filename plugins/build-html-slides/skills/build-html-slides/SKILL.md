@@ -89,12 +89,13 @@ Full Validation controls assurance depth, not research breadth. When a request a
 1. Inspect user-supplied assets first and copy selected files into a descriptive local assets folder.
 2. Read `references/asset-discovery.md`. For named brands, products, games, events, institutions, or projects, search official logos and factual imagery first, then widen discovery through topic-specific archives, creator accounts, visual-search platforms, social posts, photo communities, and fan communities. Do not stop after one official page or one generic image query. For fan-art-heavy work, use the search targets as checkpoints and avoid indefinite research. Preserve aspect ratio, clear space, signatures, and marks.
 3. For games, animation, characters, and fan-art-heavy decks, read `references/fan-art-budget.md`. Internal/private decks may record the discovery URL and visible creator handle without reverse-origin tracing. Public or commercial decks require verified reuse rights or a safer official, licensed, supplied, or original replacement; reduce the number of works instead of extending research beyond the agreed turnaround.
-4. Read `references/image-generation.md` when original raster imagery would improve the story. Use a configured image-generation tool only when one is available. Its absence does not fail the browser preflight or block ordinary deck work. Never install or configure a generator without consent, and do not generate fake factual products, screenshots, logos, or events.
-5. Every raster image referenced by the deliverable must be WebP. Keep SVG only for genuine vector logos, icons, and editable diagrams.
-6. Use `<img>`, `<picture>`, or SVG `<image>` with local paths. Do not hide raster ownership in global CSS backgrounds.
-7. Classify media as decorative, meaningful, or mixed. Decorative media may use `cover`; logos, title art, products, posters, screenshots, diagrams, character art, and edge-important key visuals use `contain`. Mixed media may use a covered backdrop plus a contained foreground copy.
-8. Avoid stretching and careless reuse. A continuity asset may appear twice only when the two appearances have different narrative roles and one is clearly subordinate.
-9. Maintain `sources.json` with local path, hash, source kind, URL where applicable, verification time, and credit. Run `source_cache.py --update` before researching a revision and revisit only `needs-review` records.
+4. For slides claiming a named fictional character or real person, read `references/identity-review.md`. Ground each subject with a separate official/authoritative local reference and visible cues, mark the slide `data-identity-review="required"`, and annotate every meaningful subject image. Filenames, folders, alt text, captions, and source tags are not identity evidence.
+5. Read `references/image-generation.md` when original raster imagery would improve the story. Use a configured image-generation tool only when one is available. Its absence does not fail the browser preflight or block ordinary deck work. Never install or configure a generator without consent, and do not generate fake factual products, screenshots, logos, or events.
+6. Every raster image referenced by the deliverable must be WebP. Keep SVG only for genuine vector logos, icons, and editable diagrams.
+7. Use `<img>`, `<picture>`, or SVG `<image>` with local paths. Do not hide raster ownership in global CSS backgrounds.
+8. Classify media as decorative, meaningful, or mixed. Decorative media may use `cover`; logos, title art, products, posters, screenshots, diagrams, character art, and edge-important key visuals use `contain`. Mixed media may use a covered backdrop plus a contained foreground copy.
+9. Avoid stretching and careless reuse. A continuity asset may appear twice only when the two appearances have different narrative roles and one is clearly subordinate.
+10. Maintain `sources.json` with local path, hash, source kind, URL where applicable, verification time, and credit. Run `source_cache.py --update` before researching a revision and revisit only `needs-review` records.
 
 ## Runtime And Interaction
 
@@ -136,6 +137,7 @@ For Edit Only, explicitly state that no new render or validation was run. Never 
 - `references/quality-bar.md`: full-validation scoring rubric.
 - `references/slide-by-slide-review.md`: how to inspect rendered evidence and fill review records.
 - `references/visual-qa.md`: visual defect checklist.
+- `references/identity-review.md`: canonical-reference contract for named character and person imagery.
 - `references/architecture-diagrams.md`: editable technical diagrams.
 - `references/source-locality.md`: region-specific factual sourcing.
 - `references/asset-discovery.md`: broad, topic-aware image discovery and original-source tracing.

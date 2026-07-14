@@ -38,6 +38,7 @@ Do not use the same dominant composition on three consecutive slides. Do not use
 - Use distinct assets for distinct narrative jobs. A different crop of the same image is not a new visual idea.
 - Convert every raster deliverable asset to WebP before referencing it in HTML. Keep SVG for logos, icons, and editable vector diagrams.
 - Avoid low-resolution thumbnails, screenshots with unreadable embedded text, generic stock filler, and decorative images that do not support the slide claim.
+- Reject images that do not visibly match the named subject. Character/person decks require canonical-reference comparison as defined in `identity-review.md`; metadata and source tags alone are insufficient.
 
 ## Composition checks
 
@@ -79,3 +80,4 @@ This rubric is used only in Full Validation. After the render/fix loop is settle
 - Reviewers approve from HTML source without inspecting settled rendered slides.
 - Full Validation lacks all-slide AI coverage, or a Quick Draft AI-routed slide lacks its adaptive profiles, review-batch membership, concrete observation, stable reviewer reference, and passing change-type verdict.
 - Full Validation lacks an independent hash-bound cross-review for the cover, closing, or a slide explicitly marked `data-visual-critical="true"`.
+- A named character/person slide lacks grounded identity targets, cue-based identity verdicts, or uses the wrong subject or variant.

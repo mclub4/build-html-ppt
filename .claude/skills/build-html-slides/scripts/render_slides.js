@@ -17,9 +17,9 @@ const PROFILES = {
   mobile: { viewport: [390, 844], screenshot: [390, 844], zoom: 1 },
 };
 const CHECKS_BY_CHANGE = {
-  all: ['crop', 'aspect_ratio', 'resolution', 'overflow', 'occlusion', 'text', 'text_bounds', 'density', 'controls'],
+  all: ['crop', 'aspect_ratio', 'resolution', 'content_match', 'overflow', 'occlusion', 'text', 'text_bounds', 'density', 'controls'],
   text: ['text', 'text_bounds', 'density'],
-  image: ['crop', 'aspect_ratio', 'resolution'],
+  image: ['crop', 'aspect_ratio', 'resolution', 'content_match'],
   navigation: ['controls'],
 };
 const AUTOMATION_CHECKS_BY_CHANGE = {
@@ -234,6 +234,80 @@ function hashLocalAsset(url) {
   }
 }
 
+function localAssetEvidence(url, deckDirectory) {
+  if (!url || !url.startsWith('file:')) {
+    return { error: 'identity assets must use local file URLs' };
+  }
+  try {
+    const filePath = fileURLToPath(url);
+    if (!fs.statSync(filePath).isFile()) return { error: 'identity asset is not a file' };
+    const relative = path.relative(deckDirectory, filePath);
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+      return { error: 'identity assets must stay inside the deck bundle' };
+    }
+    return {
+      path: relative.split(path.sep).join('/'),
+      sha256: sha256(fs.readFileSync(filePath)),
+    };
+  } catch (_error) {
+    return { error: 'identity asset is missing or unreadable' };
+  }
+}
+
+function checksFor(changeType, identityRequired) {
+  const checks = [...CHECKS_BY_CHANGE[changeType]];
+  if (identityRequired && ['all', 'image'].includes(changeType)) checks.push('identity');
+  return checks;
+}
+
+function bindIdentityEvidence(record, deckDirectory, profiles) {
+  const normalGeometry = record.captures.normal?.image_geometry;
+  record.identity_required = normalGeometry?.identityRequired === true;
+  record.identity_targets = [];
+  record.identity_review = [];
+  if (!record.identity_required) return;
+
+  const items = (normalGeometry?.items || []).filter(item => !item.decorative && item.identity?.subjectId);
+  for (const [index, item] of items.entries()) {
+    const asset = localAssetEvidence(item.sourceUrl, deckDirectory);
+    const reference = localAssetEvidence(item.identity.referenceUrl, deckDirectory);
+    const targetId = `slide-${record.slide}-identity-${index + 1}`;
+    const identityErrors = [];
+    if (asset.error) identityErrors.push(`${item.name}: ${asset.error}`);
+    if (reference.error) identityErrors.push(`${item.name}: reference ${reference.error}`);
+    if (!asset.error && !reference.error && asset.sha256 === reference.sha256) {
+      identityErrors.push(`${item.name}: candidate and canonical identity reference must be different files`);
+    }
+    for (const profile of profiles) {
+      const geometry = record.captures[profile]?.image_geometry;
+      if (geometry && identityErrors.length) {
+        geometry.issues = [...new Set([...(geometry.issues || []), ...identityErrors])];
+        geometry.ok = false;
+      }
+    }
+    record.identity_targets.push({
+      target_id: targetId,
+      subject_id: item.identity.subjectId,
+      subject_name: item.identity.subjectName,
+      mode: item.identity.mode,
+      cues: item.identity.cues,
+      asset_path: asset.path || '',
+      asset_sha256: asset.sha256 || '',
+      reference_path: reference.path || '',
+      reference_sha256: reference.sha256 || '',
+    });
+  }
+  if (['all', 'image'].includes(record.review_scope)) {
+    record.identity_review = record.identity_targets.map(target => ({
+      target_id: target.target_id,
+      subject_name: target.subject_name,
+      verdict: 'pending',
+      observation: '',
+    }));
+  }
+  record.checks = Object.fromEntries(checksFor(record.review_scope, record.identity_required).map(name => [name, 'pending']));
+}
+
 async function collectFingerprints(page) {
   const materials = await page.evaluate(() => {
     const slides = [...document.querySelectorAll('section.slide')];
@@ -292,7 +366,10 @@ function emptyRecord(number, title, sourceHash, changeType) {
     required_ai_profiles: [],
     inspected_profiles: [],
     observation: '',
-    checks: Object.fromEntries(CHECKS_BY_CHANGE[changeType].map(name => [name, 'pending'])),
+    identity_required: false,
+    identity_targets: [],
+    identity_review: [],
+    checks: Object.fromEntries(checksFor(changeType, false).map(name => [name, 'pending'])),
     status: 'pending',
     notes: [],
   };
@@ -361,7 +438,7 @@ async function main() {
     const existingProfiles = existing ? Object.keys(existing.viewports || {}) : [];
     const existingTitles = existing?.slides?.map(record => record.title) || [];
     const compatible = existing
-      && existing.schema_version === 5
+      && existing.schema_version === 6
       && existing.mode === args.mode
       && existing.review_risk === args.reviewRisk
       && JSON.stringify(existingProfiles) === JSON.stringify(profiles)
@@ -483,6 +560,9 @@ async function main() {
 
   const renderedSlides = [...renderTargets].sort((left, right) => left - right);
   const renderedSet = new Set(renderedSlides);
+  for (const number of renderedSlides) {
+    bindIdentityEvidence(records[number - 1], path.dirname(args.deck), profiles);
+  }
   const automationChecks = AUTOMATION_CHECKS_BY_CHANGE[strategy === 'full' ? 'all' : args.changeType];
   const automationFailures = [];
   const automationWarnings = [];
@@ -518,6 +598,7 @@ async function main() {
       responsiveVisionProfiles.forEach(profile => required.add(profile));
     }
     if (record.visual_critical) profiles.forEach(profile => required.add(profile));
+    if (record.identity_required && ['all', 'image'].includes(record.review_scope)) required.add('normal');
     if (slideWarnings.length) {
       required.add('normal');
       slideWarnings.forEach(warning => required.add(warning.profile));
@@ -545,7 +626,7 @@ async function main() {
     }
   }
   const manifest = {
-    schema_version: 5,
+    schema_version: 6,
     review_workspace: {
       storage: args.workspaceStorage,
       workspace: args.workspace,

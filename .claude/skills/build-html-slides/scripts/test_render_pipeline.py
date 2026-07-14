@@ -48,6 +48,15 @@ class RenderPipelineTests(unittest.TestCase):
                 f"Opened slide {slide['slide']} once with all current profiles; visible content and boundaries remain clear."
             )
             slide["checks"] = {name: "pass" for name in slide["checks"]}
+            slide["identity_review"] = [
+                {
+                    "target_id": target["target_id"],
+                    "subject_name": target["subject_name"],
+                    "verdict": "pass",
+                    "observation": "Candidate and canonical reference share the red hair and star badge without any conflicting character cues.",
+                }
+                for target in slide.get("identity_targets", [])
+            ]
             slide["status"] = "pass"
 
     def validate(self, deck: Path, manifest_path: Path) -> subprocess.CompletedProcess[str]:
@@ -201,6 +210,96 @@ class RenderPipelineTests(unittest.TestCase):
             self.assertEqual({warning["profile"] for warning in warnings}, {"normal", "short", "zoom150"})
             self.assertEqual(manifest["slides"][1]["required_ai_profiles"], ["normal", "short", "zoom150"])
             self.assertTrue(any(2 in batch["slides"] for batch in manifest["review_batches"]))
+
+    def test_identity_contract_binds_reference_and_routes_quick_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            assets = root / "assets"
+            identity = assets / "identity"
+            identity.mkdir(parents=True)
+            (assets / "candidate.svg").write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 400 400"><rect width="400" height="400" fill="#c33"/><circle cx="200" cy="180" r="90" fill="#fee"/></svg>',
+                encoding="utf-8",
+            )
+            (identity / "official.svg").write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 400 400"><rect width="400" height="400" fill="#933"/><circle cx="200" cy="180" r="92" fill="#ffd"/><path d="M160 90h80" stroke="#ff0" stroke-width="16"/></svg>',
+                encoding="utf-8",
+            )
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                '<section class="slide" data-title="Slide 2">',
+                '<section class="slide" data-title="Slide 2" data-identity-review="required">',
+                1,
+            ).replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                '<img src="assets/candidate.svg" alt="Character A" style="width:320px;height:320px;object-fit:contain" '
+                'data-subject-id="series:character-a" data-subject-name="Character A / 캐릭터 A" '
+                'data-identity-reference="assets/identity/official.svg" '
+                'data-identity-cues="red hair; star badge" data-identity-mode="primary">',
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(
+                render.returncode,
+                0,
+                render.stderr + (review_dir / "review.json").read_text(encoding="utf-8"),
+            )
+            manifest_path = review_dir / "review.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            record = manifest["slides"][1]
+            self.assertTrue(record["identity_required"])
+            self.assertEqual(record["required_ai_profiles"], ["normal"])
+            self.assertEqual(len(record["identity_targets"]), 1)
+            self.assertEqual(record["identity_targets"][0]["reference_path"], "assets/identity/official.svg")
+            self.assertIn("content_match", record["checks"])
+            self.assertIn("identity", record["checks"])
+            self.complete_rendered_reviews(manifest)
+            manifest_path.write_text(f"{json.dumps(manifest, ensure_ascii=False, indent=2)}\n", encoding="utf-8")
+            validation = self.validate(deck, manifest_path)
+            self.assertEqual(validation.returncode, 0, validation.stdout + validation.stderr)
+
+    def test_identity_contract_blocks_missing_reference_before_ai_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            assets = root / "assets"
+            assets.mkdir()
+            (assets / "candidate.svg").write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 400 400"><rect width="400" height="400" fill="#c33"/></svg>',
+                encoding="utf-8",
+            )
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                '<section class="slide" data-title="Slide 2">',
+                '<section class="slide" data-title="Slide 2" data-identity-review="required">',
+                1,
+            ).replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                '<img src="assets/candidate.svg" alt="Character A" style="width:320px;height:320px;object-fit:contain" '
+                'data-subject-id="series:character-a" data-subject-name="Character A" '
+                'data-identity-reference="assets/identity/missing.svg" '
+                'data-identity-cues="red hair; star badge">',
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 1)
+            self.assertIn("automated geometry gate blocked AI review", render.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["automation_gate"]["status"], "fail")
+            self.assertEqual(manifest["review_batches"], [])
 
     def test_default_workspace_stays_under_agent_home_and_can_be_cleaned(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

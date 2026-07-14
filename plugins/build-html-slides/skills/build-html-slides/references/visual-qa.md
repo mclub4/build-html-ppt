@@ -36,6 +36,8 @@ Use this checklist while inspecting the rendered slides selected by `validation-
 - Raster assets are sharp enough and stored as WebP.
 - Reused imagery serves a different narrative role and does not look like filler.
 - Sources, credits, signatures, and watermarks remain accurate.
+- Each meaningful image visibly matches the subject and narrative claim of its slide; filenames, alt text, captions, folders, and search tags are not proof.
+- Named characters and people match a separate official/authoritative reference, including the intended costume, age, form, and distinguishing traits. Uncertain identity is a failure.
 
 For games and animation, inspect official key art, wallpapers, title art, screenshots, and creator-hosted fan work against spoiler boundaries and distribution rights. Public or commercial decks require verified reuse rights or safer replacements.
 
@@ -70,4 +72,5 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - broken/missing local assets;
 - generic starter styling or repeated default composition;
 - wrong region, unsupported factual claims, or misleading provenance;
+- wrong character/person, wrong variant, unverifiable identity, or thematically inappropriate imagery;
 - stale captures presented as current evidence.
