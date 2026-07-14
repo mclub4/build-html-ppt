@@ -78,4 +78,4 @@ This rubric is used only in Full Validation. After the render/fix loop is settle
 - Raster assets are not WebP, except that SVG remains preferred for true vector content.
 - Reviewers approve from HTML source without inspecting settled rendered slides.
 - Full Validation lacks all-slide AI coverage, or a Quick Draft AI-routed slide lacks its adaptive profiles, review-batch membership, concrete observation, stable reviewer reference, and passing change-type verdict.
-- Full Validation lacks an independent hash-bound cross-review for the cover, closing, or a marked critical visual/diagram/data slide.
+- Full Validation lacks an independent hash-bound cross-review for the cover, closing, or a slide explicitly marked `data-visual-critical="true"`.

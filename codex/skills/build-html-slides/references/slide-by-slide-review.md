@@ -55,11 +55,13 @@ After all findings are settled:
 
 1. run `--finalize`;
 2. have an independent presentation editor score the deck once with `quality-bar.md`;
-3. add independent cross-reviews for cover, closing, and explicitly critical slides;
+3. add independent cross-reviews for cover, closing, and slides explicitly marked `data-visual-critical="true"`;
 4. bind cross-reviews to current capture hashes;
 5. run the visual-review validator again.
 
 Quick Draft skips quality scoring and cross-review.
+
+Image count does not create additional AI calls by itself. Inspect the rendered composition once per required slide/profile set. Do not open every fan-art source as a separate validation step, and do not infer critical status from styling classes such as `logo`, `key-visual`, `title-art`, or `diagram`.
 
 ## Evidence Limits
 

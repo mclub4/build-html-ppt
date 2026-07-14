@@ -331,6 +331,15 @@ class VisualReviewTests(unittest.TestCase):
         result = self.validate(deck, self.manifest(deck, 3, mode="full", phase="final", critical=2))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_visual_classes_do_not_implicitly_require_cross_review(self) -> None:
+        deck = deck_for(3).replace(
+            'data-title="Slide 2"></section>',
+            'data-title="Slide 2"><img class="logo key-visual" src="brand.svg"></section>',
+        )
+        manifest = self.manifest(deck, 3, mode="full", phase="final")
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_responsive_profiles_are_opt_in(self) -> None:
         deck = deck_for(2)
         result = self.validate(deck, self.manifest(deck, responsive=True))

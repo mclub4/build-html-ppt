@@ -15,6 +15,7 @@ from urllib.parse import unquote, urlparse
 RASTER_SUFFIXES = {".webp", ".png", ".jpg", ".jpeg", ".gif", ".tif", ".tiff", ".bmp", ".avif"}
 SOURCE_KINDS = {"official", "licensed", "fan-art", "generated", "supplied", "other"}
 URL_REQUIRED_KINDS = {"official", "licensed", "fan-art", "other"}
+FAN_ART_ORIGIN_STATUSES = {"origin-verified", "discovery-only"}
 
 
 class ImageParser(HTMLParser):
@@ -94,6 +95,7 @@ def update(deck: Path, cache_path: Path) -> int:
             "source_url": previous.get("source_url", ""),
             "verified_at": "",
             "credit": previous.get("credit", ""),
+            "origin_status": previous.get("origin_status", ""),
             "status": "needs-review",
         })
         changed += 1
@@ -156,6 +158,12 @@ def check(deck: Path, cache_path: Path) -> int:
             not isinstance(source_url, str) or urlparse(source_url).scheme not in {"http", "https"}
         ):
             errors.append(f"asset requires an http(s) source_url: {relative}")
+        if kind == "fan-art":
+            origin_status = entry.get("origin_status")
+            if origin_status not in FAN_ART_ORIGIN_STATUSES:
+                errors.append(f"fan-art origin_status is invalid: {relative}")
+            if not isinstance(entry.get("credit"), str) or not entry["credit"].strip():
+                errors.append(f"fan-art requires visible creator credit: {relative}")
         try:
             datetime.fromisoformat(str(entry.get("verified_at", "")).replace("Z", "+00:00"))
         except ValueError:

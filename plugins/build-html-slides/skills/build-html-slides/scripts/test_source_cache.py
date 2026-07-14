@@ -63,6 +63,30 @@ class SourceCacheTests(unittest.TestCase):
             self.assertEqual(invalidated["status"], "needs-review")
             self.assertEqual(invalidated["verified_at"], "")
 
+    def test_internal_fan_art_accepts_discovery_url_and_visible_credit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            asset_dir = root / "assets"
+            asset_dir.mkdir()
+            asset = asset_dir / "fan-art.webp"
+            asset.write_bytes(b"fan-art-webp")
+            deck = root / "deck.html"
+            deck.write_text('<section class="slide"><img src="assets/fan-art.webp" alt="Fan art"></section>', encoding="utf-8")
+            cache = root / "sources.json"
+            self.assertEqual(self.run_cache(deck, cache, "--update").returncode, 0)
+            data = json.loads(cache.read_text(encoding="utf-8"))
+            data["assets"][0].update({
+                "source_kind": "fan-art",
+                "source_url": "https://example.com/discovery-post",
+                "verified_at": datetime.now(timezone.utc).isoformat(),
+                "credit": "@visible-creator",
+                "origin_status": "discovery-only",
+                "status": "verified",
+            })
+            cache.write_text(f"{json.dumps(data, indent=2)}\n", encoding="utf-8")
+            result = self.run_cache(deck, cache, "--check")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

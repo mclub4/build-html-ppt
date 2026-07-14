@@ -1,6 +1,6 @@
 # Asset Discovery
 
-Use this reference when a deck needs photographs, illustrations, screenshots, wallpapers, historical material, fan work, memes, or visual evidence. Official assets remain the first pass, not the final boundary of discovery.
+Use this reference when a deck needs photographs, illustrations, screenshots, wallpapers, historical material, fan work, memes, or visual evidence. Official assets remain the first pass, not the final boundary of discovery. For fan-art-heavy or "as many as possible" requests, read `fan-art-budget.md` first; its time and quantity ceilings override open-ended discovery language here.
 
 ## Search Broadly By Topic
 
@@ -19,9 +19,9 @@ Use general web and image search as routing layers. Add site-specific searches w
 
 ## Platform Tactics
 
-- **Pinterest**: use visual search and related pins to discover a composition, object, creator, or earlier upload. A pin or board is often a repost, so trace the image to the creator, photographer, institution, or original publication before recording provenance.
+- **Pinterest**: use visual search and related pins to discover a composition, object, creator, or earlier upload. Under strict provenance, trace a repost to its origin. Under bounded internal/private fan-art discovery, keep the discovery URL and visible creator handle and do not start a reverse-search chain.
 - **Pixiv**: search native names and tags, combine or exclude terms, and prefer landscape/large results when the slide needs a wide visual. Preserve the artist name, work URL, signature, and stated usage conditions.
-- **X and other social platforms**: search exact phrases, account names, hashtags, event dates, and date ranges. Prefer the original account or photographer post over an aggregator screenshot.
+- **X and other social platforms**: search exact phrases, account names, hashtags, event dates, and date ranges. Prefer the original account or photographer post when it is directly available. Do not hop across platforms to prove origin in bounded internal/private mode.
 - **Instagram, Threads, Bluesky, Tumblr, Reddit, DeviantArt, ArtStation, Behance and fan communities**: use them to find creator-hosted work, event photography, memes, process images, and community context. Follow reposts back to the earliest credible source.
 - **Wikimedia Commons, Flickr Commons and Internet Archive**: inspect the per-item rights or rights statement. Collection membership alone does not guarantee unrestricted reuse.
 
@@ -29,9 +29,9 @@ Use general web and image search as routing layers. Add site-specific searches w
 
 1. Collect more candidates than the deck needs, then select for narrative role, crop safety, resolution, visual distinction, and consistency.
 2. Prefer the original downloadable file over screenshots, thumbnails, or hotlinked derivatives.
-3. Record the original item URL, creator/account, source kind, verification time, local hash, and required credit in `sources.json`.
+3. In strict mode, record the original item URL, creator/account, source kind, verification time, local hash, and required credit. In bounded internal/private fan-art mode, the discovery URL, visible creator/account, `origin_status: discovery-only`, verification time, local hash, and visible credit are sufficient.
 4. Preserve signatures and watermarks. Do not remove creator marks to make a slide cleaner.
 5. Internal or personal decks may use suitable creator-hosted fan work with visible credit when it fits the user's context. Public or commercial decks require verified reuse rights or an official, licensed, supplied, or original replacement.
 6. Convert the selected raster file to WebP and keep its original aspect ratio.
 
-Stop searching when each important visual role has at least one strong, source-traceable candidate and the selected set is varied enough that one image is not carrying the whole deck.
+Stop searching when each important visual role has at least one strong candidate and the selected set is varied enough that one image is not carrying the whole deck. Always stop earlier when the applicable fan-art time or candidate ceiling is reached.

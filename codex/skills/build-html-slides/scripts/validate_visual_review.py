@@ -46,7 +46,6 @@ QUALITY_DIMENSIONS = (
     "story", "art_direction", "layout_rhythm", "typography",
     "imagery", "composition", "evidence", "presentation_utility",
 )
-CRITICAL_CLASSES = {"key-visual", "logo", "title-art", "diagram", "ui-screenshot", "dense-data"}
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 VOID_TAGS = {
     "area", "base", "br", "col", "embed", "hr", "image", "img", "input",
@@ -68,13 +67,10 @@ class SlideParser(HTMLParser):
         if tag == "section" and "slide" in classes:
             self.current = {
                 "title": (values.get("data-title") or "").strip(),
-                "critical": False,
                 "visual_critical": values.get("data-visual-critical") == "true",
             }
             self.slides.append(self.current)
             self.slide_depth = len(self.stack)
-        elif self.current is not None and classes & CRITICAL_CLASSES:
-            self.current["critical"] = True
         if tag not in VOID_TAGS:
             self.stack.append(tag)
 
@@ -736,7 +732,7 @@ def main() -> int:
     required_cross = {1, len(titles)} | {
         index
         for index, slide in enumerate(slide_parser.slides, 1)
-        if bool(slide["critical"]) or bool(slide["visual_critical"])
+        if bool(slide["visual_critical"])
     }
     if phase == "final" and mode == "full":
         for number in sorted(required_cross - set(cross_by_slide)):

@@ -24,6 +24,12 @@ python3 scripts/check_environment.py
 
 The script checks Python, Node.js, Playwright, Chromium, and screenshot capture without installing anything. If it fails, report the exact missing or incompatible components and ask whether the user wants them installed. Stop until the user gives explicit consent unless that consent was already part of the request. Do not run `npm install`, `npx playwright install`, an OS package manager, or elevated installation commands first. After approved installation, rerun the preflight. Do not begin either rendered mode until it passes.
 
+## Turnaround Envelope
+
+Full Validation controls review depth, not research breadth. For an ordinary deck, target the documented 40-50 minute turnaround. Without explicit consent for exhaustive research, keep the entire task inside 120 minutes and reserve at least the final 35 minutes for settled rendering, batched AI inspection, fixes, final scoring, and required cross-review.
+
+For fan-art-heavy, image-collection, or "as many as possible" requests, `fan-art-budget.md` is mandatory. Stop fan-art search at 40 minutes or 50 candidates, whichever comes first, and reduce the selected quantity rather than consuming the validation reserve. Do not add auxiliary source or per-image review agents in bounded internal/private mode. If the user explicitly requests work likely to exceed two hours, explain the expected delay and obtain consent before switching to exhaustive research.
+
 ## Validation Workspace
 
 Review evidence and temporary authoring files are internal working data, not presentation deliverables. By default, the renderer stores the latest evidence for each deck at:
@@ -73,7 +79,7 @@ Choose review risk by reasoning about consequences, uncertainty, distribution, t
 
 Pass the decision to the renderer with `--review-risk standard|high`. Assign contiguous slide ranges. Vision batches contain at most four slides, independent of reviewer range size.
 
-After fixes settle, run `--finalize`, assign an independent presentation editor, calculate the quality score once, and cross-review the cover, closing, and marked critical slides with a reviewer different from each slide's primary reviewer. Unresolved high/medium findings or a failing score block delivery.
+After fixes settle, run `--finalize`, assign an independent presentation editor, calculate the quality score once, and cross-review the cover, closing, and slides explicitly marked `data-visual-critical="true"` with a reviewer different from each slide's primary reviewer. CSS classes such as `logo`, `key-visual`, `title-art`, or `diagram` do not independently expand cross-review scope. Unresolved high/medium findings or a failing score block delivery.
 
 ## Commands
 
