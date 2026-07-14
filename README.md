@@ -187,6 +187,26 @@ $build-html-slides
 
 일반 수정은 새 검증 근거가 필요한 요청이 아니라면 빠른 **Edit Only**로 처리합니다. 새 덱은 단어 몇 개를 정적으로 매칭하지 않고, 사용 목적·배포 범위·결과의 중요도·원하는 속도를 종합해 Quick Draft 또는 Full Validation을 선택합니다.
 
+## 작업 파일 위치
+
+최종 프레젠테이션 폴더에는 HTML, 발표자 노트, `sources.json`, 실제 사용 자산만 남깁니다. 렌더 캡처, 검토 매니페스트, 문구 초안, 접촉 시트 같은 작업 파일은 덱별로 다음 경로에 모입니다.
+
+```text
+~/.codex/build-html-slides/workspaces/<덱이름>-<경로해시>/
+├── review/   # Chromium 캡처와 검토 매니페스트
+├── drafts/   # 문구·구성 초안
+└── tmp/      # 접촉 시트와 임시 변환물
+```
+
+경로 확인과 정리:
+
+```bash
+node codex/skills/build-html-slides/scripts/render_slides.js --workspace-dir OUTPUT.html
+node codex/skills/build-html-slides/scripts/render_slides.js --clean-workspace OUTPUT.html
+```
+
+같은 덱을 다시 수정할 때는 최신 검토 근거를 재사용하므로 불필요한 실행별 폴더가 쌓이지 않습니다. 작업공간 루트는 `BUILD_HTML_SLIDES_WORKSPACE_ROOT`로 변경할 수 있습니다.
+
 ## 함께 쓰면 좋은 스킬
 
 한국어 슬라이드 문구와 발표 노트를 더 자연스럽게 다듬고 싶다면 [epoko77-ai/im-not-ai](https://github.com/epoko77-ai/im-not-ai)의 `humanize-korean` 스킬을 함께 쓰는 것을 권장합니다.

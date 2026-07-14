@@ -9,6 +9,7 @@ import json
 import os
 import re
 import subprocess
+import unicodedata
 import zlib
 from datetime import datetime
 from html.parser import HTMLParser
@@ -94,6 +95,19 @@ class SlideParser(HTMLParser):
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def default_review_directory(deck: Path) -> Path:
+    workspace_root = os.environ.get("BUILD_HTML_SLIDES_WORKSPACE_ROOT")
+    if workspace_root:
+        root = Path(workspace_root).expanduser().resolve()
+    else:
+        codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")).expanduser().resolve()
+        root = codex_home / "build-html-slides" / "workspaces"
+    stem = unicodedata.normalize("NFKC", deck.stem)
+    slug = re.sub(r"[^\w.-]+", "-", stem, flags=re.UNICODE).strip("-_.")[:48] or "deck"
+    path_hash = hashlib.sha256(str(deck.resolve()).encode("utf-8")).hexdigest()[:10]
+    return root / f"{slug}-{path_hash}" / "review"
 
 
 def valid_hash(value: object) -> bool:
@@ -305,8 +319,14 @@ def validate_current_fingerprints(deck: Path, manifest: dict, errors: list[str])
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("deck", type=Path)
-    parser.add_argument("manifest", type=Path)
+    parser.add_argument("manifest", type=Path, nargs="?")
     args = parser.parse_args()
+    args.deck = args.deck.expanduser().resolve()
+    args.manifest = (
+        args.manifest.expanduser().resolve()
+        if args.manifest is not None
+        else default_review_directory(args.deck) / "review.json"
+    )
     errors: list[str] = []
     if not args.deck.is_file():
         errors.append(f"deck not found: {args.deck}")

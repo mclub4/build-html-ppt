@@ -14,6 +14,24 @@ Create a self-contained presentation bundle with:
 
 Treat every slide as a fixed 16:9 presentation canvas, not a scrolling webpage. Presenter notes are mandatory for new decks in every mode.
 
+## Keep Working Files Out Of The Deliverable
+
+Do not create `review/`, `copy-draft.md`, contact sheets, render logs, or temporary screenshots beside the final deck. Resolve the deck workspace with:
+
+```bash
+node scripts/render_slides.js --workspace-dir OUTPUT.html
+```
+
+The default is `~/.codex/build-html-slides/workspaces/<deck-id>/`, with `review/`, `drafts/`, and `tmp/` beneath it. The renderer creates and reuses only the latest review evidence for that deck. Put outlines and copy drafts in `drafts/`; put contact sheets and disposable transforms in `tmp/`. `CODEX_HOME` relocates the Codex root, and `BUILD_HTML_SLIDES_WORKSPACE_ROOT` overrides this workspace root explicitly.
+
+The deliverable directory should contain only the HTML deck, presenter notes, `sources.json` when used, and assets referenced by the deck. Keep the workspace for incremental revisions. Remove it only when the user asks or the evidence is no longer needed:
+
+```bash
+node scripts/render_slides.js --clean-workspace OUTPUT.html
+```
+
+An explicit legacy `REVIEW_DIR` remains supported when integration with another system requires it.
+
 ## Decide The Work Mode
 
 Read `references/validation-contract.md` before substantial work. Choose the mode from the user's intent and context, not from a keyword table or substring matching.
@@ -36,7 +54,7 @@ Before Full Validation, run `node scripts/render_slides.js --check`. If tooling 
 6. Implement semantic `<section class="slide" data-title="…">` elements. Give every slide exactly one direct `.slide-media` and `.slide-content` child. Keep meaningful copy and non-croppable visuals in the content-safe layer.
 7. Create `OUTPUT-notes.md` from `assets/speaker-notes-template.md`. Use the exact slide number and title. Include purpose/audience, natural 30–90 second talk track, emphasis, transition, and source/caveat guidance without repeating slide text.
 8. Run only the checks required by the selected mode in `references/validation-contract.md`. Fix deterministic geometry failures before opening captures. After scoped edits, rerender only the changed slides and immediate neighbors unless global runtime or styles changed.
-9. Deliver the HTML, notes, sources cache, asset provenance, selected mode, and only the checks actually performed.
+9. Deliver the HTML, notes, sources cache, asset provenance, selected mode, and only the checks actually performed. Report the validation workspace separately; never present it as a deliverable.
 
 ## Story And Copy
 

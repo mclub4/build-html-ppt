@@ -24,6 +24,20 @@ node scripts/render_slides.js --check
 
 If it fails, report the exact missing component or browser launch error. Ask before installing Node.js, Playwright, Chromium, or system dependencies. Do not claim Full Validation until the preflight passes.
 
+## Validation Workspace
+
+Review evidence and temporary authoring files are internal working data, not presentation deliverables. By default, the renderer stores the latest evidence for each deck at:
+
+```text
+~/.codex/build-html-slides/workspaces/<deck-id>/review/
+```
+
+Use `node scripts/render_slides.js --workspace-dir OUTPUT.html` to resolve the parent workspace. Store copy drafts in `drafts/` and contact sheets or disposable transforms in `tmp/`. Do not create these files beside the final HTML. `CODEX_HOME` relocates the Codex root; `BUILD_HTML_SLIDES_WORKSPACE_ROOT` overrides the workspace root.
+
+The deck ID combines a readable filename with a hash of the absolute deck path, so decks with the same name do not collide. A full render replaces that deck's prior review directory; incremental renders reuse it. An explicit positional `REVIEW_DIR` remains supported for integrations.
+
+After evidence is no longer needed, remove the default workspace with `node scripts/render_slides.js --clean-workspace OUTPUT.html`. Do not remove it before validation or while incremental revisions are expected.
+
 ## Canonical Profiles
 
 Both rendered modes capture every slide at:
@@ -66,17 +80,17 @@ After fixes settle, run `--finalize`, assign an independent presentation editor,
 Quick Draft:
 
 ```bash
-node scripts/render_slides.js OUTPUT.html REVIEW_DIR --mode quick
-python3 scripts/validate_visual_review.py OUTPUT.html REVIEW_DIR/review.json
+node scripts/render_slides.js OUTPUT.html --mode quick
+python3 scripts/validate_visual_review.py OUTPUT.html
 ```
 
 Full Validation:
 
 ```bash
-node scripts/render_slides.js OUTPUT.html REVIEW_DIR --mode full --review-risk standard
-python3 scripts/validate_visual_review.py OUTPUT.html REVIEW_DIR/review.json
-node scripts/render_slides.js OUTPUT.html REVIEW_DIR --finalize
-python3 scripts/validate_visual_review.py OUTPUT.html REVIEW_DIR/review.json
+node scripts/render_slides.js OUTPUT.html --mode full --review-risk standard
+python3 scripts/validate_visual_review.py OUTPUT.html
+node scripts/render_slides.js OUTPUT.html --finalize
+python3 scripts/validate_visual_review.py OUTPUT.html
 ```
 
 Use `--responsive` only for requested tablet/mobile support.
@@ -86,7 +100,7 @@ Use `--responsive` only for requested tablet/mobile support.
 After the initial render, use:
 
 ```bash
-node scripts/render_slides.js OUTPUT.html REVIEW_DIR \
+node scripts/render_slides.js OUTPUT.html \
   --mode quick|full --review-risk standard|high \
   --slides N --change-type text|image|navigation|all
 ```

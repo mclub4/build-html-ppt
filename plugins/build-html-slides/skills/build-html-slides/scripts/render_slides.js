@@ -45,18 +45,48 @@ const MOTION_OVERRIDE = `
 function usage(message) {
   if (message) process.stderr.write(`ERROR: ${message}\n`);
   process.stderr.write(
-    'usage: node render_slides.js DECK.html REVIEW_DIR --mode quick|full '
+    'usage: node render_slides.js DECK.html [REVIEW_DIR] --mode quick|full '
     + '[--review-risk standard|high] [--slides 3,5-7] '
     + '[--change-type all|text|image|navigation] [--responsive] [--final]\n'
-    + '       node render_slides.js DECK.html REVIEW_DIR --finalize\n'
+    + '       node render_slides.js DECK.html [REVIEW_DIR] --finalize\n'
     + '       node render_slides.js --check\n'
     + '       node render_slides.js --fingerprints DECK.html\n'
+    + '       node render_slides.js --workspace-dir DECK.html\n'
+    + '       node render_slides.js --review-dir DECK.html\n'
+    + '       node render_slides.js --clean-workspace DECK.html\n'
   );
   process.exit(2);
 }
 
 function sha256(data) {
   return crypto.createHash('sha256').update(data).digest('hex');
+}
+
+function workspaceRoot() {
+  if (process.env.BUILD_HTML_SLIDES_WORKSPACE_ROOT) {
+    return path.resolve(process.env.BUILD_HTML_SLIDES_WORKSPACE_ROOT);
+  }
+  const codexHome = path.resolve(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'));
+  return path.join(codexHome, 'build-html-slides', 'workspaces');
+}
+
+function deckWorkspaceId(deck) {
+  const absolute = path.resolve(deck);
+  const resolved = fs.existsSync(absolute) ? fs.realpathSync.native(absolute) : absolute;
+  const stem = path.basename(resolved, path.extname(resolved)).normalize('NFKC');
+  const slug = stem
+    .replace(/[^\p{L}\p{N}._-]+/gu, '-')
+    .replace(/^[-_.]+|[-_.]+$/g, '')
+    .slice(0, 48) || 'deck';
+  return `${slug}-${sha256(resolved).slice(0, 10)}`;
+}
+
+function defaultWorkspaceDirectory(deck) {
+  return path.join(workspaceRoot(), deckWorkspaceId(deck));
+}
+
+function defaultReviewDirectory(deck) {
+  return path.join(defaultWorkspaceDirectory(deck), 'review');
 }
 
 function loadPlaywright() {
@@ -90,9 +120,11 @@ function parseSlideSelection(value) {
 }
 
 function parseArguments(argv) {
-  if (argv.length < 2) usage();
+  if (argv.length < 1) usage();
   const deck = path.resolve(argv[0]);
-  const output = path.resolve(argv[1]);
+  const explicitOutput = argv[1] && !argv[1].startsWith('--');
+  const output = explicitOutput ? path.resolve(argv[1]) : defaultReviewDirectory(deck);
+  const optionStart = explicitOutput ? 2 : 1;
   let mode = 'full';
   let slides = null;
   let changeType = 'all';
@@ -100,7 +132,7 @@ function parseArguments(argv) {
   let reviewRisk = 'standard';
   let phase = 'iteration';
   let finalizeOnly = false;
-  for (let index = 2; index < argv.length; index += 1) {
+  for (let index = optionStart; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--mode' && argv[index + 1]) {
       mode = argv[++index];
@@ -130,7 +162,19 @@ function parseArguments(argv) {
     usage(`review directory must be a dedicated disposable child path: ${output}`);
   }
   if (finalizeOnly && slides) usage('--finalize cannot be combined with --slides');
-  return { deck, output, mode, reviewRisk, slides, changeType, responsive, phase, finalizeOnly };
+  return {
+    deck,
+    output,
+    workspace: explicitOutput ? path.dirname(output) : defaultWorkspaceDirectory(deck),
+    workspaceStorage: explicitOutput ? 'explicit-review-dir' : 'codex-home',
+    mode,
+    reviewRisk,
+    slides,
+    changeType,
+    responsive,
+    phase,
+    finalizeOnly,
+  };
 }
 
 function profileNames(responsive) {
@@ -254,6 +298,10 @@ function loadExistingManifest(output) {
 
 async function main() {
   const args = parseArguments(process.argv.slice(2));
+  if (args.workspaceStorage === 'codex-home') {
+    fs.mkdirSync(path.join(args.workspace, 'drafts'), { recursive: true });
+    fs.mkdirSync(path.join(args.workspace, 'tmp'), { recursive: true });
+  }
   const playwright = loadPlaywright();
   const scriptPath = path.resolve(__filename);
   const textBoundsScript = fs.readFileSync(path.join(__dirname, 'measure_text_bounds.js'), 'utf8');
@@ -482,6 +530,12 @@ async function main() {
   }
   const manifest = {
     schema_version: 5,
+    review_workspace: {
+      storage: args.workspaceStorage,
+      workspace: args.workspace,
+      review_dir: args.output,
+      retention: 'latest-per-deck',
+    },
     mode: args.mode,
     review_risk: args.reviewRisk,
     phase: args.phase,
@@ -568,12 +622,35 @@ async function fingerprintCommand(deckArgument) {
   process.stdout.write(`${JSON.stringify(await fingerprintsForDeck(deck))}\n`);
 }
 
+function requireDeck(commandName, deckArgument) {
+  if (!deckArgument) usage(`${commandName} requires a deck path`);
+  const deck = path.resolve(deckArgument);
+  if (!fs.existsSync(deck) || !fs.statSync(deck).isFile()) usage(`deck not found: ${deck}`);
+  return deck;
+}
+
+function cleanWorkspaceCommand(deckArgument) {
+  const deck = requireDeck('--clean-workspace', deckArgument);
+  const workspace = defaultWorkspaceDirectory(deck);
+  fs.rmSync(workspace, { recursive: true, force: true });
+  process.stdout.write(`OK: removed ${workspace}\n`);
+}
+
 const command = process.argv.slice(2);
 let operation;
 if (command.length === 1 && command[0] === '--check') {
   operation = checkTools();
 } else if (command[0] === '--fingerprints') {
   operation = fingerprintCommand(command[1]);
+} else if (command[0] === '--workspace-dir') {
+  process.stdout.write(`${defaultWorkspaceDirectory(requireDeck('--workspace-dir', command[1]))}\n`);
+  operation = Promise.resolve();
+} else if (command[0] === '--review-dir') {
+  process.stdout.write(`${defaultReviewDirectory(requireDeck('--review-dir', command[1]))}\n`);
+  operation = Promise.resolve();
+} else if (command[0] === '--clean-workspace') {
+  cleanWorkspaceCommand(command[1]);
+  operation = Promise.resolve();
 } else {
   operation = main();
 }
