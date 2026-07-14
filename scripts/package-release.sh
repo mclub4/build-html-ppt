@@ -21,6 +21,7 @@ dist = root / "dist"
 archives = [
     (root / "codex/skills/build-html-slides", dist / f"BUILD-HTML-SLIDES-CODEX-SKILL-v{version}.zip"),
     (root / "plugins/build-html-slides", dist / f"BUILD-HTML-SLIDES-CODEX-PLUGIN-v{version}.zip"),
+    (root / ".claude/skills/build-html-slides", dist / f"BUILD-HTML-SLIDES-CLAUDE-SKILL-v{version}.zip"),
 ]
 
 for source, archive in archives:
@@ -28,8 +29,24 @@ for source, archive in archives:
         for path in sorted(source.rglob("*")):
             if path.is_file() and path.suffix != ".pyc" and "__pycache__" not in path.parts:
                 output.write(path, Path(source.name) / path.relative_to(source))
+
+claude_archive = dist / f"BUILD-HTML-SLIDES-CLAUDE-PLUGIN-v{version}.zip"
+with zipfile.ZipFile(claude_archive, "w", compression=zipfile.ZIP_DEFLATED) as output:
+    mappings = [
+        (root / ".claude-plugin", Path("build-html-slides/.claude-plugin")),
+        (root / ".claude/skills/build-html-slides", Path("build-html-slides/.claude/skills/build-html-slides")),
+        (root / "agents", Path("build-html-slides/agents")),
+    ]
+    for source, prefix in mappings:
+        for path in sorted(source.rglob("*")):
+            if path.is_file() and path.suffix != ".pyc" and "__pycache__" not in path.parts:
+                output.write(path, prefix / path.relative_to(source))
+    for filename in ("LICENSE", "THIRD_PARTY_NOTICES.md"):
+        output.write(root / filename, Path("build-html-slides") / filename)
 PY
 
-printf 'Created:\n  %s\n  %s\n' \
+printf 'Created:\n  %s\n  %s\n  %s\n  %s\n' \
   "$DIST/BUILD-HTML-SLIDES-CODEX-SKILL-v$VERSION.zip" \
-  "$DIST/BUILD-HTML-SLIDES-CODEX-PLUGIN-v$VERSION.zip"
+  "$DIST/BUILD-HTML-SLIDES-CODEX-PLUGIN-v$VERSION.zip" \
+  "$DIST/BUILD-HTML-SLIDES-CLAUDE-SKILL-v$VERSION.zip" \
+  "$DIST/BUILD-HTML-SLIDES-CLAUDE-PLUGIN-v$VERSION.zip"

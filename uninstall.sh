@@ -2,31 +2,57 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOURCE="$REPO/codex/skills/build-html-slides"
+CLAUDE_HOME="${CLAUDE_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
-DEST="$CODEX_HOME/skills/build-html-slides"
+DO_CLAUDE=1
+DO_CODEX=1
 DRY_RUN=0
 
-case "${1:-}" in
-  --dry-run) DRY_RUN=1 ;;
-  -h|--help) echo "Usage: ./uninstall.sh [--dry-run]"; exit 0 ;;
-  "") ;;
-  *) echo "Unknown option: $1" >&2; exit 2 ;;
-esac
-
-remove_path() {
-  echo "+ rm -rf $DEST"
-  [ "$DRY_RUN" -eq 1 ] || rm -rf "$DEST"
+usage() {
+  echo "Usage: ./uninstall.sh [--claude-only|--codex-only] [--dry-run]"
 }
 
-if [ -L "$DEST" ] && [ "$(readlink "$DEST")" = "$SOURCE" ]; then
-  remove_path
-elif [ -f "$DEST/.build-html-slides-copy-origin" ] &&
-  [ "$(cat "$DEST/.build-html-slides-copy-origin")" = "$REPO" ]; then
-  remove_path
-elif [ -e "$DEST" ] || [ -L "$DEST" ]; then
-  echo "Skipped unrelated installation: $DEST"
-else
-  echo "Nothing to remove: $DEST"
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --claude-only) DO_CLAUDE=1; DO_CODEX=0 ;;
+    --codex-only) DO_CLAUDE=0; DO_CODEX=1 ;;
+    --dry-run) DRY_RUN=1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
+  esac
+  shift
+done
+
+remove_owned() {
+  local source="$1" dest="$2" kind="$3" marker
+  if [ "$kind" = "dir" ]; then
+    marker="$dest/.build-html-slides-copy-origin"
+  else
+    marker="$dest.build-html-slides-origin"
+  fi
+
+  if { [ -L "$dest" ] && [ "$(readlink "$dest")" = "$source" ]; } ||
+     { [ -f "$marker" ] && [ "$(cat "$marker")" = "$REPO" ]; }; then
+    echo "+ rm -rf $dest"
+    [ "$DRY_RUN" -eq 1 ] || rm -rf "$dest"
+    if [ "$kind" = "file" ]; then
+      echo "+ rm -f $marker"
+      [ "$DRY_RUN" -eq 1 ] || rm -f "$marker"
+    fi
+  elif [ -e "$dest" ] || [ -L "$dest" ]; then
+    echo "Skipped unrelated installation: $dest"
+  else
+    echo "Nothing to remove: $dest"
+  fi
+}
+
+if [ "$DO_CLAUDE" -eq 1 ]; then
+  remove_owned "$REPO/.claude/skills/build-html-slides" "$CLAUDE_HOME/skills/build-html-slides" dir
+  for agent in "$REPO"/agents/build-html-slides-*.md; do
+    remove_owned "$agent" "$CLAUDE_HOME/agents/$(basename "$agent")" file
+  done
 fi
 
+if [ "$DO_CODEX" -eq 1 ]; then
+  remove_owned "$REPO/codex/skills/build-html-slides" "$CODEX_HOME/skills/build-html-slides" dir
+fi

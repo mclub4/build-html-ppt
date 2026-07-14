@@ -202,7 +202,7 @@ class RenderPipelineTests(unittest.TestCase):
             self.assertEqual(manifest["slides"][1]["required_ai_profiles"], ["normal", "short", "zoom150"])
             self.assertTrue(any(2 in batch["slides"] for batch in manifest["review_batches"]))
 
-    def test_default_workspace_stays_under_codex_home_and_can_be_cleaned(self) -> None:
+    def test_default_workspace_stays_under_agent_home_and_can_be_cleaned(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             delivery = root / "delivery"
@@ -250,7 +250,7 @@ class RenderPipelineTests(unittest.TestCase):
 
             manifest_path = review_dir / "review.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self.assertEqual(manifest["review_workspace"]["storage"], "codex-home")
+            self.assertEqual(manifest["review_workspace"]["storage"], "agent-home")
             self.complete_rendered_reviews(manifest)
             manifest_path.write_text(f"{json.dumps(manifest, ensure_ascii=False, indent=2)}\n", encoding="utf-8")
             validation = subprocess.run(
@@ -271,6 +271,25 @@ class RenderPipelineTests(unittest.TestCase):
             )
             self.assertEqual(clean.returncode, 0, clean.stderr)
             self.assertFalse(review_dir.parent.exists())
+
+    def test_claude_config_dir_selects_claude_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "claude-deck.html"
+            deck.write_text(TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+            claude_home = root / "claude-home"
+            env = {key: value for key, value in os.environ.items() if key != "CODEX_HOME"}
+            env["CLAUDE_CONFIG_DIR"] = str(claude_home)
+
+            lookup = subprocess.run(
+                ["node", str(RENDERER), "--workspace-dir", str(deck)],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=env,
+            )
+            self.assertEqual(lookup.returncode, 0, lookup.stderr)
+            self.assertTrue(Path(lookup.stdout.strip()).is_relative_to(claude_home))
 
 
 if __name__ == "__main__":

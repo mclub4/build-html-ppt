@@ -66,8 +66,19 @@ function workspaceRoot() {
   if (process.env.BUILD_HTML_SLIDES_WORKSPACE_ROOT) {
     return path.resolve(process.env.BUILD_HTML_SLIDES_WORKSPACE_ROOT);
   }
-  const codexHome = path.resolve(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'));
-  return path.join(codexHome, 'build-html-slides', 'workspaces');
+  let agentHome;
+  if (process.env.BUILD_HTML_SLIDES_AGENT_HOME) {
+    agentHome = process.env.BUILD_HTML_SLIDES_AGENT_HOME;
+  } else if (process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_HOME) {
+    agentHome = process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_HOME;
+  } else {
+    const scriptParts = fs.realpathSync.native(__filename).split(path.sep);
+    const runsFromClaude = scriptParts.includes('.claude');
+    agentHome = runsFromClaude
+      ? path.join(os.homedir(), '.claude')
+      : (process.env.CODEX_HOME || path.join(os.homedir(), '.codex'));
+  }
+  return path.join(path.resolve(agentHome), 'build-html-slides', 'workspaces');
 }
 
 function deckWorkspaceId(deck) {
@@ -167,7 +178,7 @@ function parseArguments(argv) {
     deck,
     output,
     workspace: explicitOutput ? path.dirname(output) : defaultWorkspaceDirectory(deck),
-    workspaceStorage: explicitOutput ? 'explicit-review-dir' : 'codex-home',
+    workspaceStorage: explicitOutput ? 'explicit-review-dir' : 'agent-home',
     mode,
     reviewRisk,
     slides,
@@ -299,7 +310,7 @@ function loadExistingManifest(output) {
 
 async function main() {
   const args = parseArguments(process.argv.slice(2));
-  if (args.workspaceStorage === 'codex-home') {
+  if (args.workspaceStorage === 'agent-home') {
     fs.mkdirSync(path.join(args.workspace, 'drafts'), { recursive: true });
     fs.mkdirSync(path.join(args.workspace, 'tmp'), { recursive: true });
   }

@@ -98,8 +98,15 @@ def default_review_directory(deck: Path) -> Path:
     if workspace_root:
         root = Path(workspace_root).expanduser().resolve()
     else:
-        codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")).expanduser().resolve()
-        root = codex_home / "build-html-slides" / "workspaces"
+        agent_home = os.environ.get("BUILD_HTML_SLIDES_AGENT_HOME")
+        if not agent_home:
+            agent_home = os.environ.get("CLAUDE_CONFIG_DIR") or os.environ.get("CLAUDE_HOME")
+        if not agent_home:
+            runs_from_claude = ".claude" in Path(__file__).resolve().parts
+            agent_home = Path.home() / (".claude" if runs_from_claude else ".codex")
+            if not runs_from_claude:
+                agent_home = os.environ.get("CODEX_HOME", agent_home)
+        root = Path(agent_home).expanduser().resolve() / "build-html-slides" / "workspaces"
     stem = unicodedata.normalize("NFKC", deck.stem)
     slug = re.sub(r"[^\w.-]+", "-", stem, flags=re.UNICODE).strip("-_.")[:48] or "deck"
     path_hash = hashlib.sha256(str(deck.resolve()).encode("utf-8")).hexdigest()[:10]

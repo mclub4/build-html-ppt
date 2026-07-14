@@ -1,8 +1,8 @@
 {
   "name": "build-html-slides",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "private": true,
-  "description": "Codex skill and plugin for art-directed, validated HTML presentations.",
+  "description": "Codex and Claude Code skills for art-directed, validated HTML presentations.",
   "license": "MIT",
   "engines": {
     "node": ">=18"

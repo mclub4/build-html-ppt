@@ -11,6 +11,9 @@ ROOT = Path(__file__).resolve().parent.parent
 STANDALONE = ROOT / "codex/skills/build-html-slides"
 PLUGIN_ROOT = ROOT / "plugins/build-html-slides"
 PLUGIN_SKILL = PLUGIN_ROOT / "skills/build-html-slides"
+CLAUDE_SKILL = ROOT / ".claude/skills/build-html-slides"
+CLAUDE_PLUGIN = ROOT / ".claude-plugin/plugin.json"
+CLAUDE_MARKETPLACE = ROOT / ".claude-plugin/marketplace.json"
 
 
 def digest(path: Path) -> str:
@@ -36,13 +39,15 @@ def require(condition: bool, message: str) -> None:
 def main() -> None:
     require((STANDALONE / "SKILL.md").is_file(), "standalone SKILL.md is missing")
     require((PLUGIN_SKILL / "SKILL.md").is_file(), "plugin SKILL.md is missing")
+    require((CLAUDE_SKILL / "SKILL.md").is_file(), "Claude SKILL.md is missing")
     require(tree_hashes(STANDALONE) == tree_hashes(PLUGIN_SKILL), "skill distributions differ")
+    require(tree_hashes(STANDALONE) == tree_hashes(CLAUDE_SKILL), "Claude skill distribution differs")
 
     license_file = ROOT / "LICENSE"
     notices_file = ROOT / "THIRD_PARTY_NOTICES.md"
     require(license_file.is_file(), "root LICENSE is missing")
     require(notices_file.is_file(), "root THIRD_PARTY_NOTICES.md is missing")
-    for distribution in (STANDALONE, PLUGIN_ROOT):
+    for distribution in (STANDALONE, CLAUDE_SKILL, PLUGIN_ROOT):
         require((distribution / "LICENSE").is_file(), f"{distribution} LICENSE is missing")
         require(digest(distribution / "LICENSE") == digest(license_file), f"{distribution} LICENSE differs")
         require((distribution / "THIRD_PARTY_NOTICES.md").is_file(), f"{distribution} third-party notices are missing")
@@ -54,6 +59,8 @@ def main() -> None:
     package = json.loads((ROOT / "package.json").read_text())
     plugin = json.loads((PLUGIN_ROOT / ".codex-plugin/plugin.json").read_text())
     marketplace = json.loads((ROOT / ".agents/plugins/marketplace.json").read_text())
+    claude_plugin = json.loads(CLAUDE_PLUGIN.read_text())
+    claude_marketplace = json.loads(CLAUDE_MARKETPLACE.read_text())
 
     require(plugin["name"] == "build-html-slides", "plugin name mismatch")
     require(plugin["version"] == package["version"], "package and plugin versions differ")
@@ -68,7 +75,26 @@ def main() -> None:
     require(isinstance(prompts, list) and 1 <= len(prompts) <= 3, "defaultPrompt must contain 1-3 prompts")
     require(all(len(prompt) <= 128 for prompt in prompts), "defaultPrompt exceeds 128 characters")
 
-    print(f"Repository validation passed ({len(tree_hashes(STANDALONE))} skill files).")
+    require(claude_plugin["name"] == plugin["name"], "Claude plugin name mismatch")
+    require(claude_plugin["version"] == package["version"], "package and Claude plugin versions differ")
+    require(claude_plugin.get("license") == "MIT", "Claude plugin license must be MIT")
+    require(claude_plugin.get("skills") == ["./.claude/skills/"], "Claude plugin skill path mismatch")
+    require(claude_marketplace.get("name") == "build-html-slides", "Claude marketplace name mismatch")
+    require(claude_marketplace.get("metadata", {}).get("version") == package["version"], "Claude marketplace version mismatch")
+    claude_entries = claude_marketplace.get("plugins", [])
+    require(len(claude_entries) == 1, "Claude marketplace must contain one plugin")
+    require(claude_entries[0].get("name") == claude_plugin["name"], "Claude marketplace plugin mismatch")
+    require(claude_entries[0].get("version") == package["version"], "Claude marketplace plugin version mismatch")
+
+    agents = sorted((ROOT / "agents").glob("build-html-slides-*.md"))
+    require(len(agents) == 2, "Claude plugin must contain two review agents")
+    for agent in agents:
+        content = agent.read_text(encoding="utf-8")
+        require(content.startswith("---\n"), f"Claude agent frontmatter missing: {agent.name}")
+        require(re.search(r"^name: build-html-slides-[a-z-]+$", content, re.MULTILINE) is not None, f"Claude agent name invalid: {agent.name}")
+        require("model: inherit" in content, f"Claude agent must inherit the session model: {agent.name}")
+
+    print(f"Repository validation passed ({len(tree_hashes(STANDALONE))} shared skill files).")
 
 
 if __name__ == "__main__":

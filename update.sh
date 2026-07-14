@@ -2,8 +2,8 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLAUDE_HOME="${CLAUDE_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
-DEST="$CODEX_HOME/skills/build-html-slides"
 CHECK_ONLY=0
 
 case "${1:-}" in
@@ -39,15 +39,23 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
   exit 10
 fi
 
-COPY_MODE=0
-if [ -f "$DEST/.build-html-slides-copy-origin" ] &&
-  [ "$(cat "$DEST/.build-html-slides-copy-origin")" = "$REPO" ]; then
-  COPY_MODE=1
+CLAUDE_COPY=0
+CODEX_COPY=0
+if [ -f "$CLAUDE_HOME/skills/build-html-slides/.build-html-slides-copy-origin" ] &&
+   [ "$(cat "$CLAUDE_HOME/skills/build-html-slides/.build-html-slides-copy-origin")" = "$REPO" ]; then
+  CLAUDE_COPY=1
+fi
+if [ -f "$CODEX_HOME/skills/build-html-slides/.build-html-slides-copy-origin" ] &&
+   [ "$(cat "$CODEX_HOME/skills/build-html-slides/.build-html-slides-copy-origin")" = "$REPO" ]; then
+  CODEX_COPY=1
 fi
 
 git -C "$REPO" pull --ff-only
-if [ "$COPY_MODE" -eq 1 ]; then
-  "$REPO/install.sh" --copy
+if [ "$CLAUDE_COPY" -eq 1 ]; then
+  "$REPO/install.sh" --copy --claude-only
 fi
-echo "Updated to $(git -C "$REPO" rev-parse --short HEAD). Start a new Codex task to reload it."
+if [ "$CODEX_COPY" -eq 1 ]; then
+  "$REPO/install.sh" --copy --codex-only
+fi
 
+echo "Updated to $(git -C "$REPO" rev-parse --short HEAD). Reload plugins or start a new Claude/Codex session."
