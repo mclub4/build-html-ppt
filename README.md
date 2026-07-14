@@ -16,6 +16,57 @@
 
 > 현재는 **OpenAI Codex CLI / Codex App만 지원**합니다. 이 저장소는 커뮤니티 프로젝트이며 OpenAI의 공식 프로젝트가 아닙니다.
 
+## 실제 생성 예시
+
+아래 이미지는 이 스킬로 만든 HTML 프레젠테이션을 Chromium에서 직접 렌더링한 결과입니다. 홍보용 키 비주얼부터 여행·음식 에디토리얼, 스포츠 데이터, 기술 시스템 흐름까지 발표 주제에 맞춰 서로 다른 구성을 사용합니다.
+
+<table>
+  <tr>
+    <td width="33.33%">
+      <img src="assets/showcase/blue-archive-kivotos.webp" alt="블루 아카이브 세계관 소개 슬라이드" />
+      <br /><strong>게임 홍보 · 세계관</strong>
+    </td>
+    <td width="33.33%">
+      <img src="assets/showcase/f1-strategy.webp" alt="F1 언더컷과 오버컷 전략 비교 슬라이드" />
+      <br /><strong>스포츠 데이터 · 전략 비교</strong>
+    </td>
+    <td width="33.33%">
+      <img src="assets/showcase/hallyu-fandom-flow.webp" alt="K-POP 팬덤 확산 구조 슬라이드" />
+      <br /><strong>문화 산업 · 팬덤 흐름</strong>
+    </td>
+  </tr>
+  <tr>
+    <td width="33.33%">
+      <img src="assets/showcase/world-cuisine-plate.webp" alt="한 접시에서 세계 음식의 역할을 비교하는 슬라이드" />
+      <br /><strong>음식 에디토리얼 · 역할 비교</strong>
+    </td>
+    <td width="33.33%">
+      <img src="assets/showcase/rescene-character.webp" alt="리센느 멤버 캐릭터 소개 슬라이드" />
+      <br /><strong>아이돌 홍보 · 캐릭터 스토리</strong>
+    </td>
+    <td width="33.33%">
+      <img src="assets/showcase/manosaba-trial.webp" alt="마법소녀의 마녀재판 재판 구조 슬라이드" />
+      <br /><strong>게임 홍보 · 키 비주얼</strong>
+    </td>
+  </tr>
+  <tr>
+    <td width="33.33%">
+      <img src="assets/showcase/car-camping-destination.webp" alt="차박 여행지 시설 정보 슬라이드" />
+      <br /><strong>여행 가이드 · 목적지 정보</strong>
+    </td>
+    <td width="33.33%">
+      <img src="assets/showcase/mars-space-garden.webp" alt="우주 식물 재배 사진을 사용한 화성 기지 운영 슬라이드" />
+      <br /><strong>기술 설계 · 우주 현장</strong>
+    </td>
+    <td width="33.33%">
+      <img src="assets/showcase/manchester-united-legacy.webp" alt="맨체스터 유나이티드 극장 같은 경기 경험 슬라이드" />
+      <br /><strong>스포츠 홍보 · 클럽 서사</strong>
+    </td>
+  </tr>
+</table>
+
+게임명, 로고, 캐릭터 및 기타 제3자 자료의 권리는 각 권리자에게 있습니다. 예시 이미지는 스킬의 출력 형식과 디자인 범위를 설명하기 위해 사용합니다.
+
 ## 무엇을 만드나요?
 
 한 번의 요청으로 다음 산출물을 함께 만듭니다.
@@ -27,6 +78,18 @@
 - 인쇄, 짧은 화면, 확대 환경을 고려한 반응형 무대
 
 단순히 내용을 카드에 나누는 템플릿이 아닙니다. 발표 대상, 의사결정자, 배경지식, 반론 가능성을 바탕으로 이야기 순서를 정하고 주제에 맞는 테마와 시각 자료를 선택합니다.
+
+## 발표자 노트 예시
+
+HTML과 함께 생성되는 `OUTPUT-notes.md`에는 슬라이드별 목적, 실제로 읽을 수 있는 발표 멘트, 강조점, 다음 장으로 넘어가는 문장을 정리합니다. 근거가 필요한 내용에는 출처와 주의사항도 함께 남깁니다.
+
+> **10. 자율 판단 루프**
+>
+> **목적:** AI를 통제되지 않은 대장으로 두지 않고 정책 가드레일 안의 판단 도구로 배치한다.
+>
+> **발표 멘트:** “관측, 예측, 결정, 실행, 학습이 반복되지만 전부 권한과 금지 규칙 안에서 움직입니다. 기계는 빠른 계산과 반복 복구를 맡고, 생명 위험과 비가역 조치는 사람이 결정합니다.”
+>
+> **전환:** “이제 실제로 펌프가 멈췄다고 가정해 보겠습니다.”
 
 ## 주요 기능
 
