@@ -1,0 +1,20 @@
+{
+  "name": "build-html-slides",
+  "interface": {
+    "displayName": "Build HTML Slides"
+  },
+  "plugins": [
+    {
+      "name": "build-html-slides",
+      "source": {
+        "source": "local",
+        "path": "./plugins/build-html-slides"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

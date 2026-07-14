@@ -1,0 +1,20 @@
+{
+  "name": "build-html-slides",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Codex skill and plugin for art-directed, validated HTML presentations.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "check": "python3 scripts/validate_repository.py",
+    "check:browser": "node codex/skills/build-html-slides/scripts/render_slides.js --check",
+    "test": "cd codex/skills/build-html-slides && python3 -m unittest discover -s scripts -p 'test_*.py'",
+    "test:unit": "cd codex/skills/build-html-slides && python3 -m unittest scripts.test_source_cache scripts.test_validate_deck scripts.test_validate_interactions scripts.test_validate_visual_review",
+    "test:e2e": "cd codex/skills/build-html-slides && python3 -m unittest scripts.test_render_pipeline"
+  },
+  "devDependencies": {
+    "playwright": "1.61.1"
+  }
+}

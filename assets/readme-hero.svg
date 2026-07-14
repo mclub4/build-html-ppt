@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">Build HTML Slides for Codex</title>
+  <desc id="desc">A dark presentation canvas with colorful slide fragments and validation signals.</desc>
+  <rect width="1280" height="640" fill="#101317"/>
+  <rect x="48" y="42" width="1184" height="556" rx="24" fill="#171b20" stroke="#343b43" stroke-width="2"/>
+  <rect x="48" y="42" width="18" height="556" rx="9" fill="#f06b52"/>
+  <circle cx="104" cy="88" r="8" fill="#f4cf5d"/>
+  <circle cx="132" cy="88" r="8" fill="#57c7b6"/>
+  <circle cx="160" cy="88" r="8" fill="#f06b52"/>
+  <text x="104" y="188" fill="#f8f5ef" font-family="Inter, Arial, sans-serif" font-size="64" font-weight="700">Build HTML Slides</text>
+  <text x="108" y="234" fill="#aab3bd" font-family="Inter, Arial, sans-serif" font-size="24">Art-directed presentation decks for Codex</text>
+  <rect x="104" y="302" width="300" height="172" rx="8" fill="#f8f5ef"/>
+  <rect x="128" y="328" width="128" height="12" fill="#f06b52"/>
+  <rect x="128" y="362" width="224" height="18" fill="#20252b"/>
+  <rect x="128" y="392" width="178" height="10" fill="#737d87"/>
+  <rect x="128" y="416" width="206" height="10" fill="#737d87"/>
+  <rect x="438" y="302" width="300" height="172" rx="8" fill="#202a2c" stroke="#57c7b6" stroke-width="2"/>
+  <path d="M474 424 L530 366 L576 398 L638 334 L700 396" fill="none" stroke="#57c7b6" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="638" cy="334" r="9" fill="#f4cf5d"/>
+  <rect x="772" y="302" width="300" height="172" rx="8" fill="#242127"/>
+  <rect x="804" y="332" width="96" height="112" rx="4" fill="#f06b52"/>
+  <rect x="918" y="360" width="62" height="84" rx="4" fill="#f4cf5d"/>
+  <rect x="998" y="388" width="42" height="56" rx="4" fill="#57c7b6"/>
+  <rect x="104" y="530" width="272" height="36" rx="18" fill="#20252b" stroke="#48515a"/>
+  <text x="132" y="555" fill="#dbe1e7" font-family="Inter, Arial, sans-serif" font-size="16">HTML + Notes + Sources</text>
+  <rect x="902" y="92" width="276" height="52" rx="26" fill="#102a26" stroke="#57c7b6"/>
+  <circle cx="934" cy="118" r="9" fill="#57c7b6"/>
+  <text x="956" y="126" fill="#d9fff8" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="600">Visual QA ready</text>
+  <text x="1086" y="548" fill="#7e8994" font-family="ui-monospace, monospace" font-size="16">CODEX ONLY / v0.1</text>
+</svg>
+

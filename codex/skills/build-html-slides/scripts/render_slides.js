@@ -1,0 +1,556 @@
+#!/usr/bin/env node
+'use strict';
+
+const crypto = require('crypto');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { fileURLToPath, pathToFileURL } = require('url');
+
+const BASE_PROFILES = ['normal', 'short', 'zoom150'];
+const RESPONSIVE_PROFILES = ['tablet', 'mobile'];
+const PROFILES = {
+  normal: { viewport: [1920, 1080], screenshot: [1920, 1080], zoom: 1 },
+  short: { viewport: [1366, 650], screenshot: [1366, 650], zoom: 1 },
+  zoom150: { viewport: [1280, 720], screenshot: [1920, 1080], zoom: 1.5 },
+  tablet: { viewport: [1024, 768], screenshot: [1024, 768], zoom: 1 },
+  mobile: { viewport: [390, 844], screenshot: [390, 844], zoom: 1 },
+};
+const CHECKS_BY_CHANGE = {
+  all: ['crop', 'aspect_ratio', 'resolution', 'overflow', 'occlusion', 'text', 'text_bounds', 'controls'],
+  text: ['text', 'text_bounds'],
+  image: ['crop', 'aspect_ratio', 'resolution'],
+  navigation: ['controls'],
+};
+const AUTOMATION_CHECKS_BY_CHANGE = {
+  all: ['text_bounds', 'controls', 'image_geometry'],
+  text: ['text_bounds'],
+  image: ['image_geometry'],
+  navigation: ['controls'],
+};
+const REVIEW_BATCH_SIZE = 4;
+const QUALITY_DIMENSIONS = [
+  'story', 'art_direction', 'layout_rhythm', 'typography',
+  'imagery', 'composition', 'evidence', 'presentation_utility',
+];
+const MOTION_OVERRIDE = `
+  *, *::before, *::after {
+    animation: none !important;
+    caret-color: transparent !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+`;
+
+function usage(message) {
+  if (message) process.stderr.write(`ERROR: ${message}\n`);
+  process.stderr.write(
+    'usage: node render_slides.js DECK.html REVIEW_DIR --mode quick|full '
+    + '[--slides 3,5-7] [--change-type all|text|image|navigation] [--responsive] [--final]\n'
+    + '       node render_slides.js DECK.html REVIEW_DIR --finalize\n'
+    + '       node render_slides.js --check\n'
+    + '       node render_slides.js --fingerprints DECK.html\n'
+  );
+  process.exit(2);
+}
+
+function sha256(data) {
+  return crypto.createHash('sha256').update(data).digest('hex');
+}
+
+function loadPlaywright() {
+  const candidates = [
+    'playwright',
+    path.join(os.homedir(), '.local/lib/node_modules/playwright'),
+    '/usr/local/lib/node_modules/playwright',
+    '/usr/lib/node_modules/playwright',
+  ];
+  for (const candidate of candidates) {
+    try {
+      return require(candidate);
+    } catch (error) {
+      if (error.code !== 'MODULE_NOT_FOUND') throw error;
+    }
+  }
+  throw new Error('Playwright is not installed. Install the Node playwright package and Chromium before rendering.');
+}
+
+function parseSlideSelection(value) {
+  const selected = new Set();
+  for (const token of value.split(',')) {
+    const match = token.trim().match(/^(\d+)(?:-(\d+))?$/);
+    if (!match) usage(`invalid --slides selection: ${value}`);
+    const start = Number(match[1]);
+    const end = Number(match[2] || match[1]);
+    if (start < 1 || end < start) usage(`invalid --slides range: ${token}`);
+    for (let number = start; number <= end; number += 1) selected.add(number);
+  }
+  return selected;
+}
+
+function parseArguments(argv) {
+  if (argv.length < 2) usage();
+  const deck = path.resolve(argv[0]);
+  const output = path.resolve(argv[1]);
+  let mode = 'full';
+  let slides = null;
+  let changeType = 'all';
+  let responsive = false;
+  let phase = 'iteration';
+  let finalizeOnly = false;
+  for (let index = 2; index < argv.length; index += 1) {
+    const argument = argv[index];
+    if (argument === '--mode' && argv[index + 1]) {
+      mode = argv[++index];
+    } else if (argument === '--slides' && argv[index + 1]) {
+      slides = parseSlideSelection(argv[++index]);
+    } else if (argument === '--change-type' && argv[index + 1]) {
+      changeType = argv[++index];
+    } else if (argument === '--responsive') {
+      responsive = true;
+    } else if (argument === '--final') {
+      phase = 'final';
+    } else if (argument === '--finalize') {
+      phase = 'final';
+      finalizeOnly = true;
+    } else {
+      usage(`unknown argument: ${argument}`);
+    }
+  }
+  if (!['quick', 'full'].includes(mode)) usage(`mode must be quick or full: ${mode}`);
+  if (!CHECKS_BY_CHANGE[changeType]) usage(`invalid change type: ${changeType}`);
+  if (!fs.existsSync(deck) || !fs.statSync(deck).isFile()) usage(`deck not found: ${deck}`);
+  const protectedPaths = new Set([path.parse(output).root, os.homedir(), process.cwd(), path.dirname(deck), deck]);
+  if (protectedPaths.has(output) || deck.startsWith(`${output}${path.sep}`)) {
+    usage(`review directory must be a dedicated disposable child path: ${output}`);
+  }
+  if (finalizeOnly && slides) usage('--finalize cannot be combined with --slides');
+  return { deck, output, mode, slides, changeType, responsive, phase, finalizeOnly };
+}
+
+function profileNames(responsive) {
+  return responsive ? [...BASE_PROFILES, ...RESPONSIVE_PROFILES] : [...BASE_PROFILES];
+}
+
+function expandWithNeighbors(selected, slideCount) {
+  const expanded = new Set();
+  for (const number of selected) {
+    for (const candidate of [number - 1, number, number + 1]) {
+      if (candidate >= 1 && candidate <= slideCount) expanded.add(candidate);
+    }
+  }
+  return expanded;
+}
+
+async function waitForMedia(page) {
+  await page.evaluate(async () => {
+    if (document.fonts?.ready) await document.fonts.ready;
+    await Promise.all([...document.images].map(image => image.complete ? null : new Promise(resolve => {
+      image.addEventListener('load', resolve, { once: true });
+      image.addEventListener('error', resolve, { once: true });
+    })));
+  });
+  await waitForFrames(page);
+}
+
+async function waitForFrames(page) {
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function preparePage(page, url) {
+  await page.goto(url, { waitUntil: 'load' });
+  await page.addStyleTag({ content: MOTION_OVERRIDE, attributes: { 'data-slide-validation-motion': 'off' } });
+  await waitForMedia(page);
+}
+
+function hashLocalAsset(url) {
+  if (!url || !url.startsWith('file:')) return url || '';
+  try {
+    const filePath = fileURLToPath(url);
+    return fs.statSync(filePath).isFile() ? `${url}:${sha256(fs.readFileSync(filePath))}` : url;
+  } catch (_error) {
+    return `${url}:missing`;
+  }
+}
+
+async function collectFingerprints(page) {
+  const materials = await page.evaluate(() => {
+    const slides = [...document.querySelectorAll('section.slide')];
+    const head = document.head.cloneNode(true);
+    head.querySelectorAll('[data-slide-validation-motion]').forEach(node => node.remove());
+    const body = document.body.cloneNode(true);
+    body.querySelectorAll('section.slide').forEach(node => node.remove());
+    return {
+      titles: slides.map(slide => slide.dataset.title || ''),
+      criticalSlides: slides.map((slide, index) => (
+        slide.dataset.visualCritical === 'true' ? index + 1 : null
+      )).filter(Boolean),
+      global: `${head.innerHTML}\n${body.innerHTML}`,
+      slides: slides.map(slide => ({
+        html: slide.outerHTML,
+        assets: [...slide.querySelectorAll('img, source, video, image')].map(element => (
+          element.currentSrc || element.src || element.poster || element.getAttribute('href') || element.getAttribute('xlink:href') || ''
+        )),
+      })),
+    };
+  });
+  return {
+    titles: materials.titles,
+    critical_slides: materials.criticalSlides,
+    global_sha256: sha256(materials.global),
+    slides: Object.fromEntries(materials.slides.map((slide, index) => [String(index + 1), sha256(
+      `${slide.html}\n${slide.assets.map(hashLocalAsset).sort().join('\n')}`
+    )])),
+  };
+}
+
+async function fingerprintsForDeck(deck) {
+  const playwright = loadPlaywright();
+  const browser = await playwright.chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+    await preparePage(page, `${pathToFileURL(deck).href}#1`);
+    return await collectFingerprints(page);
+  } finally {
+    await browser.close();
+  }
+}
+
+function emptyRecord(number, title, sourceHash, changeType) {
+  return {
+    slide: number,
+    title,
+    source_sha256: sourceHash,
+    review_scope: changeType,
+    reviewer: '',
+    reviewer_ref: '',
+    visual_critical: false,
+    review_batch_id: '',
+    review_method: 'vision-batched-full-size',
+    captures: {},
+    required_ai_profiles: [],
+    inspected_profiles: [],
+    observation: '',
+    checks: Object.fromEntries(CHECKS_BY_CHANGE[changeType].map(name => [name, 'pending'])),
+    status: 'pending',
+    notes: [],
+  };
+}
+
+function loadExistingManifest(output) {
+  const manifestPath = path.join(output, 'review.json');
+  if (!fs.existsSync(manifestPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  } catch (error) {
+    throw new Error(`existing review manifest is invalid: ${error.message}`);
+  }
+}
+
+async function main() {
+  const args = parseArguments(process.argv.slice(2));
+  const playwright = loadPlaywright();
+  const scriptPath = path.resolve(__filename);
+  const textBoundsScript = fs.readFileSync(path.join(__dirname, 'measure_text_bounds.js'), 'utf8');
+  const controlGeometryScript = fs.readFileSync(path.join(__dirname, 'measure_geometry.js'), 'utf8');
+  const imageGeometryScript = fs.readFileSync(path.join(__dirname, 'measure_image_geometry.js'), 'utf8');
+  const deckBytes = fs.readFileSync(args.deck);
+  const deckHash = sha256(deckBytes);
+  const runId = crypto.randomUUID();
+  const existing = args.slides || args.finalizeOnly ? loadExistingManifest(args.output) : null;
+  if ((args.slides || args.finalizeOnly) && !existing) {
+    usage('--slides/--finalize requires an existing review.json from an earlier full render');
+  }
+  if (args.finalizeOnly) args.responsive = existing.responsive === true;
+  const profiles = profileNames(args.responsive);
+
+  const browser = await playwright.chromium.launch({ headless: true });
+  const browserVersion = browser.version();
+  const fileUrl = pathToFileURL(args.deck).href;
+  let fingerprints;
+  let renderTargets;
+  let directlyChanged;
+  let strategy = 'full';
+  let records;
+  let previousDeckHash = existing?.deck_sha256 || null;
+
+  try {
+    const inspectionPage = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+    await preparePage(inspectionPage, `${fileUrl}#1`);
+    fingerprints = await collectFingerprints(inspectionPage);
+    await inspectionPage.close();
+    const slideCount = fingerprints.titles.length;
+    if (!slideCount || fingerprints.titles.some(title => !title.trim())) {
+      throw new Error('every slide needs a non-empty data-title');
+    }
+    if (args.slides && [...args.slides].some(number => number > slideCount)) {
+      usage(`--slides references a slide above the deck count ${slideCount}`);
+    }
+
+    const allSlides = new Set(Array.from({ length: slideCount }, (_value, index) => index + 1));
+    const existingProfiles = existing ? Object.keys(existing.viewports || {}) : [];
+    const existingTitles = existing?.slides?.map(record => record.title) || [];
+    const compatible = existing
+      && existing.schema_version === 4
+      && JSON.stringify(existingProfiles) === JSON.stringify(profiles)
+      && JSON.stringify(existingTitles) === JSON.stringify(fingerprints.titles);
+    const globalChanged = compatible
+      && existing.source_fingerprints?.global_sha256 !== fingerprints.global_sha256;
+    directlyChanged = new Set();
+    if (compatible) {
+      for (let number = 1; number <= slideCount; number += 1) {
+        if (existing.source_fingerprints?.slides?.[String(number)] !== fingerprints.slides[String(number)]) {
+          directlyChanged.add(number);
+        }
+      }
+    }
+
+    if (args.finalizeOnly) {
+      if (!compatible || globalChanged || directlyChanged.size || existing.deck_sha256 !== deckHash) {
+        throw new Error('deck changed after review; render the changed slides before --finalize');
+      }
+      existing.phase = 'final';
+      existing.quality_score = {
+        status: 'pending',
+        reviewer: '',
+        reviewer_ref: '',
+        dimensions: Object.fromEntries(QUALITY_DIMENSIONS.map(name => [name, 0])),
+        total: 0,
+        weakest_slides: [],
+        notes: '',
+      };
+      fs.writeFileSync(path.join(args.output, 'review.json'), `${JSON.stringify(existing, null, 2)}\n`);
+      process.stdout.write(`OK: finalized review phase without re-rendering; complete quality_score once\n${path.join(args.output, 'review.json')}\n`);
+      return;
+    }
+
+    if (args.slides && compatible && !globalChanged) {
+      strategy = 'incremental';
+      renderTargets = expandWithNeighbors(new Set([...args.slides, ...directlyChanged]), slideCount);
+      records = existing.slides.map(record => JSON.parse(JSON.stringify(record)));
+      fs.mkdirSync(args.output, { recursive: true });
+    } else {
+      renderTargets = allSlides;
+      directlyChanged = compatible ? directlyChanged : allSlides;
+      records = fingerprints.titles.map((title, index) => emptyRecord(
+        index + 1, title, fingerprints.slides[String(index + 1)], 'all'
+      ));
+      fs.rmSync(args.output, { recursive: true, force: true });
+      fs.mkdirSync(args.output, { recursive: true });
+    }
+
+    for (const number of renderTargets) {
+      records[number - 1] = emptyRecord(
+        number,
+        fingerprints.titles[number - 1],
+        fingerprints.slides[String(number)],
+        strategy === 'full' ? 'all' : args.changeType
+      );
+    }
+    for (let number = 1; number <= slideCount; number += 1) {
+      records[number - 1].source_sha256 = fingerprints.slides[String(number)];
+      records[number - 1].visual_critical = number === 1 || number === slideCount
+        || fingerprints.critical_slides.includes(number);
+    }
+
+    for (const profileName of profiles) {
+      const profile = PROFILES[profileName];
+      const context = await browser.newContext({
+        viewport: { width: profile.viewport[0], height: profile.viewport[1] },
+        deviceScaleFactor: profile.zoom,
+      });
+      const page = await context.newPage();
+      await preparePage(page, `${fileUrl}#1`);
+      const profileDir = path.join(args.output, profileName);
+      fs.mkdirSync(profileDir, { recursive: true });
+      for (const slideNumber of [...renderTargets].sort((left, right) => left - right)) {
+        await page.evaluate(number => { window.location.hash = `#${number}`; }, slideNumber);
+        await waitForFrames(page);
+        const active = await page.evaluate(() => {
+          const slides = [...document.querySelectorAll('section.slide')];
+          const element = document.querySelector('section.slide.active');
+          return element ? { slide: slides.indexOf(element) + 1, title: element.dataset.title || '' } : null;
+        });
+        if (!active || active.slide !== slideNumber || active.title !== fingerprints.titles[slideNumber - 1]) {
+          throw new Error(`active slide mismatch for ${profileName} slide ${slideNumber}`);
+        }
+        const textGeometry = await page.evaluate(source => (0, eval)(source), textBoundsScript);
+        const controlGeometry = await page.evaluate(source => (0, eval)(source), controlGeometryScript);
+        const imageGeometry = await page.evaluate(source => (0, eval)(source), imageGeometryScript);
+        await waitForFrames(page);
+        const filename = `slide-${String(slideNumber).padStart(2, '0')}.png`;
+        const capturePath = path.join(profileDir, filename);
+        await page.screenshot({ path: capturePath, fullPage: false });
+        const captureBytes = fs.readFileSync(capturePath);
+        records[slideNumber - 1].captures[profileName] = {
+          path: `${profileName}/${filename}`,
+          sha256: sha256(captureBytes),
+          active_slide: active.slide,
+          active_title: active.title,
+          viewport: `${profile.viewport[0]}x${profile.viewport[1]}`,
+          screenshot: `${profile.screenshot[0]}x${profile.screenshot[1]}`,
+          zoom: profile.zoom,
+          source_sha256: fingerprints.slides[String(slideNumber)],
+          render_run_id: runId,
+          motion_disabled: true,
+          text_geometry: textGeometry,
+          control_geometry: controlGeometry,
+          image_geometry: imageGeometry,
+        };
+      }
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+
+  const renderedSlides = [...renderTargets].sort((left, right) => left - right);
+  const renderedSet = new Set(renderedSlides);
+  const automationChecks = AUTOMATION_CHECKS_BY_CHANGE[strategy === 'full' ? 'all' : args.changeType];
+  const automationFailures = [];
+  const automationWarnings = [];
+  const geometryField = {
+    text_bounds: 'text_geometry',
+    controls: 'control_geometry',
+    image_geometry: 'image_geometry',
+  };
+  for (const number of renderedSlides) {
+    const record = records[number - 1];
+    for (const profile of profiles) {
+      const capture = record.captures[profile];
+      for (const check of automationChecks) {
+        const result = capture[geometryField[check]];
+        for (const issue of result?.issues || []) {
+          automationFailures.push({ slide: number, profile, check, issue });
+        }
+        for (const warning of result?.warnings || []) {
+          automationWarnings.push({ slide: number, profile, check, warning });
+        }
+      }
+    }
+  }
+
+  const responsiveVisionProfiles = args.responsive ? RESPONSIVE_PROFILES : [];
+  for (const number of renderedSlides) {
+    const record = records[number - 1];
+    const required = new Set(['normal', ...responsiveVisionProfiles]);
+    if (record.visual_critical) profiles.forEach(profile => required.add(profile));
+    automationWarnings
+      .filter(warning => warning.slide === number)
+      .forEach(warning => required.add(warning.profile));
+    record.required_ai_profiles = profiles.filter(profile => required.has(profile));
+  }
+
+  const reviewBatches = [];
+  if (!automationFailures.length) {
+    for (let offset = 0; offset < renderedSlides.length; offset += REVIEW_BATCH_SIZE) {
+      const slides = renderedSlides.slice(offset, offset + REVIEW_BATCH_SIZE);
+      const id = `batch-${String(reviewBatches.length + 1).padStart(2, '0')}`;
+      const captureProfiles = {};
+      for (const number of slides) {
+        records[number - 1].review_batch_id = id;
+        captureProfiles[String(number)] = records[number - 1].required_ai_profiles;
+      }
+      reviewBatches.push({ id, slides, capture_profiles: captureProfiles, status: 'pending' });
+    }
+  }
+  const manifest = {
+    schema_version: 4,
+    mode: args.mode,
+    phase: args.phase,
+    responsive: args.responsive,
+    change_type: strategy === 'full' ? 'all' : args.changeType,
+    deck_sha256: deckHash,
+    previous_deck_sha256: previousDeckHash,
+    render_run: {
+      id: runId,
+      generator: 'render_slides.js',
+      generator_sha256: sha256(fs.readFileSync(scriptPath)),
+      browser: `chromium ${browserVersion}`,
+      captured_at: new Date().toISOString(),
+      strategy,
+      requested_slides: args.slides ? [...args.slides].sort((left, right) => left - right) : renderedSlides,
+      rendered_slides: renderedSlides,
+      directly_changed_slides: [...directlyChanged].sort((left, right) => left - right),
+      reused_slides: records.map(record => record.slide).filter(number => !renderedSet.has(number)),
+      animations_disabled: true,
+    },
+    source_fingerprints: {
+      global_sha256: fingerprints.global_sha256,
+      previous_global_sha256: existing?.source_fingerprints?.global_sha256 || null,
+      slides: fingerprints.slides,
+    },
+    viewports: Object.fromEntries(profiles.map(name => [name, {
+      viewport: `${PROFILES[name].viewport[0]}x${PROFILES[name].viewport[1]}`,
+      screenshot: `${PROFILES[name].screenshot[0]}x${PROFILES[name].screenshot[1]}`,
+      zoom: PROFILES[name].zoom,
+    }])),
+    automation_gate: {
+      status: automationFailures.length ? 'fail' : 'pass',
+      checks: automationChecks,
+      failures: automationFailures,
+      warnings: automationWarnings,
+    },
+    review_batches: reviewBatches,
+    quality_score: {
+      status: 'pending',
+      reviewer: '',
+      reviewer_ref: '',
+      dimensions: Object.fromEntries(QUALITY_DIMENSIONS.map(name => [name, 0])),
+      total: 0,
+      weakest_slides: [],
+      notes: '',
+    },
+    cross_reviews: (existing?.cross_reviews || []).filter(review => !renderedSet.has(review.slide)),
+    slides: records,
+  };
+  const manifestPath = path.join(args.output, 'review.json');
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  if (automationFailures.length) {
+    process.stderr.write(
+      `ERROR: automated geometry gate blocked AI review with ${automationFailures.length} failure(s); `
+      + `fix the rendered defects and rerun before opening captures\n${manifestPath}\n`
+    );
+    process.exitCode = 1;
+    return;
+  }
+  process.stdout.write(
+    `OK: rendered ${renderedSlides.length}/${records.length} slides across ${profiles.length} profiles `
+    + `(${strategy}, ${reviewBatches.length} AI review batch(es), motion disabled only in validation)\n${manifestPath}\n`
+  );
+}
+
+async function checkTools() {
+  const playwright = loadPlaywright();
+  const browser = await playwright.chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 320, height: 180 } });
+    await page.setContent('<!doctype html><html><body style="margin:0;background:#111;color:#fff"><h1>render check</h1></body></html>');
+    const screenshot = await page.screenshot();
+    if (!screenshot?.length) throw new Error('Chromium returned an empty screenshot');
+    process.stdout.write(`OK: Node, Playwright, Chromium ${browser.version()}, and screenshot capture are available\n`);
+  } finally {
+    await browser.close();
+  }
+}
+
+async function fingerprintCommand(deckArgument) {
+  if (!deckArgument) usage('--fingerprints requires a deck path');
+  const deck = path.resolve(deckArgument);
+  if (!fs.existsSync(deck) || !fs.statSync(deck).isFile()) usage(`deck not found: ${deck}`);
+  process.stdout.write(`${JSON.stringify(await fingerprintsForDeck(deck))}\n`);
+}
+
+const command = process.argv.slice(2);
+let operation;
+if (command.length === 1 && command[0] === '--check') {
+  operation = checkTools();
+} else if (command[0] === '--fingerprints') {
+  operation = fingerprintCommand(command[1]);
+} else {
+  operation = main();
+}
+operation.catch(error => {
+  process.stderr.write(`ERROR: ${error.stack || error.message}\n`);
+  process.exit(1);
+});

@@ -1,0 +1,39 @@
+{
+  "name": "build-html-slides",
+  "version": "0.1.0",
+  "description": "Create art-directed HTML presentations with presenter notes and adaptive visual QA.",
+  "author": {
+    "name": "HYUNJIN CHO",
+    "url": "https://github.com/mclub4"
+  },
+  "homepage": "https://github.com/mclub4/build-html-ppt",
+  "repository": "https://github.com/mclub4/build-html-ppt",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "html-slides",
+    "presentation",
+    "playwright",
+    "visual-qa"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Build HTML Slides",
+    "shortDescription": "Create HTML decks with notes and adaptive visual QA.",
+    "longDescription": "Build offline-portable HTML presentations with audience-aware story routing, topic-aware themes, WebP imagery, presenter notes, source caching, viewport-safe scaling, crop protection, and adaptive Chromium visual review.",
+    "developerName": "HYUNJIN CHO",
+    "category": "Productivity",
+    "capabilities": [
+      "Write",
+      "Analyze",
+      "Generate"
+    ],
+    "websiteURL": "https://github.com/mclub4/build-html-ppt",
+    "brandColor": "#F06B52",
+    "defaultPrompt": [
+      "Create a quick HTML presentation draft with presenter notes.",
+      "Build and fully validate an audience-aware HTML slide deck.",
+      "Revise this HTML deck and validate only the changed slides."
+    ]
+  }
+}
