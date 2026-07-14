@@ -16,6 +16,8 @@ Use this checklist while inspecting the rendered slides selected by `validation-
 - The composition does not look trapped inside one large panel.
 - Repeated cards, decorative chips, and labels have a real information job.
 - Intentional whitespace reads as hierarchy, not missing work.
+- Large cards and panels contain enough information or visual evidence to justify their area; short copy is not stranded inside tall empty boxes.
+- Empty outlines, low-contrast placeholder-like shapes, and equal-height sparse cards do not make the slide look unfinished.
 - Dense slides have enough separation for scanning and comparison.
 
 ## Typography

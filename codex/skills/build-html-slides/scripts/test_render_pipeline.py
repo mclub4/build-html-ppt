@@ -126,7 +126,7 @@ class RenderPipelineTests(unittest.TestCase):
             self.assertEqual(manifest["render_run"]["rendered_slides"], [1, 2])
             self.assertEqual(manifest["render_run"]["reused_slides"], [3])
             self.assertEqual(manifest["slides"][0]["review_scope"], "text")
-            self.assertEqual(list(manifest["slides"][0]["checks"]), ["text", "text_bounds"])
+            self.assertEqual(list(manifest["slides"][0]["checks"]), ["text", "text_bounds", "density"])
             self.assertEqual(reused_capture.stat().st_mtime_ns, reused_mtime)
             self.assertEqual(manifest["slides"][2]["captures"]["normal"]["sha256"], reused_hash)
             self.complete_rendered_reviews(manifest)
@@ -174,6 +174,33 @@ class RenderPipelineTests(unittest.TestCase):
             manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["automation_gate"]["status"], "fail")
             self.assertEqual(manifest["review_batches"], [])
+
+    def test_underfilled_container_warns_and_routes_slide_to_ai_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                '<div class="card" style="width:900px;height:420px;border:1px solid #bbb"><p>짧은 사실</p></div>',
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 0, render.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            warnings = [
+                warning for warning in manifest["automation_gate"]["warnings"]
+                if warning["slide"] == 2 and warning["check"] == "container_density"
+            ]
+            self.assertEqual({warning["profile"] for warning in warnings}, {"normal", "short", "zoom150"})
+            self.assertEqual(manifest["slides"][1]["required_ai_profiles"], ["normal", "short", "zoom150"])
+            self.assertTrue(any(2 in batch["slides"] for batch in manifest["review_batches"]))
 
     def test_default_workspace_stays_under_codex_home_and_can_be_cleaned(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

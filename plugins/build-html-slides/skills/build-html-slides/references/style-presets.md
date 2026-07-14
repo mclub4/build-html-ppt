@@ -169,6 +169,17 @@ Use these as warning thresholds, not mechanical templates:
 
 Split a slide when the audience must read and compare too many independent ideas at once.
 
+### Container Fit
+
+Whitespace and empty boxes are not interchangeable. Whitespace can connect a focal element to the slide edge and establish hierarchy. A large filled or bordered rectangle with little content reads as unfinished UI.
+
+- Size cards and panels from their content instead of forcing equal heights by default.
+- A short label, one sentence, or one small bullet group should normally remain unboxed, use a compact content-sized surface, or sit beside meaningful evidence.
+- Large surfaces must earn their area through comparison, grouping, interaction, a chart, a diagram, an image, an annotated object, or a deliberate hero/chapter composition.
+- Do not use a tall card merely to occupy an empty grid track. Change the composition: open typography, editorial split, dominant image, metric cluster, timeline, rule-based list, or asymmetric evidence layout.
+- Do not add low-contrast rectangles, outlines, empty slots, or decorative boxes that resemble missing content.
+- `data-density-ignore` is reserved for intentional hero/chapter whitespace or fixed-format UI mockups. The rendered slide must still look complete, and the visual reviewer must explain why the empty area is intentional.
+
 ## Navigation Panel
 
 Keep the runtime order exactly:
@@ -203,6 +214,7 @@ Do not redefine profile sizes here or in deck-specific instructions. Use `valida
 - meaningful media with negative offsets or `cover` cropping;
 - raster images hidden in CSS backgrounds;
 - one large rounded panel around an entire slide;
+- oversized low-information cards, empty outlined rectangles, and equal-height boxes containing only a few words;
 - repeated three-card grids as the default composition;
 - type shrunk below readable size to avoid splitting content;
 - page counters centered with padding guesses or transforms;

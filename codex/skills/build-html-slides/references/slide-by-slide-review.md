@@ -32,9 +32,10 @@ For `all` scope:
 - `occlusion`: media and decoration do not obscure copy or controls;
 - `text`: copy is readable and visually coherent;
 - `text_bounds`: text remains inside its box, cell, button, badge, column, and safe area;
+- `density`: cards, panels, and decorative shapes justify their area and do not leave sparse copy stranded in oversized empty boxes;
 - `controls`: navigation and interactive elements are centered, readable, and usable.
 
-Text-only changes use `text` and `text_bounds`; image-only changes use crop, aspect ratio, and resolution; navigation-only changes use controls.
+Text-only changes use `text`, `text_bounds`, and `density`; image-only changes use crop, aspect ratio, and resolution; navigation-only changes use controls.
 
 ## Concrete Observations
 

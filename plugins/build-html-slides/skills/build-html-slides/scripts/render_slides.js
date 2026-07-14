@@ -17,14 +17,14 @@ const PROFILES = {
   mobile: { viewport: [390, 844], screenshot: [390, 844], zoom: 1 },
 };
 const CHECKS_BY_CHANGE = {
-  all: ['crop', 'aspect_ratio', 'resolution', 'overflow', 'occlusion', 'text', 'text_bounds', 'controls'],
-  text: ['text', 'text_bounds'],
+  all: ['crop', 'aspect_ratio', 'resolution', 'overflow', 'occlusion', 'text', 'text_bounds', 'density', 'controls'],
+  text: ['text', 'text_bounds', 'density'],
   image: ['crop', 'aspect_ratio', 'resolution'],
   navigation: ['controls'],
 };
 const AUTOMATION_CHECKS_BY_CHANGE = {
-  all: ['text_bounds', 'controls', 'image_geometry'],
-  text: ['text_bounds'],
+  all: ['text_bounds', 'container_density', 'controls', 'image_geometry'],
+  text: ['text_bounds', 'container_density'],
   image: ['image_geometry'],
   navigation: ['controls'],
 };
@@ -308,6 +308,7 @@ async function main() {
   const textBoundsScript = fs.readFileSync(path.join(__dirname, 'measure_text_bounds.js'), 'utf8');
   const controlGeometryScript = fs.readFileSync(path.join(__dirname, 'measure_geometry.js'), 'utf8');
   const imageGeometryScript = fs.readFileSync(path.join(__dirname, 'measure_image_geometry.js'), 'utf8');
+  const containerDensityScript = fs.readFileSync(path.join(__dirname, 'measure_container_density.js'), 'utf8');
   const deckBytes = fs.readFileSync(args.deck);
   const deckHash = sha256(deckBytes);
   const runId = crypto.randomUUID();
@@ -438,6 +439,7 @@ async function main() {
           throw new Error(`active slide mismatch for ${profileName} slide ${slideNumber}`);
         }
         const textGeometry = await page.evaluate(source => (0, eval)(source), textBoundsScript);
+        const containerDensity = await page.evaluate(source => (0, eval)(source), containerDensityScript);
         const controlGeometry = await page.evaluate(source => (0, eval)(source), controlGeometryScript);
         const imageGeometry = await page.evaluate(source => (0, eval)(source), imageGeometryScript);
         await waitForFrames(page);
@@ -457,6 +459,7 @@ async function main() {
           render_run_id: runId,
           motion_disabled: true,
           text_geometry: textGeometry,
+          container_density: containerDensity,
           control_geometry: controlGeometry,
           image_geometry: imageGeometry,
         };
@@ -474,6 +477,7 @@ async function main() {
   const automationWarnings = [];
   const geometryField = {
     text_bounds: 'text_geometry',
+    container_density: 'container_density',
     controls: 'control_geometry',
     image_geometry: 'image_geometry',
   };

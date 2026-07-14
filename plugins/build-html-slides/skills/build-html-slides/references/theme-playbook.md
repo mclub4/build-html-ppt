@@ -95,6 +95,7 @@ Before the first render, confirm that `assets/runtime-shell.html` supplied only 
 - No demo copy remains.
 - The demo dark-blue/purple palette is gone unless the topic independently calls for it.
 - The three-card sample is not the dominant layout.
+- No large sparse card or placeholder-like empty shape remains; every large surface carries proportionate information or a deliberate visual role.
 - At least five composition families are visible in the storyboard.
 - The cover and closing are designed for this subject.
 - The deck's visual identity is recognizable with the text blurred.

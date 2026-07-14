@@ -31,14 +31,14 @@ PROFILE_SPECS = {
 BASE_PROFILES = ("normal", "short", "zoom150")
 RESPONSIVE_PROFILES = BASE_PROFILES + ("tablet", "mobile")
 CHECKS_BY_CHANGE = {
-    "all": ("crop", "aspect_ratio", "resolution", "overflow", "occlusion", "text", "text_bounds", "controls"),
-    "text": ("text", "text_bounds"),
+    "all": ("crop", "aspect_ratio", "resolution", "overflow", "occlusion", "text", "text_bounds", "density", "controls"),
+    "text": ("text", "text_bounds", "density"),
     "image": ("crop", "aspect_ratio", "resolution"),
     "navigation": ("controls",),
 }
 AUTOMATION_CHECKS_BY_CHANGE = {
-    "all": ("text_bounds", "controls", "image_geometry"),
-    "text": ("text_bounds",),
+    "all": ("text_bounds", "container_density", "controls", "image_geometry"),
+    "text": ("text_bounds", "container_density"),
     "image": ("image_geometry",),
     "navigation": ("controls",),
 }
@@ -653,6 +653,9 @@ def main() -> int:
                     geometry = capture.get("text_geometry")
                     if not isinstance(geometry, dict) or geometry.get("ok") is not True or geometry.get("issues"):
                         errors.append(f"slide {number} {profile} deterministic text-bound geometry did not pass")
+                    density = capture.get("container_density")
+                    if not isinstance(density, dict) or density.get("ok") is not True or density.get("issues"):
+                        errors.append(f"slide {number} {profile} container-density measurement did not pass")
                 if scope in {"all", "navigation"}:
                     geometry = capture.get("control_geometry")
                     if not isinstance(geometry, dict) or geometry.get("ok") is not True or geometry.get("issues"):

@@ -50,7 +50,7 @@ Add `tablet` 1024×768 and `mobile` 390×844 only when responsive device support
 
 ## Quick Draft
 
-Run the deterministic deck, notes, interaction, source-cache, and Chromium geometry checks. Render all slides at all canonical profiles. Automated text bounds, control geometry, and image geometry must pass before any AI inspection.
+Run the deterministic deck, notes, interaction, source-cache, and Chromium geometry checks. Render all slides at all canonical profiles. Automated text bounds, container-density measurement, control geometry, and image geometry must complete before any AI inspection. Geometry issues block review; low-density container warnings route the affected slide and profile to AI inspection instead of failing automatically.
 
 AI inspects only:
 
@@ -111,7 +111,7 @@ Run checks by change type:
 
 | Change | Automated and AI scope |
 | --- | --- |
-| Text | text and text bounds |
+| Text | text, text bounds, and container density |
 | Image | crop, aspect ratio, and resolution |
 | Navigation | controls and interaction |
 | Mixed/global | all checks |

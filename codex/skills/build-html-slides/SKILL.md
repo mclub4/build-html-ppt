@@ -80,11 +80,12 @@ The preflight never installs software. If it fails, report the exact missing or 
 - Do not ship generic demo styling, repeated three-card layouts, decorative gradient blobs, or a recognizable reference deck copied pixel for pixel.
 - Promotional, entertainment, product, travel, event, and narrative decks normally need meaningful raster imagery across the story. Technical decks need visual evidence, diagrams, states, or flows rather than walls of prose.
 - Use whitespace for hierarchy. Except for intentional hero or chapter slides, avoid compositions that look unfinished or trapped inside one large panel.
+- Match every container to its information load. A large bordered or filled box with only a heading, one sentence, or a few short bullets is an underfilled container and a quality defect. Shrink it to its content, remove the surface and use open alignment, or earn the area with meaningful imagery, data, comparison, process, or annotation. Do not stretch sparse facts into equal-height cards merely to fill a grid.
 
 ## Asset Contract
 
 1. Inspect user-supplied assets first and copy selected files into a descriptive local assets folder.
-2. For named brands, products, games, events, institutions, or projects, search for official logos and factual imagery before inventing substitutes. Preserve aspect ratio, clear space, signatures, and marks.
+2. Read `references/asset-discovery.md`. For named brands, products, games, events, institutions, or projects, search official logos and factual imagery first, then widen discovery through topic-specific archives, creator accounts, visual-search platforms, social posts, photo communities, and fan communities. Do not stop after one official page or one generic image query. Preserve aspect ratio, clear space, signatures, and marks.
 3. For games and animation, prefer official sites, press/media pages, wallpapers, key art, title art, and screenshots. Internal decks may use suitable creator-hosted fan art with creator/source credit and preserved signatures; public or commercial decks require verified reuse rights or a safer official, licensed, supplied, or original replacement.
 4. Use ImageGen for original atmosphere, editorial illustration, conceptual scenes, and bespoke backgrounds when it improves the story. Do not generate fake factual products, screenshots, logos, or events.
 5. Every raster image referenced by the deliverable must be WebP. Keep SVG only for genuine vector logos, icons, and editable diagrams.
@@ -135,7 +136,9 @@ For Edit Only, explicitly state that no new render or validation was run. Never 
 - `references/visual-qa.md`: visual defect checklist.
 - `references/architecture-diagrams.md`: editable technical diagrams.
 - `references/source-locality.md`: region-specific factual sourcing.
+- `references/asset-discovery.md`: broad, topic-aware image discovery and original-source tracing.
 - `scripts/validate_deck.py`, `validate_speaker_notes.py`, `validate_image_reuse.py`, and `validate_interactions.py`: deterministic deliverable checks.
 - `scripts/render_slides.js` and `validate_visual_review.py`: Chromium evidence and adaptive review validation.
 - `scripts/check_environment.py`: non-mutating Python, Node.js, Playwright, and Chromium preflight.
+- `scripts/measure_container_density.js`: rendered warning detector for oversized low-information surfaces.
 - `scripts/source_cache.py`: hash-bound raster provenance cache.

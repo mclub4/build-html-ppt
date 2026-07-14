@@ -47,6 +47,7 @@ Do not use the same dominant composition on three consecutive slides. Do not use
 - Use deliberate asymmetry when it improves energy, but keep alignment lines obvious.
 - Keep sources and controls quiet but readable. They must not compete with the headline or collide with the main composition.
 - Use surface changes as chapter punctuation, not random decoration.
+- Judge container occupancy, not only alignment. Large panels containing a few words, short bullets floating at the top of tall cards, and empty decorative rectangles are unfinished compositions. Use open layout or add evidence instead of enlarging the box.
 
 ## Anti-regression rubric
 
@@ -59,7 +60,7 @@ Score each dimension from 0 to 3 on rendered slides.
 | Layout rhythm | one repeated layout | minor variation | several useful families | deliberate pacing and chapter resets |
 | Typography | cramped or generic | readable | strong hierarchy | expressive and language-aware |
 | Imagery | absent or filler | sparse/repetitive | purposeful | narrative, sourced, well-cropped, and varied |
-| Composition | clipped/empty/overfull | mechanically aligned | balanced | confident focal hierarchy and movement |
+| Composition | clipped/underfilled/overfull | mechanically aligned | balanced | confident focal hierarchy and movement |
 | Evidence | unsupported or detached | present but weak | integrated sources | evidence strengthens the visual argument |
 | Presentation utility | broken or awkward | functional | smooth controls and notes | rehearsal-ready and audience-aware |
 
@@ -70,6 +71,7 @@ This rubric is used only in Full Validation. After the render/fix loop is settle
 - The output still looks like the starter template.
 - Three or more consecutive slides share the same dominant layout.
 - A product, game, place, person, or event deck relies mainly on text and generic cards.
+- A rendered slide contains oversized low-information surfaces or decorative empty boxes that are not justified by a hero, chapter, comparison, interaction, or fixed-format visual.
 - The cover lacks a clear first-viewport identity signal for the named subject.
 - The deck has no designed closing payoff.
 - A named mixed audience receives a generic topic order, or must endure specialist detail before understanding the shared stakes, decision, or relevance.

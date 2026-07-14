@@ -28,8 +28,8 @@ PROFILE_SPECS = {
 BASE_PROFILES = ("normal", "short", "zoom150")
 RESPONSIVE_PROFILES = BASE_PROFILES + ("tablet", "mobile")
 CHECKS_BY_CHANGE = {
-    "all": ("crop", "aspect_ratio", "resolution", "overflow", "occlusion", "text", "text_bounds", "controls"),
-    "text": ("text", "text_bounds"),
+    "all": ("crop", "aspect_ratio", "resolution", "overflow", "occlusion", "text", "text_bounds", "density", "controls"),
+    "text": ("text", "text_bounds", "density"),
     "image": ("crop", "aspect_ratio", "resolution"),
     "navigation": ("controls",),
 }
@@ -119,6 +119,7 @@ class VisualReviewTests(unittest.TestCase):
                 "render_run_id": self.run_id if refreshed else self.old_run_id,
                 "motion_disabled": True,
                 "text_geometry": {"ok": True, "checked": 3, "issues": []},
+                "container_density": {"ok": True, "checked": 0, "issues": [], "warnings": [], "items": []},
                 "control_geometry": {"ok": True, "issues": []},
                 "image_geometry": {"ok": True, "checked": 1, "issues": [], "warnings": []},
             }
@@ -264,8 +265,8 @@ class VisualReviewTests(unittest.TestCase):
             "automation_gate": {
                 "status": "pass",
                 "checks": list({
-                    "all": ("text_bounds", "controls", "image_geometry"),
-                    "text": ("text_bounds",),
+                    "all": ("text_bounds", "container_density", "controls", "image_geometry"),
+                    "text": ("text_bounds", "container_density"),
                     "image": ("image_geometry",),
                     "navigation": ("controls",),
                 }[scope]),
