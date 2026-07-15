@@ -19,11 +19,11 @@ from pathlib import Path
 VALIDATOR = Path(__file__).with_name("validate_visual_review.py")
 RENDERER = Path(__file__).with_name("render_slides.js")
 PROFILE_SPECS = {
-    "normal": {"viewport": "1920x1080", "screenshot": "1920x1080", "zoom": 1},
-    "short": {"viewport": "1366x650", "screenshot": "1366x650", "zoom": 1},
-    "zoom150": {"viewport": "1280x720", "screenshot": "1920x1080", "zoom": 1.5},
-    "tablet": {"viewport": "1024x768", "screenshot": "1024x768", "zoom": 1},
-    "mobile": {"viewport": "390x844", "screenshot": "390x844", "zoom": 1},
+    "normal": {"viewport": "1920x1080", "visual_viewport": "1920x1080", "screenshot": "1920x1080", "zoom": 1, "scale_mode": "none", "device_pixel_ratio": 1},
+    "short": {"viewport": "1366x650", "visual_viewport": "1366x650", "screenshot": "1366x650", "zoom": 1, "scale_mode": "none", "device_pixel_ratio": 1},
+    "zoom150": {"viewport": "1920x1080", "visual_viewport": "1280x720", "screenshot": "1920x1080", "zoom": 1.5, "scale_mode": "browser-page", "device_pixel_ratio": 1},
+    "tablet": {"viewport": "1024x768", "visual_viewport": "1024x768", "screenshot": "1024x768", "zoom": 1, "scale_mode": "none", "device_pixel_ratio": 1},
+    "mobile": {"viewport": "390x844", "visual_viewport": "390x844", "screenshot": "390x844", "zoom": 1, "scale_mode": "none", "device_pixel_ratio": 1},
 }
 BASE_PROFILES = ("normal", "short", "zoom150")
 RESPONSIVE_PROFILES = BASE_PROFILES + ("tablet", "mobile")
@@ -145,6 +145,7 @@ class VisualReviewTests(unittest.TestCase):
             "inspected_profiles": ["normal"],
             "observation": f"Opened slide {number} across all required profiles once; visible text, media, and controls remain clear.",
             "identity_required": identity,
+            "identity_detection": "explicit" if identity else "none",
             "identity_targets": ([{
                 "target_id": f"slide-{number}-identity-1",
                 "subject_id": "series:character-a",

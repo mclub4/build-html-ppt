@@ -53,6 +53,17 @@ class ValidateDeckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("raster image must be WebP", result.stdout)
 
+    def test_svg_identity_reference_fails_even_when_svg_images_are_otherwise_allowed(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            "<!-- SLIDE_1_CONTENT -->",
+            '<img class="key-visual" src="candidate.webp" alt="Character" '
+            'data-identity-reference="official.svg">',
+            1,
+        )
+        result = self.validate(html, ("candidate.webp", "official.svg"))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("identity reference must be a local WebP", result.stdout)
+
     def test_css_png_fails(self) -> None:
         html = TEMPLATE.read_text(encoding="utf-8").replace(
             "</style>", '.test-bg{background-image:url("asset.png")}</style>', 1

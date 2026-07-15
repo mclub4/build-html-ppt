@@ -37,7 +37,9 @@ class SourceCacheTests(unittest.TestCase):
             first = self.run_cache(deck, cache, "--update")
             self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
             data = json.loads(cache.read_text(encoding="utf-8"))
+            self.assertEqual(data["schema_version"], 2)
             entry = data["assets"][0]
+            self.assertEqual(entry["roles"], ["slide-image"])
             entry.update({
                 "source_kind": "official",
                 "source_url": "https://example.com/hero",
@@ -86,6 +88,56 @@ class SourceCacheTests(unittest.TestCase):
             cache.write_text(f"{json.dumps(data, indent=2)}\n", encoding="utf-8")
             result = self.run_cache(deck, cache, "--check")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_identity_reference_is_cached_and_must_be_authoritative_webp(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            assets = root / "assets"
+            assets.mkdir()
+            (assets / "candidate.webp").write_bytes(b"candidate-webp")
+            (assets / "official.webp").write_bytes(b"official-reference-webp")
+            deck = root / "deck.html"
+            deck.write_text(
+                '<section class="slide"><img src="assets/candidate.webp" alt="Character" '
+                'data-subject-id="series:character" data-identity-reference="assets/official.webp"></section>',
+                encoding="utf-8",
+            )
+            cache = root / "sources.json"
+            self.assertEqual(self.run_cache(deck, cache, "--update").returncode, 0)
+            data = json.loads(cache.read_text(encoding="utf-8"))
+            by_path = {entry["path"]: entry for entry in data["assets"]}
+            self.assertEqual(by_path["assets/official.webp"]["roles"], ["identity-reference"])
+            for entry in data["assets"]:
+                entry.update({
+                    "source_kind": "official",
+                    "source_url": f"https://example.com/{Path(entry['path']).stem}",
+                    "verified_at": datetime.now(timezone.utc).isoformat(),
+                    "credit": "Example",
+                    "status": "verified",
+                })
+            cache.write_text(f"{json.dumps(data, indent=2)}\n", encoding="utf-8")
+            result = self.run_cache(deck, cache, "--check")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            (assets / "official.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"/>', encoding="utf-8")
+            deck.write_text(
+                deck.read_text(encoding="utf-8").replace("official.webp", "official.svg"),
+                encoding="utf-8",
+            )
+            self.assertEqual(self.run_cache(deck, cache, "--update").returncode, 0)
+            migrated = json.loads(cache.read_text(encoding="utf-8"))
+            for entry in migrated["assets"]:
+                entry.update({
+                    "source_kind": "official",
+                    "source_url": "https://example.com/reference",
+                    "verified_at": datetime.now(timezone.utc).isoformat(),
+                    "credit": "Example",
+                    "status": "verified",
+                })
+            cache.write_text(f"{json.dumps(migrated, indent=2)}\n", encoding="utf-8")
+            result = self.run_cache(deck, cache, "--check")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("identity reference must be a local WebP", result.stdout)
 
 
 if __name__ == "__main__":

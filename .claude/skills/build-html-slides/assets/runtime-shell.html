@@ -166,6 +166,7 @@
       const prev = document.getElementById('prev');
       const next = document.getElementById('next');
       const full = document.getElementById('full');
+      const nav = document.querySelector('.nav');
       const progress = document.getElementById('progress');
       const edgeLeft = document.getElementById('edgeLeft');
       const edgeRight = document.getElementById('edgeRight');
@@ -176,14 +177,31 @@
         return {
           width: viewport?.width ?? document.documentElement.clientWidth,
           height: viewport?.height ?? document.documentElement.clientHeight,
+          offsetLeft: viewport?.offsetLeft ?? 0,
+          offsetTop: viewport?.offsetTop ?? 0,
         };
       };
       const fit = () => {
-        const { width, height } = viewportSize();
+        const { width, height, offsetLeft, offsetTop } = viewportSize();
         const scale = Math.min(width / STAGE_WIDTH, height / STAGE_HEIGHT);
-        stage.style.left = `${Math.max(0, (width - STAGE_WIDTH * scale) / 2)}px`;
-        stage.style.top = `${Math.max(0, (height - STAGE_HEIGHT * scale) / 2)}px`;
+        stage.style.left = `${offsetLeft + Math.max(0, (width - STAGE_WIDTH * scale) / 2)}px`;
+        stage.style.top = `${offsetTop + Math.max(0, (height - STAGE_HEIGHT * scale) / 2)}px`;
         stage.style.transform = `scale(${scale})`;
+        nav.style.right = `${Math.max(0, document.documentElement.clientWidth - offsetLeft - width) + 14}px`;
+        nav.style.bottom = `${Math.max(0, document.documentElement.clientHeight - offsetTop - height) + 14}px`;
+        progress.style.left = `${offsetLeft}px`;
+        progress.style.top = `${offsetTop}px`;
+        progress.style.width = `${width * ((index + 1) / slides.length)}px`;
+        const edgeWidth = width * 0.08;
+        edgeLeft.style.left = `${offsetLeft}px`;
+        edgeLeft.style.top = `${offsetTop}px`;
+        edgeLeft.style.width = `${edgeWidth}px`;
+        edgeLeft.style.height = `${height}px`;
+        edgeRight.style.left = `${offsetLeft + width - edgeWidth}px`;
+        edgeRight.style.right = 'auto';
+        edgeRight.style.top = `${offsetTop}px`;
+        edgeRight.style.width = `${edgeWidth}px`;
+        edgeRight.style.height = `${height}px`;
       };
       const show = number => {
         index = Math.max(0, Math.min(slides.length - 1, number));
@@ -194,10 +212,10 @@
         });
         pageInput.value = String(index + 1);
         total.textContent = String(slides.length);
-        progress.style.width = `${((index + 1) / slides.length) * 100}%`;
         prev.disabled = index === 0;
         next.disabled = index === slides.length - 1;
         if (location.hash !== `#${index + 1}`) history.replaceState(null, '', `#${index + 1}`);
+        fit();
       };
       const go = () => {
         const number = Number.parseInt(pageInput.value, 10);

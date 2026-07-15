@@ -10,11 +10,11 @@ const { fileURLToPath, pathToFileURL } = require('url');
 const BASE_PROFILES = ['normal', 'short', 'zoom150'];
 const RESPONSIVE_PROFILES = ['tablet', 'mobile'];
 const PROFILES = {
-  normal: { viewport: [1920, 1080], screenshot: [1920, 1080], zoom: 1 },
-  short: { viewport: [1366, 650], screenshot: [1366, 650], zoom: 1 },
-  zoom150: { viewport: [1280, 720], screenshot: [1920, 1080], zoom: 1.5 },
-  tablet: { viewport: [1024, 768], screenshot: [1024, 768], zoom: 1 },
-  mobile: { viewport: [390, 844], screenshot: [390, 844], zoom: 1 },
+  normal: { viewport: [1920, 1080], visualViewport: [1920, 1080], screenshot: [1920, 1080], zoom: 1, scaleMode: 'none' },
+  short: { viewport: [1366, 650], visualViewport: [1366, 650], screenshot: [1366, 650], zoom: 1, scaleMode: 'none' },
+  zoom150: { viewport: [1920, 1080], visualViewport: [1280, 720], screenshot: [1920, 1080], zoom: 1.5, scaleMode: 'browser-page' },
+  tablet: { viewport: [1024, 768], visualViewport: [1024, 768], screenshot: [1024, 768], zoom: 1, scaleMode: 'none' },
+  mobile: { viewport: [390, 844], visualViewport: [390, 844], screenshot: [390, 844], zoom: 1, scaleMode: 'none' },
 };
 const CHECKS_BY_CHANGE = {
   all: ['crop', 'aspect_ratio', 'resolution', 'content_match', 'overflow', 'occlusion', 'text', 'text_bounds', 'density', 'controls'],
@@ -234,7 +234,7 @@ function hashLocalAsset(url) {
   }
 }
 
-function localAssetEvidence(url, deckDirectory) {
+function localAssetEvidence(url, deckDirectory, { requireWebP = false } = {}) {
   if (!url || !url.startsWith('file:')) {
     return { error: 'identity assets must use local file URLs' };
   }
@@ -244,6 +244,9 @@ function localAssetEvidence(url, deckDirectory) {
     const relative = path.relative(deckDirectory, filePath);
     if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
       return { error: 'identity assets must stay inside the deck bundle' };
+    }
+    if (requireWebP && path.extname(filePath).toLowerCase() !== '.webp') {
+      return { error: 'canonical identity references must be local WebP files' };
     }
     return {
       path: relative.split(path.sep).join('/'),
@@ -263,6 +266,7 @@ function checksFor(changeType, identityRequired) {
 function bindIdentityEvidence(record, deckDirectory, profiles) {
   const normalGeometry = record.captures.normal?.image_geometry;
   record.identity_required = normalGeometry?.identityRequired === true;
+  record.identity_detection = normalGeometry?.identityDetection || 'none';
   record.identity_targets = [];
   record.identity_review = [];
   if (!record.identity_required) return;
@@ -270,7 +274,7 @@ function bindIdentityEvidence(record, deckDirectory, profiles) {
   const items = (normalGeometry?.items || []).filter(item => !item.decorative && item.identity?.subjectId);
   for (const [index, item] of items.entries()) {
     const asset = localAssetEvidence(item.sourceUrl, deckDirectory);
-    const reference = localAssetEvidence(item.identity.referenceUrl, deckDirectory);
+    const reference = localAssetEvidence(item.identity.referenceUrl, deckDirectory, { requireWebP: true });
     const targetId = `slide-${record.slide}-identity-${index + 1}`;
     const identityErrors = [];
     if (asset.error) identityErrors.push(`${item.name}: ${asset.error}`);
@@ -313,16 +317,65 @@ async function collectFingerprints(page) {
     const slides = [...document.querySelectorAll('section.slide')];
     const head = document.head.cloneNode(true);
     head.querySelectorAll('[data-slide-validation-motion]').forEach(node => node.remove());
+    head.querySelectorAll('style').forEach(node => { node.textContent = ''; });
     const body = document.body.cloneNode(true);
     body.querySelectorAll('section.slide').forEach(node => node.remove());
+    const globalStyles = [];
+    const slideStyles = slides.map(() => []);
+
+    const selectorTargets = selectorText => {
+      if (/\.active\b|:target\b|\[aria-hidden(?:[\]=])/i.test(selectorText)) return [];
+      const query = selectorText
+        .replace(/::[a-z-]+(?:\([^)]*\))?/gi, '')
+        .replace(/:(?:hover|active|focus|focus-visible|focus-within|visited|target)(?![\w-])/gi, '');
+      try {
+        const targets = slides.flatMap((slide, index) => (
+          slide.matches(query) || slide.querySelector(query) ? [index] : []
+        ));
+        const outside = [...document.querySelectorAll(query)].some(element => !element.closest('section.slide'));
+        return outside ? [] : targets;
+      } catch (_error) {
+        return [];
+      }
+    };
+    const classifyRules = (rules, context = '') => {
+      for (const rule of [...rules]) {
+        if (rule.type === CSSRule.STYLE_RULE) {
+          const material = `${context}${rule.cssText}`;
+          const targets = selectorTargets(rule.selectorText || '');
+          if (targets.length === 1) slideStyles[targets[0]].push(material);
+          else globalStyles.push(material);
+          continue;
+        }
+        if (rule.cssRules && typeof rule.conditionText === 'string') {
+          classifyRules(rule.cssRules, `${context}@${rule.constructor.name} ${rule.conditionText}{`);
+          continue;
+        }
+        globalStyles.push(`${context}${rule.cssText}`);
+      }
+    };
+    for (const style of [...document.querySelectorAll('head style')]) {
+      if (style.hasAttribute('data-slide-validation-motion')) continue;
+      const explicit = (style.dataset.slideScope || '').split(',')
+        .map(value => Number.parseInt(value.trim(), 10))
+        .filter(number => number >= 1 && number <= slides.length);
+      if (explicit.length) {
+        explicit.forEach(number => slideStyles[number - 1].push(style.textContent || ''));
+      } else if (style.sheet) {
+        classifyRules(style.sheet.cssRules);
+      } else {
+        globalStyles.push(style.textContent || '');
+      }
+    }
     return {
       titles: slides.map(slide => slide.dataset.title || ''),
       criticalSlides: slides.map((slide, index) => (
         slide.dataset.visualCritical === 'true' ? index + 1 : null
       )).filter(Boolean),
-      global: `${head.innerHTML}\n${body.innerHTML}`,
-      slides: slides.map(slide => ({
+      global: `${head.innerHTML}\n${body.innerHTML}\n${globalStyles.join('\n')}`,
+      slides: slides.map((slide, index) => ({
         html: slide.outerHTML,
+        styles: slideStyles[index],
         assets: [...slide.querySelectorAll('img, source, video, image')].map(element => (
           element.currentSrc || element.src || element.poster || element.getAttribute('href') || element.getAttribute('xlink:href') || ''
         )),
@@ -334,7 +387,7 @@ async function collectFingerprints(page) {
     critical_slides: materials.criticalSlides,
     global_sha256: sha256(materials.global),
     slides: Object.fromEntries(materials.slides.map((slide, index) => [String(index + 1), sha256(
-      `${slide.html}\n${slide.assets.map(hashLocalAsset).sort().join('\n')}`
+      `${slide.html}\n${slide.styles.join('\n')}\n${slide.assets.map(hashLocalAsset).sort().join('\n')}`
     )])),
   };
 }
@@ -367,6 +420,7 @@ function emptyRecord(number, title, sourceHash, changeType) {
     inspected_profiles: [],
     observation: '',
     identity_required: false,
+    identity_detection: 'none',
     identity_targets: [],
     identity_review: [],
     checks: Object.fromEntries(checksFor(changeType, false).map(name => [name, 'pending'])),
@@ -509,10 +563,32 @@ async function main() {
       const profile = PROFILES[profileName];
       const context = await browser.newContext({
         viewport: { width: profile.viewport[0], height: profile.viewport[1] },
-        deviceScaleFactor: profile.zoom,
+        deviceScaleFactor: 1,
       });
       const page = await context.newPage();
       await preparePage(page, `${fileUrl}#1`);
+      if (profile.scaleMode === 'browser-page') {
+        const cdp = await context.newCDPSession(page);
+        await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: profile.zoom });
+        await waitForFrames(page);
+      }
+      const viewportEvidence = await page.evaluate(() => ({
+        layout: [window.innerWidth, window.innerHeight],
+        visual: [window.visualViewport?.width || 0, window.visualViewport?.height || 0],
+        scale: window.visualViewport?.scale || 1,
+        devicePixelRatio: window.devicePixelRatio,
+      }));
+      const roundedVisual = viewportEvidence.visual.map(value => Math.round(value));
+      if (
+        roundedVisual[0] !== profile.visualViewport[0]
+        || roundedVisual[1] !== profile.visualViewport[1]
+        || Math.abs(viewportEvidence.scale - profile.zoom) > 0.01
+      ) {
+        throw new Error(
+          `${profileName} browser zoom mismatch: visualViewport `
+          + `${roundedVisual.join('x')} scale ${viewportEvidence.scale}`
+        );
+      }
       const profileDir = path.join(args.output, profileName);
       fs.mkdirSync(profileDir, { recursive: true });
       for (const slideNumber of [...renderTargets].sort((left, right) => left - right)) {
@@ -541,8 +617,11 @@ async function main() {
           active_slide: active.slide,
           active_title: active.title,
           viewport: `${profile.viewport[0]}x${profile.viewport[1]}`,
+          visual_viewport: `${roundedVisual[0]}x${roundedVisual[1]}`,
           screenshot: `${profile.screenshot[0]}x${profile.screenshot[1]}`,
           zoom: profile.zoom,
+          scale_mode: profile.scaleMode,
+          device_pixel_ratio: viewportEvidence.devicePixelRatio,
           source_sha256: fingerprints.slides[String(slideNumber)],
           render_run_id: runId,
           motion_disabled: true,
@@ -660,8 +739,11 @@ async function main() {
     },
     viewports: Object.fromEntries(profiles.map(name => [name, {
       viewport: `${PROFILES[name].viewport[0]}x${PROFILES[name].viewport[1]}`,
+      visual_viewport: `${PROFILES[name].visualViewport[0]}x${PROFILES[name].visualViewport[1]}`,
       screenshot: `${PROFILES[name].screenshot[0]}x${PROFILES[name].screenshot[1]}`,
       zoom: PROFILES[name].zoom,
+      scale_mode: PROFILES[name].scaleMode,
+      device_pixel_ratio: 1,
     }])),
     automation_gate: {
       status: automationFailures.length ? 'fail' : 'pass',

@@ -67,6 +67,41 @@ class RenderPipelineTests(unittest.TestCase):
             check=False,
         )
 
+    def create_webps(self, *targets: tuple[Path, str]) -> None:
+        script = r"""
+const fs = require('fs');
+const { chromium } = require('playwright');
+(async () => {
+  const targets = JSON.parse(process.argv[1]);
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  for (const target of targets) {
+    const data = await page.evaluate(color => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 800;
+      const context = canvas.getContext('2d');
+      context.fillStyle = color;
+      context.fillRect(0, 0, 800, 800);
+      context.fillStyle = '#fff';
+      context.fillRect(280, 280, 240, 240);
+      return canvas.toDataURL('image/webp', 0.82).split(',')[1];
+    }, target.color);
+    fs.writeFileSync(target.path, Buffer.from(data, 'base64'));
+  }
+  await browser.close();
+})();
+"""
+        payload = [{"path": str(path), "color": color} for path, color in targets]
+        result = subprocess.run(
+            ["node", "-e", script, json.dumps(payload)],
+            cwd=ROOT.parents[2],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_renderer_requires_explicit_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             deck = Path(temporary) / "deck.html"
@@ -98,6 +133,10 @@ class RenderPipelineTests(unittest.TestCase):
             manifest_path = review_dir / "review.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(list(manifest["viewports"]), ["normal", "short", "zoom150"])
+            self.assertEqual(manifest["viewports"]["zoom150"]["viewport"], "1920x1080")
+            self.assertEqual(manifest["viewports"]["zoom150"]["visual_viewport"], "1280x720")
+            self.assertEqual(manifest["viewports"]["zoom150"]["scale_mode"], "browser-page")
+            self.assertEqual(manifest["slides"][0]["captures"]["zoom150"]["device_pixel_ratio"], 1)
             self.assertEqual(manifest["phase"], "iteration")
             self.assertTrue(all(
                 capture["motion_disabled"]
@@ -161,6 +200,51 @@ class RenderPipelineTests(unittest.TestCase):
             self.assertEqual(final_validation.returncode, 0, final_validation.stdout + final_validation.stderr)
             self.assertIn("without quality scoring", final_validation.stdout)
 
+    def test_single_slide_css_change_keeps_incremental_rendering(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "</style>", ".slide-2-only{color:#123456}</style>", 1
+            ).replace(
+                "<!-- SLIDE_2_CONTENT -->", '<p class="slide-2-only">Scoped copy</p>', 1
+            ).replace(
+                "    </main>",
+                '      <section class="slide" data-title="Slide 4"><div class="slide-media" aria-hidden="true"></div><div class="slide-content"><p>Four</p></div></section>\n'
+                '      <section class="slide" data-title="Slide 5"><div class="slide-media" aria-hidden="true"></div><div class="slide-content"><p>Five</p></div></section>\n'
+                "    </main>",
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            initial = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(initial.returncode, 0, initial.stderr)
+            first = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            global_hash = first["source_fingerprints"]["global_sha256"]
+
+            deck.write_text(html.replace("#123456", "#654321"), encoding="utf-8")
+            incremental = subprocess.run(
+                [
+                    "node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick",
+                    "--slides", "2", "--change-type", "text",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(incremental.returncode, 0, incremental.stderr)
+            second = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            self.assertEqual(second["render_run"]["strategy"], "incremental")
+            self.assertEqual(second["render_run"]["directly_changed_slides"], [2])
+            self.assertEqual(second["render_run"]["rendered_slides"], [1, 2, 3])
+            self.assertEqual(second["render_run"]["reused_slides"], [4, 5])
+            self.assertEqual(second["source_fingerprints"]["global_sha256"], global_hash)
+
     def test_failed_image_geometry_blocks_review_batches(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -218,23 +302,15 @@ class RenderPipelineTests(unittest.TestCase):
             assets = root / "assets"
             identity = assets / "identity"
             identity.mkdir(parents=True)
-            (assets / "candidate.svg").write_text(
-                '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 400 400"><rect width="400" height="400" fill="#c33"/><circle cx="200" cy="180" r="90" fill="#fee"/></svg>',
-                encoding="utf-8",
-            )
-            (identity / "official.svg").write_text(
-                '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 400 400"><rect width="400" height="400" fill="#933"/><circle cx="200" cy="180" r="92" fill="#ffd"/><path d="M160 90h80" stroke="#ff0" stroke-width="16"/></svg>',
-                encoding="utf-8",
+            self.create_webps(
+                (assets / "candidate.webp", "#cc3344"),
+                (identity / "official.webp", "#993355"),
             )
             html = TEMPLATE.read_text(encoding="utf-8").replace(
-                '<section class="slide" data-title="Slide 2">',
-                '<section class="slide" data-title="Slide 2" data-identity-review="required">',
-                1,
-            ).replace(
                 "<!-- SLIDE_2_CONTENT -->",
-                '<img src="assets/candidate.svg" alt="Character A" style="width:320px;height:320px;object-fit:contain" '
+                '<img src="assets/candidate.webp" alt="Character A" style="width:320px;height:320px;object-fit:contain" '
                 'data-subject-id="series:character-a" data-subject-name="Character A / 캐릭터 A" '
-                'data-identity-reference="assets/identity/official.svg" '
+                'data-identity-reference="assets/identity/official.webp" '
                 'data-identity-cues="red hair; star badge" data-identity-mode="primary">',
                 1,
             )
@@ -255,9 +331,10 @@ class RenderPipelineTests(unittest.TestCase):
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             record = manifest["slides"][1]
             self.assertTrue(record["identity_required"])
+            self.assertEqual(record["identity_detection"], "subject-metadata")
             self.assertEqual(record["required_ai_profiles"], ["normal"])
             self.assertEqual(len(record["identity_targets"]), 1)
-            self.assertEqual(record["identity_targets"][0]["reference_path"], "assets/identity/official.svg")
+            self.assertEqual(record["identity_targets"][0]["reference_path"], "assets/identity/official.webp")
             self.assertIn("content_match", record["checks"])
             self.assertIn("identity", record["checks"])
             self.complete_rendered_reviews(manifest)
@@ -271,19 +348,12 @@ class RenderPipelineTests(unittest.TestCase):
             deck = root / "deck.html"
             assets = root / "assets"
             assets.mkdir()
-            (assets / "candidate.svg").write_text(
-                '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 400 400"><rect width="400" height="400" fill="#c33"/></svg>',
-                encoding="utf-8",
-            )
+            self.create_webps((assets / "candidate.webp", "#cc3344"))
             html = TEMPLATE.read_text(encoding="utf-8").replace(
-                '<section class="slide" data-title="Slide 2">',
-                '<section class="slide" data-title="Slide 2" data-identity-review="required">',
-                1,
-            ).replace(
                 "<!-- SLIDE_2_CONTENT -->",
-                '<img src="assets/candidate.svg" alt="Character A" style="width:320px;height:320px;object-fit:contain" '
+                '<img src="assets/candidate.webp" alt="Character A" style="width:320px;height:320px;object-fit:contain" '
                 'data-subject-id="series:character-a" data-subject-name="Character A" '
-                'data-identity-reference="assets/identity/missing.svg" '
+                'data-identity-reference="assets/identity/missing.webp" '
                 'data-identity-cues="red hair; star badge">',
                 1,
             )
@@ -300,6 +370,64 @@ class RenderPipelineTests(unittest.TestCase):
             manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["automation_gate"]["status"], "fail")
             self.assertEqual(manifest["review_batches"], [])
+
+    def test_semantic_character_profile_cannot_bypass_identity_review_by_omitting_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            assets = root / "assets"
+            assets.mkdir()
+            self.create_webps((assets / "candidate.webp", "#4488cc"))
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                '<div class="character-profile"><img src="assets/candidate.webp" alt="Named character" '
+                'style="width:320px;height:320px;object-fit:contain"></div>',
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 1)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            record = manifest["slides"][1]
+            self.assertTrue(record["identity_required"])
+            self.assertEqual(record["identity_detection"], "semantic-markup")
+            self.assertTrue(any(
+                "identity review requires data-subject-id" in failure["issue"]
+                for failure in manifest["automation_gate"]["failures"]
+            ))
+
+    def test_descendant_person_content_kind_activates_identity_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            assets = root / "assets"
+            assets.mkdir()
+            self.create_webps((assets / "candidate.webp", "#225599"))
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                '<figure data-content-kind="person"><img src="assets/candidate.webp" alt="Named person" '
+                'style="width:320px;height:320px;object-fit:contain"></figure>',
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 1)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            record = manifest["slides"][1]
+            self.assertTrue(record["identity_required"])
+            self.assertEqual(record["identity_detection"], "semantic-markup")
 
     def test_default_workspace_stays_under_agent_home_and_can_be_cleaned(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

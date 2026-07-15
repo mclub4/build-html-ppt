@@ -10,7 +10,7 @@ Every slide still retains all canonical captures. Only slides listed in `review_
 
 ## Batch Procedure
 
-For each generated batch of at most four slides:
+For each generated batch of at most four slides. Keep the batch intact in one vision call; do not open one call per slide or per image:
 
 1. Open exactly the full-size PNGs listed in each slide's `required_ai_profiles`. When `identity_required` is true, also open every local `identity_targets[].reference_path`.
 2. Inspect the images, not only HTML source, a contact sheet, or DOM metrics.
@@ -35,7 +35,7 @@ For `all` scope:
 - `text_bounds`: text remains inside its box, cell, button, badge, column, and safe area;
 - `density`: cards, panels, and decorative shapes justify their area and do not leave sparse copy stranded in oversized empty boxes;
 - `controls`: navigation and interactive elements are centered, readable, and usable.
-- `identity`: on `data-identity-review="required"` slides, every candidate matches its canonical reference and the intended character/person variant.
+- `identity`: on explicitly or automatically identity-routed slides, every candidate matches its canonical WebP reference and the intended character/person variant.
 
 Text-only changes use `text`, `text_bounds`, and `density`; image-only changes use crop, aspect ratio, resolution, and content match; navigation-only changes use controls. Identity-required `all` and `image` reviews also include `identity` and one cue-based `identity_review` entry per target.
 
@@ -49,13 +49,13 @@ Do not reuse generic approval text across slides. Do not claim a model or person
 
 ## Fix Loop
 
-After a scoped edit, rerender the changed slide and immediate neighbors with `--slides` and the matching `--change-type`. A global style/runtime change forces a full render. Reopen only the refreshed slides routed to AI review, then rerun `validate_visual_review.py`.
+After a scoped edit, rerun `validate_all.py --phase prepare` with `--slides` and the matching `--change-type`. The renderer keeps a CSS rule that matches one slide in that slide's fingerprint; shared styles and runtime changes still force a full render. Reopen only the refreshed slides routed to AI review, then run `validate_all.py --phase verify`.
 
 ## Full Validation Final Pass
 
 After all findings are settled:
 
-1. run `--finalize`;
+1. run `validate_all.py --phase finalize`;
 2. have an independent presentation editor score the deck once with `quality-bar.md`;
 3. add independent cross-reviews for cover, closing, and slides explicitly marked `data-visual-critical="true"`;
 4. bind cross-reviews to current capture hashes;

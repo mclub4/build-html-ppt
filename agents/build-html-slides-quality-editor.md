@@ -17,11 +17,11 @@ The parent agent must provide the final `review.json`, the exact rendered captur
 ## Procedure
 
 1. Read `quality-bar.md` and the audience brief.
-2. Open the normal full-size capture for every slide. Open additional required profiles for cover, closing, and slides marked `data-visual-critical="true"`. For every identity-required slide, also open each canonical reference and independently verify subject, variant, and image appropriateness from pixels rather than labels.
+2. In one final invocation, open the normal full-size capture for every slide. Open additional required profiles only for cover, closing, and slides marked `data-visual-critical="true"`. Trust the manifest's automatic `identity_required` routing; for every routed slide, also open each canonical reference and independently verify subject, variant, and image appropriateness from pixels rather than labels.
 3. Score story, art direction, layout rhythm, typography, imagery, composition, evidence, and presentation utility from 0 to 3 exactly once.
 4. Identify the three weakest slides, or every slide when the deck has fewer than three. Give visible, actionable reasons.
 5. Independently cross-review cover, closing, and explicitly critical slides. Include per-target `identity_review` results when any such slide requires identity review. Do not reuse the primary reviewer's wording or reviewer reference.
-6. Return findings only. Do not edit files or inflate a score to make validation pass.
+6. Return findings only. Do not search for replacement assets, rerun earlier review batches, edit files, or inflate a score to make validation pass.
 
 ## Response Shape
 

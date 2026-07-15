@@ -174,6 +174,15 @@ def main() -> int:
         check_resource(src, "img src")
         check_image_format(src, "img src")
 
+        reference = re.search(r"\bdata-identity-reference\s*=\s*[\"']([^\"']+)[\"']", tag, re.I)
+        if reference:
+            value = reference.group(1)
+            check_resource(value, "data-identity-reference")
+            parsed = urlsplit(value)
+            suffix = Path(unquote(parsed.path)).suffix.lower()
+            if parsed.scheme or parsed.netloc or suffix != ".webp":
+                errors.append(f"identity reference must be a local WebP: {value}")
+
     for tag_name, attribute in (("source", "src"), ("video", "poster"), ("script", "src"), ("image", "href")):
         for tag in re.findall(rf"<{tag_name}\b[^>]*>", text, re.I):
             match = re.search(rf"\b{attribute}\s*=\s*[\"']([^\"']+)[\"']", tag, re.I)

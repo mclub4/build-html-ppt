@@ -5,7 +5,6 @@
   const warnings = [];
   if (!active) return { ok: false, checked: 0, issues: ['Missing active slide'], warnings: [] };
 
-  const identityRequired = active.dataset.identityReview === 'required';
   const identityModes = new Set(['primary', 'contains']);
 
   const round = value => Math.round(value * 100) / 100;
@@ -22,6 +21,33 @@
   const elements = [...active.querySelectorAll('img, svg image')].filter(element => (
     rendered(element) && !element.hasAttribute('data-image-geometry-ignore')
   ));
+  const identitySetting = (active.dataset.identityReview || '').trim();
+  const hasIdentityMetadata = elements.some(element => [
+    element.dataset.subjectId,
+    element.dataset.subjectName,
+    element.dataset.identityReference,
+    element.dataset.identityCues,
+  ].some(value => (value || '').trim()));
+  const identityKinds = new Set(['character', 'person', 'cast', 'member', 'portrait', 'named-subject']);
+  const declaredIdentity = [active, ...active.querySelectorAll('[data-slide-kind],[data-content-kind]')]
+    .some(element => identityKinds.has(
+      (element.dataset.slideKind || element.dataset.contentKind || '').trim().toLowerCase()
+    ));
+  const semanticClass = [active, ...active.querySelectorAll('[class]')].some(element => (
+    [...element.classList].some(token => (
+      /(?:^|-)(?:character|person|cast|member|portrait)(?:-|$)/i.test(token)
+      || /^(?:profile-wrap|profile-gallery|profile-grid)$/i.test(token)
+    ))
+  ));
+  const semanticIdentity = declaredIdentity || semanticClass;
+  const identityRequired = identitySetting === 'required' || hasIdentityMetadata
+    || (identitySetting !== 'not-applicable' && semanticIdentity);
+  const identityDetection = identitySetting === 'required'
+    ? 'explicit'
+    : (hasIdentityMetadata ? 'subject-metadata' : (semanticIdentity ? 'semantic-markup' : 'none'));
+  if (identitySetting === 'not-applicable' && hasIdentityMetadata) {
+    issues.push('data-identity-review="not-applicable" conflicts with subject identity metadata');
+  }
   const items = [];
 
   for (const [index, element] of elements.entries()) {
@@ -97,7 +123,8 @@
       } else {
         cssScale = Math.max(rect.width / element.naturalWidth, rect.height / element.naturalHeight);
       }
-      const density = 1 / Math.max(cssScale * window.devicePixelRatio, 0.0001);
+      const browserScale = window.visualViewport?.scale || 1;
+      const density = 1 / Math.max(cssScale * window.devicePixelRatio * browserScale, 0.0001);
       item.pixelDensity = round(density);
       if (!decorative && !element.hasAttribute('data-low-res-ok') && density < 0.85) {
         issues.push(`${name}: effective raster resolution is only ${round(density)}x device pixels`);
@@ -116,6 +143,7 @@
     ok: issues.length === 0,
     checked: elements.length,
     identityRequired,
+    identityDetection,
     issues: [...new Set(issues)],
     warnings: [...new Set(warnings)],
     items,

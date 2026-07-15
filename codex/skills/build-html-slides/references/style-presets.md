@@ -38,15 +38,20 @@ function fitStage() {
   const viewport = window.visualViewport;
   const width = viewport?.width ?? document.documentElement.clientWidth;
   const height = viewport?.height ?? document.documentElement.clientHeight;
+  const offsetLeft = viewport?.offsetLeft ?? 0;
+  const offsetTop = viewport?.offsetTop ?? 0;
   const scale = Math.min(width / STAGE_WIDTH, height / STAGE_HEIGHT);
 
-  stage.style.left = `${Math.max(0, (width - STAGE_WIDTH * scale) / 2)}px`;
-  stage.style.top = `${Math.max(0, (height - STAGE_HEIGHT * scale) / 2)}px`;
+  stage.style.left = `${offsetLeft + Math.max(0, (width - STAGE_WIDTH * scale) / 2)}px`;
+  stage.style.top = `${offsetTop + Math.max(0, (height - STAGE_HEIGHT * scale) / 2)}px`;
   stage.style.transform = `scale(${scale})`;
+
+  nav.style.right = `${Math.max(0, document.documentElement.clientWidth - offsetLeft - width) + 14}px`;
+  nav.style.bottom = `${Math.max(0, document.documentElement.clientHeight - offsetTop - height) + 14}px`;
 }
 ```
 
-Listen to window resize/orientation changes and `visualViewport` resize/scroll events. Use `document.documentElement.clientWidth/clientHeight` only as fallback. Do not calculate the stage ratio from `window.innerWidth` or `window.innerHeight` alone.
+Listen to window resize/orientation changes and `visualViewport` resize/scroll events. Anchor progress and edge-click regions to the same offsets and dimensions as the stage; do not leave fixed controls at the layout viewport edge during browser zoom. Use `document.documentElement.clientWidth/clientHeight` only as fallback. Do not calculate the stage ratio from `window.innerWidth` or `window.innerHeight` alone.
 
 There is no second fluid `.deck` layout contract. Do not resize each slide to the browser's changing aspect ratio. A 1366×650 viewport shows a centered scaled 16:9 stage with side margins; it does not stretch the composition to 1366×650.
 

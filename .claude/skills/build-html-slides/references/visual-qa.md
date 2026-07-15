@@ -50,11 +50,11 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 
 ## Geometry And Runtime
 
-- The full 16:9 stage is centered and visible at each retained profile.
+- The full 16:9 stage is centered and visible at each retained profile, including Chromium page scale 1.5 with a measured 1280×720 `visualViewport`.
 - No text, logo, image, badge, diagram, or control crosses the stage.
 - Navigation order and page counter match the runtime contract.
 - Current page, separator, total, and icons are geometrically centered.
-- Hash navigation, direct page input, arrows, Page Up/Down, Home/End, fullscreen, edge clicks, and print behavior work when in scope.
+- Hash navigation, direct page input, arrows, Page Up/Down, Home/End, fullscreen, edge clicks, and print behavior pass `validate_browser_e2e.js`, not only source-string checks.
 - Final HTML retains authored motion and reduced-motion support.
 
 ## Evidence And Locale

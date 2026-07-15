@@ -6,15 +6,15 @@ Use this contract when a request asks for many fan artworks, as many images as p
 
 These are planning targets, not hard limits:
 
-- total delivery target: 90-120 minutes;
-- fan-art search target: 30-40 minutes;
+- total delivery target: 60-90 minutes for 20-25 slides;
+- fan-art search target: 25-35 minutes;
 - candidate target: 40-50 works;
 - selected fan-art target: 24-30 works;
 - normally one contact-sheet selection pass;
 - normally one replacement pass affecting no more than 20% of selected works;
-- aim to freeze asset selection around minute 45 and preserve the remaining time for implementation and validation.
+- aim to freeze asset selection around minute 35-40 and preserve the final 25-35 minutes for implementation and validation.
 
-Reaching the upper end of a target does not terminate the task. Use it as a checkpoint: inspect visual-role coverage, candidate quality, diversity, and remaining validation time. Freeze the set when it is already strong. Continue searching when the expected improvement is meaningful and the schedule remains reasonable. If the task is likely to exceed two hours, explain the cause and ask whether to continue discovery or finish with the current candidates; do not abruptly stop.
+Reaching the upper end of a target does not terminate the task. Use it as a checkpoint: inspect visual-role coverage, candidate quality, diversity, and remaining validation time. Freeze the set when it is already strong. Continue searching when the expected improvement is meaningful and the schedule remains reasonable. If the task is likely to exceed 90 minutes, explain the cause and ask whether to continue discovery or finish with the current candidates; do not abruptly stop.
 
 Interpret "maximum," "as many as possible," and similar superlatives as a request for a strong and varied set, not an automatic instruction to crawl every platform exhaustively. If the requested slide count cannot present the selected works legibly, prefer fewer stronger works over dense galleries. When the user explicitly prioritizes exhaustive coverage, adapt the targets and communicate the expected duration.
 
@@ -32,7 +32,7 @@ Interpret "maximum," "as many as possible," and similar superlatives as a reques
 
 - Use origin-verified, licensed, supplied, official, or original assets.
 - At the research checkpoint, prefer a smaller verified set over presenting uncertain fan art as cleared.
-- If further rights verification would push the task well beyond two hours, ask whether to continue verification or replace the affected work.
+- If further rights verification would push the task beyond 90 minutes, ask whether to continue verification or replace the affected work.
 
 ## Efficient Collection
 

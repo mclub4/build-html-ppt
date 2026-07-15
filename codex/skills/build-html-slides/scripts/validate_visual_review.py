@@ -22,11 +22,11 @@ except ImportError:  # Keep a dependency-free PNG decoder for portable validatio
 
 
 PROFILE_SPECS = {
-    "normal": {"viewport": "1920x1080", "screenshot": "1920x1080", "zoom": 1},
-    "short": {"viewport": "1366x650", "screenshot": "1366x650", "zoom": 1},
-    "zoom150": {"viewport": "1280x720", "screenshot": "1920x1080", "zoom": 1.5},
-    "tablet": {"viewport": "1024x768", "screenshot": "1024x768", "zoom": 1},
-    "mobile": {"viewport": "390x844", "screenshot": "390x844", "zoom": 1},
+    "normal": {"viewport": "1920x1080", "visual_viewport": "1920x1080", "screenshot": "1920x1080", "zoom": 1, "scale_mode": "none", "device_pixel_ratio": 1},
+    "short": {"viewport": "1366x650", "visual_viewport": "1366x650", "screenshot": "1366x650", "zoom": 1, "scale_mode": "none", "device_pixel_ratio": 1},
+    "zoom150": {"viewport": "1920x1080", "visual_viewport": "1280x720", "screenshot": "1920x1080", "zoom": 1.5, "scale_mode": "browser-page", "device_pixel_ratio": 1},
+    "tablet": {"viewport": "1024x768", "visual_viewport": "1024x768", "screenshot": "1024x768", "zoom": 1, "scale_mode": "none", "device_pixel_ratio": 1},
+    "mobile": {"viewport": "390x844", "visual_viewport": "390x844", "screenshot": "390x844", "zoom": 1, "scale_mode": "none", "device_pixel_ratio": 1},
 }
 BASE_PROFILES = ("normal", "short", "zoom150")
 RESPONSIVE_PROFILES = BASE_PROFILES + ("tablet", "mobile")
@@ -65,13 +65,41 @@ class SlideParser(HTMLParser):
         values = dict(attrs)
         classes = set(values.get("class", "").split())
         if tag == "section" and "slide" in classes:
+            identity_setting = (values.get("data-identity-review") or "").strip()
             self.current = {
                 "title": (values.get("data-title") or "").strip(),
                 "visual_critical": values.get("data-visual-critical") == "true",
-                "identity_required": values.get("data-identity-review") == "required",
+                "identity_setting": identity_setting,
+                "identity_metadata": False,
+                "identity_semantic": False,
+                "identity_required": identity_setting == "required",
+                "identity_detection": "explicit" if identity_setting == "required" else "none",
             }
             self.slides.append(self.current)
             self.slide_depth = len(self.stack)
+        if self.current is not None:
+            metadata = any((values.get(name) or "").strip() for name in (
+                "data-subject-id", "data-subject-name", "data-identity-reference", "data-identity-cues"
+            ))
+            declared_kind = (values.get("data-slide-kind") or values.get("data-content-kind") or "").strip().lower()
+            semantic = declared_kind in {"character", "person", "cast", "member", "portrait", "named-subject"} or any(
+                re.search(r"(?:^|-)(?:character|person|cast|member|portrait)(?:-|$)", token, re.I)
+                or re.fullmatch(r"(?:profile-wrap|profile-gallery|profile-grid)", token, re.I)
+                for token in classes
+            )
+            self.current["identity_metadata"] = bool(self.current["identity_metadata"] or metadata)
+            self.current["identity_semantic"] = bool(self.current["identity_semantic"] or semantic)
+            setting = str(self.current["identity_setting"])
+            required = setting == "required" or bool(self.current["identity_metadata"]) or (
+                setting != "not-applicable" and bool(self.current["identity_semantic"])
+            )
+            self.current["identity_required"] = required
+            self.current["identity_detection"] = (
+                "explicit" if setting == "required"
+                else "subject-metadata" if self.current["identity_metadata"]
+                else "semantic-markup" if self.current["identity_semantic"]
+                else "none"
+            )
         if tag not in VOID_TAGS:
             self.stack.append(tag)
 
@@ -176,6 +204,8 @@ def validate_identity_targets(
             if not candidate.is_relative_to(deck_root) or not candidate.is_file():
                 errors.append(f"slide {number} identity target {target_id} {kind}_path is not a local bundle file")
                 continue
+            if kind == "reference" and candidate.suffix.lower() != ".webp":
+                errors.append(f"slide {number} identity target {target_id} reference_path must be WebP")
             resolved[kind] = candidate
             supplied_hash = target.get(f"{kind}_sha256")
             if not valid_hash(supplied_hash) or supplied_hash != sha256(candidate):
@@ -555,7 +585,7 @@ def main() -> int:
         if not isinstance(supplied, dict):
             errors.append(f"missing viewport profile: {profile}")
             continue
-        for field in ("viewport", "screenshot"):
+        for field in ("viewport", "visual_viewport", "screenshot"):
             size = parse_size(supplied.get(field), f"{profile}.{field}", errors)
             if supplied.get(field) != expected[field]:
                 errors.append(f"{profile}.{field} must be {expected[field]}")
@@ -563,6 +593,9 @@ def main() -> int:
                 screenshot_sizes[profile] = size
         if supplied.get("zoom") != expected["zoom"]:
             errors.append(f"{profile}.zoom must be {expected['zoom']}")
+        for field in ("scale_mode", "device_pixel_ratio"):
+            if supplied.get(field) != expected[field]:
+                errors.append(f"{profile}.{field} must be {expected[field]}")
 
     automation_gate = manifest.get("automation_gate")
     if not isinstance(automation_gate, dict):
@@ -676,6 +709,9 @@ def main() -> int:
         expected_identity_required = bool(slide_parser.slides[number - 1]["identity_required"])
         if record.get("identity_required") is not expected_identity_required:
             errors.append(f"slide {number} identity_required does not match the HTML contract")
+        expected_identity_detection = str(slide_parser.slides[number - 1]["identity_detection"])
+        if record.get("identity_detection") != expected_identity_detection:
+            errors.append(f"slide {number} identity_detection does not match automatic HTML classification")
         identity_targets = validate_identity_targets(
             record, args.deck.parent.resolve(), number, expected_identity_required, errors
         )
@@ -743,7 +779,9 @@ def main() -> int:
             capture_hashes[number][profile] = actual_hash
             if capture.get("active_slide") != number or capture.get("active_title") != titles[number - 1]:
                 errors.append(f"slide {number} {profile} active slide evidence does not match the HTML")
-            for field in ("viewport", "screenshot", "zoom"):
+            for field in (
+                "viewport", "visual_viewport", "screenshot", "zoom", "scale_mode", "device_pixel_ratio"
+            ):
                 if capture.get(field) != PROFILE_SPECS[profile][field]:
                     errors.append(f"slide {number} {profile} capture {field} does not match the canonical profile")
             if capture.get("source_sha256") != source_hash:

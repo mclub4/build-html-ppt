@@ -26,9 +26,9 @@ The script checks Python, Node.js, Playwright, Chromium, and screenshot capture 
 
 ## Turnaround Envelope
 
-Full Validation controls review depth, not research breadth. For an ordinary deck, target the documented 40-50 minute turnaround. For image-heavy work, target 90-120 minutes and aim to reserve the final 35 minutes for settled rendering, batched AI inspection, fixes, final scoring, and required cross-review. These are planning targets, not forced limits.
+Full Validation controls review depth, not research breadth. For a 20-25 slide deck, target 40-90 minutes from settled brief to validated delivery. Ordinary decks should stay near the lower half; image-heavy decks use the upper half. Reserve the final 25-35 minutes for settled rendering, batched AI inspection, focused fixes, one final score, and required cross-review. These are planning targets, not a forced process timeout.
 
-For fan-art-heavy, image-collection, or "as many as possible" requests, `fan-art-budget.md` is mandatory. Check progress around 40 minutes or 50 candidates instead of stopping automatically. Freeze a strong set when coverage is sufficient; continue when further discovery is materially useful and enough validation time remains. If total work is likely to exceed two hours, explain the expected delay and ask whether to continue or finish with the current set. Do not add auxiliary source or per-image review agents in ordinary internal/private mode.
+For fan-art-heavy, image-collection, or "as many as possible" requests, `fan-art-budget.md` is mandatory. Check progress around 30-40 minutes or 40-50 candidates. Freeze a strong set when coverage is sufficient; continue only when the expected improvement justifies the remaining validation time. If the work is likely to exceed 90 minutes, explain the cause and ask whether to freeze the current set or continue. Do not add auxiliary source or per-image review agents in ordinary internal/private mode.
 
 ## Validation Workspace
 
@@ -50,22 +50,22 @@ Both rendered modes capture every slide at:
 
 - `normal`: 1920×1080 viewport and screenshot, zoom 1;
 - `short`: 1366×650 viewport and screenshot, zoom 1;
-- `zoom150`: 1280×720 CSS viewport, 1920×1080 screenshot, zoom 1.5.
+- `zoom150`: 1920×1080 layout viewport with Chromium page scale 1.5, a measured 1280×720 `visualViewport`, and a 1920×1080 screenshot. This is a browser zoom stress test, not a DPR-only capture.
 
 Add `tablet` 1024×768 and `mobile` 390×844 only when responsive device support is requested. Additional exploratory sizes supplement rather than replace canonical evidence.
 
 ## Quick Draft
 
-Run the deterministic deck, notes, interaction, source-cache, and Chromium geometry checks. Render all slides at all canonical profiles. Automated text bounds, container-density measurement, control geometry, and image geometry must complete before any AI inspection. Geometry issues block review; low-density container warnings route the affected slide and profile to AI inspection instead of failing automatically.
+Run the deterministic deck, notes, source-cache, interaction semantics, real-browser navigation/print E2E, and Chromium geometry checks. Render all slides at all canonical profiles. Automated text bounds, container-density measurement, control geometry, and image geometry must complete before any AI inspection. Geometry issues block review; low-density container warnings route the affected slide and profile to AI inspection instead of failing automatically.
 
 AI inspects only:
 
 - cover and closing slides;
 - slides explicitly marked `data-visual-critical="true"`;
 - slides and profiles named by automation warnings.
-- slides marked `data-identity-review="required"` for `all` or `image` review scope.
+- slides explicitly or automatically routed to identity review for `all` or `image` scope.
 
-Critical slides inspect every generated profile. A warning-triggered ordinary slide inspects `normal` plus the warned profiles. Identity-required slides inspect at least `normal`, including Quick Draft, and require local canonical references plus per-target cue-based verdicts. Missing identity metadata or reference files blocks AI review before batching. Other slides retain hash-bound captures and geometry results with `review_method: automated-geometry-only`; they must not claim an AI reviewer or observation.
+Critical slides inspect every generated profile. A warning-triggered ordinary slide inspects `normal` plus the warned profiles. Identity-required slides inspect at least `normal`, including Quick Draft, and require local canonical WebP references plus per-target cue-based verdicts. Identity review activates automatically from subject metadata, named-subject slide kinds, or character/person/profile markup; the slide flag is an explicit signal, not the only trigger. Missing identity metadata or reference files blocks AI review before batching. Other slides retain hash-bound captures and geometry results with `review_method: automated-geometry-only`; they must not claim an AI reviewer or observation.
 
 Quick Draft does not calculate the 24-point quality score, run independent cross-reviews, or require multiple reviewer agents. Report the AI-inspected subset separately from all-slide automated coverage.
 
@@ -84,35 +84,31 @@ After fixes settle, run `--finalize`, assign an independent presentation editor,
 
 ## Commands
 
-Quick Draft:
+Quick Draft preparation:
 
 ```bash
-node scripts/render_slides.js OUTPUT.html --mode quick
-python3 scripts/validate_visual_review.py OUTPUT.html
+python3 scripts/validate_all.py OUTPUT.html --mode quick --phase prepare
 ```
 
-Full Validation:
+Full Validation preparation:
 
 ```bash
-node scripts/render_slides.js OUTPUT.html --mode full --review-risk standard
-python3 scripts/validate_visual_review.py OUTPUT.html
-node scripts/render_slides.js OUTPUT.html --finalize
-python3 scripts/validate_visual_review.py OUTPUT.html
+python3 scripts/validate_all.py OUTPUT.html --mode full --review-risk standard --phase prepare
 ```
 
-Use `--responsive` only for requested tablet/mobile support.
+After filling the listed AI batches, run `python3 scripts/validate_all.py OUTPUT.html --phase verify`. For Full Validation, then run `--phase finalize`, fill the one quality score and required cross-reviews, and run `--phase verify` once more. The entrypoint executes structure, notes, source cache, reuse, locality, static interaction, browser E2E, render/geometry, and evidence checks in the required order. Use `--responsive` only for requested tablet/mobile support.
 
 ## Incremental Revision
 
 After the initial render, use:
 
 ```bash
-node scripts/render_slides.js OUTPUT.html \
+python3 scripts/validate_all.py OUTPUT.html --phase prepare \
   --mode quick|full --review-risk standard|high \
   --slides N --change-type text|image|navigation|all
 ```
 
-The renderer refreshes changed slides and immediate neighbors. It forces a full render when global styles, runtime, profile set, mode, review risk, or slide titles make reuse unsafe.
+The renderer refreshes changed slides and immediate neighbors. It fingerprints a CSS rule with exactly one matching slide, so a local style edit remains incremental. Shared styles, dynamic active-state selectors, runtime code, profile set, mode, review risk, or slide-title changes still force a full render when reuse is unsafe. Authors may also declare isolated rules with `<style data-slide-scope="N">`.
 
 Run checks by change type:
 

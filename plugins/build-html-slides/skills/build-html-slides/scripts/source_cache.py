@@ -16,46 +16,51 @@ RASTER_SUFFIXES = {".webp", ".png", ".jpg", ".jpeg", ".gif", ".tif", ".tiff", ".
 SOURCE_KINDS = {"official", "licensed", "fan-art", "generated", "supplied", "other"}
 URL_REQUIRED_KINDS = {"official", "licensed", "fan-art", "other"}
 FAN_ART_ORIGIN_STATUSES = {"origin-verified", "discovery-only"}
+IDENTITY_REFERENCE_KINDS = {"official", "licensed", "supplied"}
 
 
 class ImageParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
-        self.urls: set[str] = set()
+        self.uses: dict[str, set[str]] = {}
+
+    def record(self, url: str, role: str) -> None:
+        if url:
+            self.uses.setdefault(url, set()).add(role)
 
     def handle_starttag(self, tag: str, attrs) -> None:
         values = dict(attrs)
         if tag == "img" and values.get("src"):
-            self.urls.add(values["src"])
+            self.record(values["src"], "slide-image")
         elif tag == "source" and values.get("srcset"):
             for candidate in values["srcset"].split(","):
                 url = candidate.strip().split()[0] if candidate.strip() else ""
-                if url:
-                    self.urls.add(url)
+                self.record(url, "slide-image")
         elif tag == "image":
             url = values.get("href") or values.get("xlink:href")
-            if url:
-                self.urls.add(url)
+            self.record(url or "", "slide-image")
+        self.record(values.get("data-identity-reference", ""), "identity-reference")
 
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def local_assets(deck: Path) -> dict[str, Path]:
+def local_assets(deck: Path) -> dict[str, tuple[Path, tuple[str, ...]]]:
     parser = ImageParser()
     parser.feed(deck.read_text(encoding="utf-8"))
-    assets: dict[str, Path] = {}
-    for raw_url in parser.urls:
+    assets: dict[str, tuple[Path, tuple[str, ...]]] = {}
+    for raw_url, roles in parser.uses.items():
         parsed = urlparse(raw_url)
         if parsed.scheme in {"http", "https", "data"} or parsed.netloc:
             continue
         relative = unquote(parsed.path)
-        if not relative or Path(relative).suffix.lower() not in RASTER_SUFFIXES:
+        suffix = Path(relative).suffix.lower()
+        if not relative or (suffix not in RASTER_SUFFIXES and "identity-reference" not in roles):
             continue
         resolved = (deck.parent / relative).resolve()
         key = resolved.relative_to(deck.parent.resolve()).as_posix()
-        assets[key] = resolved
+        assets[key] = (resolved, tuple(sorted(roles)))
     return dict(sorted(assets.items()))
 
 
@@ -81,16 +86,19 @@ def update(deck: Path, cache_path: Path) -> int:
     entries = []
     reused = 0
     changed = 0
-    for relative, asset in local_assets(deck).items():
+    for relative, (asset, roles) in local_assets(deck).items():
         digest = sha256(asset) if asset.is_file() else ""
         previous = existing_entries.get(relative, {})
         if previous.get("sha256") == digest and digest:
-            entries.append(previous)
+            reused_entry = dict(previous)
+            reused_entry["roles"] = list(roles)
+            entries.append(reused_entry)
             reused += 1
             continue
         entries.append({
             "path": relative,
             "sha256": digest,
+            "roles": list(roles),
             "source_kind": previous.get("source_kind", ""),
             "source_url": previous.get("source_url", ""),
             "verified_at": "",
@@ -100,7 +108,7 @@ def update(deck: Path, cache_path: Path) -> int:
         })
         changed += 1
     cache = {
-        "schema_version": 1,
+        "schema_version": 2,
         "deck": deck.name,
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "assets": entries,
@@ -117,8 +125,8 @@ def check(deck: Path, cache_path: Path) -> int:
     except ValueError as exc:
         print(f"ERROR: {exc}")
         return 1
-    if cache.get("schema_version") != 1:
-        errors.append("schema_version must be 1")
+    if cache.get("schema_version") != 2:
+        errors.append("schema_version must be 2; run --update to migrate the source cache")
     if cache.get("deck") != deck.name:
         errors.append(f"deck must be {deck.name}")
     entries = cache.get("assets")
@@ -141,7 +149,7 @@ def check(deck: Path, cache_path: Path) -> int:
             errors.append(f"uncached local raster asset: {relative}")
         for relative in sorted(set(by_path) - set(expected)):
             errors.append(f"stale cache entry: {relative}")
-    for relative, asset in expected.items():
+    for relative, (asset, expected_roles) in expected.items():
         entry = by_path.get(relative)
         if entry is None:
             continue
@@ -150,6 +158,9 @@ def check(deck: Path, cache_path: Path) -> int:
             continue
         if entry.get("sha256") != sha256(asset):
             errors.append(f"asset hash changed; run --update: {relative}")
+        roles = entry.get("roles")
+        if roles != list(expected_roles):
+            errors.append(f"asset roles changed; run --update: {relative}")
         kind = entry.get("source_kind")
         if kind not in SOURCE_KINDS:
             errors.append(f"asset source_kind is invalid: {relative}")
@@ -164,6 +175,13 @@ def check(deck: Path, cache_path: Path) -> int:
                 errors.append(f"fan-art origin_status is invalid: {relative}")
             if not isinstance(entry.get("credit"), str) or not entry["credit"].strip():
                 errors.append(f"fan-art requires visible creator credit: {relative}")
+        if "identity-reference" in expected_roles:
+            if asset.suffix.lower() != ".webp":
+                errors.append(f"identity reference must be a local WebP: {relative}")
+            if kind not in IDENTITY_REFERENCE_KINDS:
+                errors.append(
+                    f"identity reference source_kind must be official, licensed, or supplied: {relative}"
+                )
         try:
             datetime.fromisoformat(str(entry.get("verified_at", "")).replace("Z", "+00:00"))
         except ValueError:

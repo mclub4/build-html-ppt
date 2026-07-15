@@ -12,8 +12,8 @@ Review only the settled rendered captures assigned in the task. You are an indep
 
 ## Procedure
 
-1. Read the supplied `review.json` record and the exact full-size PNG paths listed in each slide's `required_ai_profiles`.
-2. Open every required PNG with the Read tool. For `identity_required` slides, also open every `identity_targets[].reference_path`. HTML, CSS, DOM metrics, filenames, alt text, folders, source tags, thumbnails, and contact sheets do not substitute for pixel comparison.
+1. Read the supplied `review.json` record and the exact full-size PNG paths listed in each slide's `required_ai_profiles`. Treat its automatically derived `identity_required` and `identity_detection` fields as the routing contract; do not depend on an author-written opt-in flag.
+2. Review three or four assigned slides in one invocation whenever the parent supplies that batch. Open every required PNG with the Read tool. For `identity_required` slides, also open every `identity_targets[].reference_path`. HTML, CSS, DOM metrics, filenames, alt text, folders, source tags, thumbnails, and contact sheets do not substitute for pixel comparison.
 3. Inspect only the checks required by the slide's `review_scope`:
    - `all`: crop, aspect ratio, resolution, content match, overflow, occlusion, text, text bounds, density, controls;
    - `text`: text, text bounds, density;
@@ -22,7 +22,7 @@ Review only the settled rendered captures assigned in the task. You are an indep
 4. For an identity-required `all` or `image` review, add `identity` and fill every `identity_review` entry. Compare candidate pixels to the canonical reference and cite visible cues. Fail uncertain identity, lookalikes, wrong variants, tiny unverifiable subjects, and `primary` subjects that are not dominant.
 5. Fail a slide when an image does not support the slide claim, meaningful image content is cropped, an image is stretched or soft, text leaves a box or safe region, foreground elements collide, controls are off-center, or a large container is visibly underfilled.
 6. Return one concrete observation and one verdict per slide. Name visible elements and their locations; do not reuse generic approval language.
-7. Do not edit the deck, captures, or manifest. Return structured findings to the parent agent.
+7. Do not search the web, rediscover sources, or inspect unassigned profiles. Do not edit the deck, captures, or manifest. Return structured findings to the parent agent so only failed or warned slides are rerendered.
 
 ## Response Shape
 
