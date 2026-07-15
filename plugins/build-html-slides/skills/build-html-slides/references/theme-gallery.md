@@ -52,8 +52,8 @@ Choose one primary visual system after identifying the audience, subject, and em
 - Best for: market reports, investigations, performance reviews, policy evidence
 - Type: editorial sans with tabular numerals and compact source labels
 - Palette: warm white, ink, one highlight, semantic red/green used sparingly
-- Grammar: headline-first charts, annotated deltas, source rails, map or timeline evidence, conclusion boxes
-- Signature slides: finding headline, one-chart argument, before/after, timeline, methodology, implications
+- Grammar: headline-first charts, annotated deltas, source rails, map or timeline evidence, conclusion boxes, and sourced context photography when the market concerns physical products, facilities, people, or infrastructure
+- Signature slides: finding headline, one-chart argument, subject-setting image, before/after, timeline, methodology, implications
 - Avoid: dashboard density and charts without a stated takeaway
 
 ## 7. Destination Magazine
@@ -142,7 +142,7 @@ Choose one primary visual system after identifying the audience, subject, and em
 - Best for: biology, medicine, climate, space, materials, research communication
 - Type: precise serif display or specimen labels with highly legible sans body and tabular numerals
 - Palette: warm laboratory white, ink, one specimen-derived accent, semantic colors reserved for findings
-- Grammar: plate numbers, callout leaders, calibrated scales, sectional diagrams, magnified details, evidence captions, restrained grids
+- Grammar: plate numbers, callout leaders, calibrated scales, sectional diagrams, sourced microscopy, pathology, medical or field imagery when relevant, magnified details, evidence captions, restrained grids
 - Signature slides: specimen cover, annotated plate, mechanism sequence, comparison table, uncertainty map, findings summary
 - Avoid: decorative pseudo-science, unlabeled scales, invented measurements, and generated imagery presented as factual evidence
 

@@ -19,7 +19,7 @@ For each generated batch of at most four slides. Keep the batch intact in one vi
 5. Fill only the checks required by `review_scope`. Complete each `identity_review` entry from pixel comparison, never from labels or filenames.
 6. Record a readable reviewer label and stable run-specific `reviewer_ref`.
 
-Use contact sheets only to notice deck-wide rhythm, repetition, or density. They do not replace slide-level inspection.
+Use contact sheets only to notice deck-wide rhythm, repetition, density, or a report-like absence of subject imagery. They do not replace slide-level inspection. In Full Validation, the final quality editor must assess whether the deck's overall media mix fits the subject rather than rewarding chart-only rigor by default.
 
 ## Visual Checks
 
@@ -28,7 +28,7 @@ For `all` scope:
 - `crop`: meaningful content remains fully visible;
 - `aspect_ratio`: images, logos, screenshots, and diagrams are not stretched;
 - `resolution`: raster detail is adequate at displayed size;
-- `content_match`: each meaningful image actually depicts and supports the slide's claimed subject, event, product, place, or concept; labels are not evidence;
+- `content_match`: each meaningful image actually depicts and supports the slide's claimed subject, event, product, place, or concept; labels are not evidence. On the cover, chapter openers, company/entity profiles, and mechanism slides, also fail when a physical or observable subject that reasonably needs to be seen is replaced only by generic SVG, chart, or text treatment;
 - `completion`: no visible placeholder, temporary/dummy asset, empty media frame, or generic substitute graphic stands in for a promised real subject image; `PLACE NOTE` is an automatic failure, not a design label;
 - `overflow`: text and components remain inside their intended regions;
 - `occlusion`: media and decoration do not obscure copy or controls;

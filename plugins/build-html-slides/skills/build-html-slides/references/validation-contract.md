@@ -26,7 +26,7 @@ The script checks Python, Node.js, Playwright, Chromium, and screenshot capture 
 
 ## Turnaround Envelope
 
-Full Validation controls review depth, not research breadth. For a 20-25 slide deck, target 40-90 minutes from settled brief to validated delivery. Ordinary decks should stay near the lower half; image-heavy decks use the upper half. Reserve the final 25-35 minutes for settled rendering, batched AI inspection, focused fixes, one final score, and required cross-review. These are planning targets, not a forced process timeout.
+Full Validation controls review depth, not research breadth, art direction, or media variety. It must not simplify an image-worthy physical, industrial, product, or research subject into a report made only of text, charts, tables, and generic SVGs. For a 20-25 slide deck, target 40-90 minutes from settled brief to validated delivery. Ordinary decks should stay near the lower half; image-heavy decks use the upper half. Reserve the final 25-35 minutes for settled rendering, batched AI inspection, focused fixes, one final score, and required cross-review. These are planning targets, not a forced process timeout.
 
 For fan-art-heavy, image-collection, or "as many as possible" requests, `fan-art-budget.md` is mandatory. Check progress around 30-40 minutes or 40-50 candidates. Freeze a strong set when coverage is sufficient; continue only when the expected improvement justifies the remaining validation time. If the work is likely to exceed 90 minutes, explain the cause and ask whether to freeze the current set or continue. Do not add auxiliary source or per-image review agents in ordinary internal/private mode.
 

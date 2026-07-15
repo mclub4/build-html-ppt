@@ -92,6 +92,17 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("When `drawio-skill` is already available", architecture)
         self.assertIn("self-contained SVG", architecture)
 
+    def test_physical_subjects_keep_real_world_or_scientific_imagery(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        media = (ROOT / "references" / "media-strategy.md").read_text(encoding="utf-8")
+        quality = (ROOT / "references" / "quality-bar.md").read_text(encoding="utf-8")
+        self.assertIn("Full Validation controls assurance depth, not research breadth, art direction, or visual-media variety", skill)
+        self.assertIn("## Classify the visual job semantically", media)
+        self.assertIn("AI-driven semiconductor market change", media)
+        self.assertIn("Cancer treatment research and development", media)
+        self.assertIn("four to eight distinct sourced visual anchors", media)
+        self.assertIn("must not remove useful subject imagery", quality)
+
 
 if __name__ == "__main__":
     unittest.main()

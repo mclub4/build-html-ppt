@@ -34,7 +34,9 @@ Do not use the same dominant composition on three consecutive slides. Do not use
 ## Imagery expectations
 
 - Promotional, entertainment, travel, lifestyle, portfolio, and product decks: use meaningful raster imagery across most of the story.
-- Technical and strategy decks: combine diagrams and data layouts with enough factual or atmospheric imagery to establish stakes and provide chapter rhythm.
+- Technical, strategy, market, industrial, and research decks: read `media-strategy.md`. When the subject is physical or observable, combine diagrams and data layouts with sourced product, facility, equipment, infrastructure, microscopy, pathology, medical, laboratory, field, or other subject-specific imagery that establishes what the audience is discussing.
+- Full Validation must improve image relevance, provenance, crop, resolution, and captions; it must not remove useful subject imagery merely to make the deck easier to verify.
+- A 12-20 slide physical-subject deck often needs four to eight distinct visual anchors across the cover, chapters, major entities, and key mechanisms. Treat this as a planning range, not a quota.
 - Use distinct assets for distinct narrative jobs. A different crop of the same image is not a new visual idea.
 - Convert every raster deliverable asset to WebP before referencing it in HTML. Keep SVG for logos, icons, and editable vector diagrams.
 - Avoid low-resolution thumbnails, screenshots with unreadable embedded text, generic stock filler, and decorative images that do not support the slide claim.
@@ -61,7 +63,7 @@ Score each dimension from 0 to 3 on rendered slides.
 | Art direction | default template | colors changed only | cohesive system | distinctive, topic-specific visual world |
 | Layout rhythm | one repeated layout | minor variation | several useful families | deliberate pacing and chapter resets |
 | Typography | cramped or generic | readable | strong hierarchy | expressive and language-aware |
-| Imagery | absent or filler | sparse/repetitive | purposeful | narrative, sourced, well-cropped, and varied |
+| Imagery | subject unseen, absent, or filler | sparse, repetitive, or wrong medium | subject-appropriate real/scientific/diagram coverage | narrative, sourced, well-cropped, varied, and evidentially clear |
 | Composition | clipped/underfilled/overfull | mechanically aligned | balanced | confident focal hierarchy and movement |
 | Evidence | unsupported or detached | present but weak | integrated sources | evidence strengthens the visual argument |
 | Presentation utility | broken or awkward | functional | smooth controls and notes | rehearsal-ready and audience-aware |
@@ -73,6 +75,7 @@ This rubric is used only in Full Validation. After the render/fix loop is settle
 - The output still looks like the starter template.
 - Three or more consecutive slides share the same dominant layout.
 - A product, game, place, person, or event deck relies mainly on text and generic cards.
+- A materially observable industry, product chain, facility, device, experiment, biological phenomenon, or research modality is shown almost entirely through text, tables, charts, and generic SVGs even though suitable subject imagery is reasonably available.
 - A rendered slide contains oversized low-information surfaces or decorative empty boxes that are not justified by a hero, chapter, comparison, interaction, or fixed-format visual.
 - The cover lacks a clear first-viewport identity signal for the named subject.
 - The deck has no designed closing payoff.

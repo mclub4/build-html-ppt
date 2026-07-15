@@ -30,6 +30,9 @@ Use this checklist while inspecting the rendered slides selected by `validation-
 
 ## Imagery
 
+- The deck's medium matches the subject. Physical industries, products, facilities, equipment, people, experiments, organisms, tissue, and clinical or laboratory phenomena receive enough sourced real-world or scientific imagery to establish the subject; charts and SVGs do not replace seeing the thing itself.
+- The cover or opening sequence visually establishes a materially observable subject unless confidentiality, availability, or a deliberate abstract communication job justifies another approach.
+- Data-heavy slides may remain chart-first, but the overall sequence still has image-led context and chapter rhythm when the subject benefits from it.
 - Official marks retain aspect ratio and clear space.
 - Key visuals use `contain` when faces, products, title art, UI, diagrams, or edges matter.
 - Decorative `cover` crops do not remove meaningful content.
@@ -72,6 +75,7 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - unreadable contrast or foreground media over copy;
 - broken/missing local assets;
 - generic starter styling or repeated default composition;
+- a report-like, image-starved treatment of a materially observable subject despite suitable factual imagery being reasonably available;
 - wrong region, unsupported factual claims, or misleading provenance;
 - wrong character/person, wrong variant, unverifiable identity, or thematically inappropriate imagery;
 - any visible placeholder or generic replacement graphic standing in for missing factual or subject-specific media;

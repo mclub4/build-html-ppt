@@ -13,6 +13,8 @@ Build a small source map before downloading. Search in the subject's native lang
 | Music and culture | artist/label/promoter media, venue and festival galleries, music-video stills, magazine/editorial photography, photographer accounts, fan communities, Instagram, X, TikTok, YouTube, Tumblr and Pinterest |
 | Travel, food, place | tourism boards, venue and operator galleries, local publications, map/street imagery, Wikimedia Commons, Flickr, Unsplash, Pexels, Instagram, blogs and community reviews |
 | Product and technology | newsroom, media kit, manuals, launch events, official demos, credible reviews, conference talks, repositories, technical blogs, YouTube and practitioner communities |
+| Semiconductor, manufacturing, infrastructure | company newsrooms and media kits, foundries, equipment and materials suppliers, product galleries, fabs and packaging facilities, industry associations, conference media, government laboratories, data-center operators, power and cooling vendors |
+| Biomedical and clinical research | university and hospital media, government and public-domain repositories, open-license microscopy and pathology collections, source papers and supplements, laboratory and instrument vendors, trial or research-group pages; verify modality, specimen, scale, study context, privacy, and reuse terms |
 | History and research | libraries, museums, public archives, institutional collections, Wikimedia Commons, Flickr Commons, Internet Archive, papers and government media repositories |
 
 Use general web and image search as routing layers. Add site-specific searches when a promising platform is not surfaced naturally. Do not treat the first ten results as the available visual world.
