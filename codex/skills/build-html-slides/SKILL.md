@@ -66,6 +66,14 @@ The preflight never installs software. If it fails, report the exact missing or 
 
 Full Validation controls assurance depth, not research breadth. For 20-25 slides, target 40-90 minutes. When a request asks for many, as many as possible, or a large collection of fan artworks, read `references/fan-art-budget.md` before searching. Use its planning targets to protect implementation and validation time, but treat them as checkpoints rather than hard caps. If the task is likely to exceed 90 minutes, explain why and ask whether to continue discovery or freeze the current set; do not abruptly stop the work.
 
+## Optional Companion Routing
+
+- Inspect the skills already available in the current agent session before drafting. Never install or configure a missing companion during deck work without explicit consent.
+- If `humanize-korean` is available and the deliverable contains Korean, invoke it once after facts, numbers, proper nouns, citations, and slide order have settled. Apply it to slide copy and presenter notes without waiting for a separate request. Review the diff and reject any change to meaning, factual claims, figures, names, source scope, or technical terminology.
+- If `drawio-skill` is available and the deck needs an architecture, network or cloud topology, deployment view, ERD, UML, sequence, BPMN, swimlane, codebase structure, or a complex multi-component flow that benefits from editable rich shapes, invoke it proactively without waiting for a separate request. Read `references/architecture-diagrams.md` for the handoff contract.
+- Keep simple slide-native grids, two- or three-node flows, and diagrams whose main purpose is staged animation in semantic HTML/CSS or inline SVG. Do not pay the draw.io export and review cost when it adds no clarity or editability.
+- Prefer a self-contained SVG export plus the editable `.drawio` source. Inline external icons and fonts so the final deck remains offline portable. If drawio-skill is present but its required draw.io desktop CLI is missing, ask before installing it; if the user declines, fall back to the native diagram path. Graphviz remains optional and also requires consent.
+
 ## Story And Copy
 
 - Give every slide one main claim and one communication job.

@@ -167,6 +167,8 @@ echo
 echo "Post-install guidance:"
 echo "- Optional Korean polish: epoko77-ai/im-not-ai provides humanize-korean for slide copy and presenter notes after facts, numbers, names, and citations are settled. It is not bundled or installed automatically."
 echo "- After installing im-not-ai separately, invoke /humanize-korean in Claude Code or \$humanize-korean in Codex; Codex uses its Fast single-call mode."
+echo "- Optional technical diagrams: Agents365-ai/drawio-skill can create editable architecture, topology, ERD, UML, sequence, BPMN, swimlane, and complex flow diagrams. Local export requires the draw.io desktop CLI; Graphviz is optional for large auto-layouts."
+echo "- AI installer: check which companions are missing, then ask whether to install im-not-ai and/or drawio-skill. Do not install either companion, draw.io, Graphviz, or system packages without explicit consent."
 if [ "$installed_claude" -eq 1 ]; then
   echo "- Claude Code can inspect rendered images but does not include a raster image generator by default. Connect a compatible image-generation plugin, MCP server, or external tool separately if generated imagery is needed."
   echo "- Do not install or configure an image generator, credentials, or a paid service without explicit user consent. The slide skill still works without one."

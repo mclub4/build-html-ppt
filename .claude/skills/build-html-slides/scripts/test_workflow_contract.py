@@ -81,6 +81,17 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("### Travel routing", playbook)
         self.assertIn("Japanese travel does not automatically mean dark green", playbook)
 
+    def test_installed_companions_are_routed_without_implicit_installation(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        architecture = (ROOT / "references" / "architecture-diagrams.md").read_text(encoding="utf-8")
+        self.assertIn("## Optional Companion Routing", skill)
+        self.assertIn("If `humanize-korean` is available", skill)
+        self.assertIn("If `drawio-skill` is available", skill)
+        self.assertIn("without waiting for a separate request", skill)
+        self.assertIn("ask before installing", skill)
+        self.assertIn("When `drawio-skill` is already available", architecture)
+        self.assertIn("self-contained SVG", architecture)
+
 
 if __name__ == "__main__":
     unittest.main()
