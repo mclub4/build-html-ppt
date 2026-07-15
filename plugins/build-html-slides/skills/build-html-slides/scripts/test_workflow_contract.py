@@ -71,6 +71,16 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("Choose the type system without asking a separate font question", typography)
         self.assertTrue((ROOT / "scripts" / "validate_placeholders.py").is_file())
 
+    def test_consumer_travel_routes_to_destination_magazine(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        gallery = (ROOT / "references" / "theme-gallery.md").read_text(encoding="utf-8")
+        playbook = (ROOT / "references" / "theme-playbook.md").read_text(encoding="utf-8")
+        self.assertIn("ordinary leisure guides default to Destination Magazine", skill)
+        self.assertIn("## 7. Destination Magazine", gallery)
+        self.assertIn("Do not select Field Notes merely because the subject is travel", gallery)
+        self.assertIn("### Travel routing", playbook)
+        self.assertIn("Japanese travel does not automatically mean dark green", playbook)
+
 
 if __name__ == "__main__":
     unittest.main()

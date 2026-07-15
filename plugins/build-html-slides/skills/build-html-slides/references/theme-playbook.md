@@ -6,6 +6,7 @@ Read `theme-gallery.md`, then define six decisions before styling: three mood ad
 
 | Direction | Best for | Visual grammar |
 |---|---|---|
+| Destination magazine | consumer travel guides, itineraries, city and food recommendations | destination-derived color, bold cover hierarchy, editorial photo pacing, route maps, neighborhood spreads, compact practical metadata |
 | Editorial field guide | security, policy, strategy, architecture | paper + forest/dark surfaces, serif display with sans utility, thin rules, mint/orange accents, generous margins, diagrams and matrices |
 | Technical night | infrastructure, developer tools, systems | near-black/navy, cyan or green accent, monospace details, glowing nodes, code and topology diagrams |
 | Minimal corporate | proposals, reports, roadmaps | warm white or navy, restrained blue/green, clean grid, quiet transitions, data-first layouts |
@@ -20,6 +21,20 @@ Read `theme-gallery.md`, then define six decisions before styling: three mood ad
 | Financial trust | banking, fintech, stablecoins, payments | tabular numerals, reserve composition, money movement, fiat/chain boundaries, audit trails, semantic risk color |
 
 These are routing hints, not fixed presets. Use the larger gallery for distinctive directions including Neo Brutalist, Riso Zine, Scientific Atlas, Blueprint Workshop, Documentary Photo Essay, Spatial Interface, and Ledger Trust alongside the original gallery. Mix only compatible attributes.
+
+### Travel routing
+
+Treat travel as a set of editorial jobs, not one visual theme:
+
+| Communication job | Primary direction | Typical treatment |
+|---|---|---|
+| Leisure guide, itinerary, city or food recommendations | Destination Magazine | travel-magazine cover hierarchy, destination photography, editorial spreads, route and practical-info modules |
+| Premium hotel, resort, ryokan, wellness stay | Soft Kinetic or Museum Catalog | quiet image-led pacing, material and service details, elegant but readable typography |
+| Expedition, ecology, research trip, first-person observations | Field Notes | field evidence, annotated maps, observation-to-insight sequence, restrained notebook cues |
+| Reportage, oral history, heritage, community story | Documentary Photo Essay | full-frame documentary photography, place/date slugs, testimony, map interludes |
+| Tourism campaign or destination launch | Destination Magazine with Product Keynote accents | aspirational hero imagery, memorable claims, seasonal reasons to visit, decisive closing |
+
+For an ordinary Tokyo, Kyoto, Osaka, or regional Japan guide, start from Destination Magazine unless the brief clearly asks for luxury hospitality, documentary reporting, or field research. Infer the palette from the actual season and photographs. A contemporary city guide may use bold grotesk display type, while a heritage-focused guide may use a serif/sans contrast; Japanese travel does not automatically mean dark green, off-white, or a serif headline.
 
 ## Theme contract
 

@@ -79,6 +79,7 @@ Full Validation controls assurance depth, not research breadth. For 20-25 slides
 - Translate the theme into type, surfaces, shapes, imagery, information density, and motion, not color alone.
 - Choose typography proactively from the language, subject, audience, and room. Declare `--font-display`, `--font-body`, and `--font-mono`; use a deliberate display/body contrast when the theme benefits from it. Do not ship the shell's neutral font stack unchanged or fall back to bare `system-ui` as the final art direction.
 - Use the theme gallery as a vocabulary, not a template library. Combine composition families coherently within one visual system.
+- Classify the communication job before mapping a subject to a theme. For travel, distinguish consumer magazine, premium hospitality, documentary reportage, and expedition records; ordinary leisure guides default to Destination Magazine rather than Field Notes.
 - Test the longest title and densest body copy in the actual writing system before committing to typography.
 - Do not ship generic demo styling, repeated three-card layouts, decorative gradient blobs, or a recognizable reference deck copied pixel for pixel.
 - Promotional, entertainment, product, travel, event, and narrative decks normally need meaningful raster imagery across the story. Technical decks need visual evidence, diagrams, states, or flows rather than walls of prose.

@@ -155,7 +155,8 @@ Useful starting directions, not fixed templates:
 
 | Deck character | Display direction | Body/data direction |
 | --- | --- | --- |
-| Travel, culture, editorial | MaruBuri or Noto Serif KR when warmth/history matters; a restrained grotesk for contemporary city travel | Pretendard, SUIT, or Noto Sans KR |
+| Consumer travel magazine | Bold contemporary Korean sans for city, food, and itinerary covers; serif/sans editorial contrast only when the destination story benefits from it | Pretendard, SUIT, or Noto Sans KR |
+| Heritage, reflective travel, culture | MaruBuri or Noto Serif KR when warmth, history, or literary pacing matters; a restrained grotesk for contemporary treatment | Pretendard, SUIT, or Noto Sans KR |
 | Finance, stablecoin, enterprise | IBM Plex Sans KR, Pretendard, or SUIT with firm numeric hierarchy | Same family or Noto Sans KR; IBM Plex Mono for code/addresses |
 | Product, technology, strategy | Pretendard, SUIT, Noto Sans KR, or another clean humanist sans | Same family with distinct weight/width; JetBrains Mono or IBM Plex Mono only for technical tokens |
 | Game, anime, entertainment | One topic-appropriate expressive display face for short headlines | Pretendard, SUIT, or Noto Sans KR for all explanatory copy |
