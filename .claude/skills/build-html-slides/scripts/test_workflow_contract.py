@@ -60,6 +60,17 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("Omitting the slide flag does not bypass review", identity)
         self.assertIn("local WebP reference", identity)
 
+    def test_placeholders_are_blocked_and_typography_is_selected_proactively(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
+        quality = (ROOT / "references" / "quality-bar.md").read_text(encoding="utf-8")
+        typography = (ROOT / "references" / "style-presets.md").read_text(encoding="utf-8")
+        self.assertIn("Placeholders may exist only in the private authoring workspace", skill)
+        self.assertIn("placeholder gate runs in every phase and mode", contract)
+        self.assertIn("One occurrence blocks delivery", quality)
+        self.assertIn("Choose the type system without asking a separate font question", typography)
+        self.assertTrue((ROOT / "scripts" / "validate_placeholders.py").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -147,6 +147,22 @@ Never use `cover` for transparent logos, posters, product shots, UI screenshots,
 
 ## Logical Canvas Typography
 
+### Automatic type direction
+
+Choose the type system without asking a separate font question unless the user supplied brand rules or requests control. Infer it from language, subject, audience, and tone, then declare and apply `--font-display`, `--font-body`, and `--font-mono`. The runtime shell's neutral Korean-safe stack is only a fallback; a finished deck must make a deliberate choice and must not reduce typography to bare `system-ui`.
+
+Useful starting directions, not fixed templates:
+
+| Deck character | Display direction | Body/data direction |
+| --- | --- | --- |
+| Travel, culture, editorial | MaruBuri or Noto Serif KR when warmth/history matters; a restrained grotesk for contemporary city travel | Pretendard, SUIT, or Noto Sans KR |
+| Finance, stablecoin, enterprise | IBM Plex Sans KR, Pretendard, or SUIT with firm numeric hierarchy | Same family or Noto Sans KR; IBM Plex Mono for code/addresses |
+| Product, technology, strategy | Pretendard, SUIT, Noto Sans KR, or another clean humanist sans | Same family with distinct weight/width; JetBrains Mono or IBM Plex Mono only for technical tokens |
+| Game, anime, entertainment | One topic-appropriate expressive display face for short headlines | Pretendard, SUIT, or Noto Sans KR for all explanatory copy |
+| Premium, fashion, hospitality | An elegant licensed serif or high-contrast display face | A quiet sans with compatible Korean metrics |
+
+Test the exact Korean/Latin/numeral mix before committing. Use no more than two primary families plus one mono family. A novelty face belongs only in short display copy, never paragraphs or tables. When portability requires bundled fonts, use local WOFF2 files with redistribution-compatible licenses and retain their license/credit; otherwise use an intentional cross-platform fallback stack. Never load a remote font at runtime.
+
 Use values appropriate to the 1280×720 logical canvas:
 
 - display title: typically 44–68px;

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import tempfile
 import unittest
@@ -128,6 +129,20 @@ class ValidateDeckTests(unittest.TestCase):
         template = TEMPLATE.read_text(encoding="utf-8")
         self.assertNotIn('class="nav-title"', template)
         self.assertNotIn('id="navTitle"', template)
+
+    def test_generic_system_font_only_deck_fails(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8")
+        html = re.sub(r'--font-display:\s*[^;]+;', '--font-display: system-ui, sans-serif;', html)
+        html = re.sub(r'--font-body:\s*[^;]+;', '--font-body: system-ui, sans-serif;', html)
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("deliberate named display/body font stack", result.stdout)
+
+    def test_theme_font_variables_are_required(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8").replace("--font-display:", "--removed-display:", 1)
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("typography must declare --font-display", result.stdout)
 
     def test_geometry_checks_page_counter_centers(self) -> None:
         geometry = GEOMETRY_CHECK.read_text(encoding="utf-8")

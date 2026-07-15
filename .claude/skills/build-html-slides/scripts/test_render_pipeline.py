@@ -132,6 +132,7 @@ const { chromium } = require('playwright');
 
             manifest_path = review_dir / "review.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["schema_version"], 7)
             self.assertEqual(list(manifest["viewports"]), ["normal", "short", "zoom150"])
             self.assertEqual(manifest["viewports"]["zoom150"]["viewport"], "1920x1080")
             self.assertEqual(manifest["viewports"]["zoom150"]["visual_viewport"], "1280x720")
@@ -336,6 +337,7 @@ const { chromium } = require('playwright');
             self.assertEqual(len(record["identity_targets"]), 1)
             self.assertEqual(record["identity_targets"][0]["reference_path"], "assets/identity/official.webp")
             self.assertIn("content_match", record["checks"])
+            self.assertIn("completion", record["checks"])
             self.assertIn("identity", record["checks"])
             self.complete_rendered_reviews(manifest)
             manifest_path.write_text(f"{json.dumps(manifest, ensure_ascii=False, indent=2)}\n", encoding="utf-8")

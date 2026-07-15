@@ -208,6 +208,30 @@ def main() -> int:
             if "icon" in rel.group(1).lower().split():
                 check_image_format(value, f"link rel={rel.group(1)}")
     styles = "\n".join(re.findall(r"<style\b[^>]*>([\s\S]*?)</style>", text, re.I))
+    for variable in ("--font-display", "--font-body"):
+        if not re.search(rf"{re.escape(variable)}\s*:\s*[^;}}]+", styles, re.I):
+            errors.append(f"typography must declare {variable} for the selected theme")
+    generic_families = {
+        "serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-serif",
+        "ui-sans-serif", "ui-monospace", "ui-rounded", "math", "fangsong", "inherit", "initial",
+    }
+    font_values = re.findall(
+        r"(?:font-family|--font-(?:display|body))\s*:\s*([^;}}]+)", styles, re.I
+    )
+    named_families = []
+    for value in font_values:
+        for family in value.split(","):
+            normalized = family.strip().strip("\"'").lower()
+            if normalized and normalized not in generic_families and not normalized.startswith("var("):
+                named_families.append(normalized)
+    if not named_families:
+        errors.append("typography needs a deliberate named display/body font stack, not generic system families only")
+    if re.search(
+        r"body\s*\{[^}]*font-family\s*:\s*(?:system-ui\s*,\s*)?(?:sans-serif|system-ui)\s*;",
+        styles,
+        re.I | re.S,
+    ):
+        errors.append("body typography must not remain a bare system-ui/sans-serif shell default")
     for match in re.finditer(r'url\(\s*(?:"([^"]*)"|\'([^\']*)\'|([^\)"\']+))\s*\)', styles, re.I):
         value = next(group for group in match.groups() if group is not None).strip()
         if value and not value.startswith("#") and not value.lower().startswith("%23"):

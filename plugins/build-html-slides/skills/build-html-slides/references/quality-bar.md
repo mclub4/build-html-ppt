@@ -39,6 +39,7 @@ Do not use the same dominant composition on three consecutive slides. Do not use
 - Convert every raster deliverable asset to WebP before referencing it in HTML. Keep SVG for logos, icons, and editable vector diagrams.
 - Avoid low-resolution thumbnails, screenshots with unreadable embedded text, generic stock filler, and decorative images that do not support the slide claim.
 - Reject images that do not visibly match the named subject. Character/person decks require canonical-reference comparison as defined in `identity-review.md`; metadata and source tags alone are insufficient.
+- Reject unfinished media slots. A label such as `PLACE NOTE`, an empty image frame, a repeated geometric fallback, or generic art standing in for an expected real place/product/person/event image is a blocking placeholder, not intentional visual variety.
 
 ## Composition checks
 
@@ -81,3 +82,5 @@ This rubric is used only in Full Validation. After the render/fix loop is settle
 - Full Validation lacks all-slide AI coverage, or a Quick Draft AI-routed slide lacks its adaptive profiles, review-batch membership, concrete observation, stable reviewer reference, and passing change-type verdict.
 - Full Validation lacks an independent hash-bound cross-review for the cover, closing, or a slide explicitly marked `data-visual-critical="true"`.
 - A named character/person slide lacks grounded identity targets, cue-based identity verdicts, or uses the wrong subject or variant.
+- Any slide contains a visible placeholder, temporary/dummy asset, empty media promise, or generic substitute graphic where the composition claims a real subject image. One occurrence blocks delivery regardless of the numeric score.
+- Typography remains the neutral runtime-shell stack, bare `system-ui`, or an unrelated generic face instead of a deliberate language- and topic-appropriate display/body system.

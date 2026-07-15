@@ -74,6 +74,35 @@ class ValidateAllTests(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn("--mode quick|full is required", result.stderr)
 
+    def test_prepare_blocks_place_note_before_rendering(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            deck.write_text(
+                TEMPLATE.read_text(encoding="utf-8").replace(
+                    "<!-- SLIDE_2_CONTENT -->",
+                    '<div class="destination-art">PLACE NOTE</div><h2>가나자와</h2>',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            notes_path = root / "deck-notes.md"
+            notes_path.write_text(notes(), encoding="utf-8")
+            review = root / "review"
+            result = subprocess.run(
+                [
+                    "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "quick",
+                    "--notes", str(notes_path), "--review-dir", str(review),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("blocked PLACE NOTE text", result.stdout)
+            self.assertIn("placeholder and incomplete-asset gate failed", result.stderr)
+            self.assertFalse((review / "review.json").exists())
+
     def test_incremental_change_types_skip_unrelated_expensive_checks(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -88,7 +117,9 @@ class ValidateAllTests(unittest.TestCase):
             image_labels = {label for label, _command in deterministic_commands(deck, notes_path, sources, "image")}
             self.assertNotIn("browser interaction and print E2E", text_labels)
             self.assertNotIn("image reuse", text_labels)
+            self.assertIn("placeholder and incomplete-asset gate", text_labels)
             self.assertIn("browser interaction and print E2E", navigation_labels)
+            self.assertIn("placeholder and incomplete-asset gate", navigation_labels)
             self.assertNotIn("presenter notes", navigation_labels)
             self.assertIn("source locality", image_labels)
             self.assertNotIn("source locality", text_labels)

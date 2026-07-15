@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression tests for adaptive visual-review manifest schema version 6."""
+"""Regression tests for adaptive visual-review manifest schema version 7."""
 
 from __future__ import annotations
 
@@ -28,9 +28,9 @@ PROFILE_SPECS = {
 BASE_PROFILES = ("normal", "short", "zoom150")
 RESPONSIVE_PROFILES = BASE_PROFILES + ("tablet", "mobile")
 CHECKS_BY_CHANGE = {
-    "all": ("crop", "aspect_ratio", "resolution", "content_match", "overflow", "occlusion", "text", "text_bounds", "density", "controls"),
+    "all": ("crop", "aspect_ratio", "resolution", "content_match", "completion", "overflow", "occlusion", "text", "text_bounds", "density", "controls"),
     "text": ("text", "text_bounds", "density"),
-    "image": ("crop", "aspect_ratio", "resolution", "content_match"),
+    "image": ("crop", "aspect_ratio", "resolution", "content_match", "completion"),
     "navigation": ("controls",),
 }
 
@@ -264,7 +264,7 @@ class VisualReviewTests(unittest.TestCase):
                 "status": "pending",
             })
         return {
-            "schema_version": 6,
+            "schema_version": 7,
             "mode": mode,
             "review_risk": review_risk,
             "phase": phase,
@@ -459,6 +459,14 @@ class VisualReviewTests(unittest.TestCase):
         self.assertEqual([batch["slides"] for batch in manifest["review_batches"]], [[1, 5]])
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_full_review_cannot_pass_with_failed_completion(self) -> None:
+        deck = deck_for(4)
+        manifest = self.manifest(deck, count=4, mode="full")
+        manifest["slides"][1]["checks"]["completion"] = "fail"
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("check did not pass: completion", result.stdout)
 
     def test_quick_routes_identity_slide_and_accepts_grounded_review(self) -> None:
         deck = deck_for(5, identity=3)

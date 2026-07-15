@@ -17,9 +17,9 @@ const PROFILES = {
   mobile: { viewport: [390, 844], visualViewport: [390, 844], screenshot: [390, 844], zoom: 1, scaleMode: 'none' },
 };
 const CHECKS_BY_CHANGE = {
-  all: ['crop', 'aspect_ratio', 'resolution', 'content_match', 'overflow', 'occlusion', 'text', 'text_bounds', 'density', 'controls'],
+  all: ['crop', 'aspect_ratio', 'resolution', 'content_match', 'completion', 'overflow', 'occlusion', 'text', 'text_bounds', 'density', 'controls'],
   text: ['text', 'text_bounds', 'density'],
-  image: ['crop', 'aspect_ratio', 'resolution', 'content_match'],
+  image: ['crop', 'aspect_ratio', 'resolution', 'content_match', 'completion'],
   navigation: ['controls'],
 };
 const AUTOMATION_CHECKS_BY_CHANGE = {
@@ -324,7 +324,7 @@ async function collectFingerprints(page) {
     const slideStyles = slides.map(() => []);
 
     const selectorTargets = selectorText => {
-      if (/\.active\b|:target\b|\[aria-hidden(?:[\]=])/i.test(selectorText)) return [];
+      if (/\.active\b|:target\b|\[aria-hidden(?:[\]=])/i.test(selectorText)) return null;
       const query = selectorText
         .replace(/::[a-z-]+(?:\([^)]*\))?/gi, '')
         .replace(/:(?:hover|active|focus|focus-visible|focus-within|visited|target)(?![\w-])/gi, '');
@@ -333,9 +333,9 @@ async function collectFingerprints(page) {
           slide.matches(query) || slide.querySelector(query) ? [index] : []
         ));
         const outside = [...document.querySelectorAll(query)].some(element => !element.closest('section.slide'));
-        return outside ? [] : targets;
+        return outside ? null : targets;
       } catch (_error) {
-        return [];
+        return null;
       }
     };
     const classifyRules = (rules, context = '') => {
@@ -343,8 +343,8 @@ async function collectFingerprints(page) {
         if (rule.type === CSSRule.STYLE_RULE) {
           const material = `${context}${rule.cssText}`;
           const targets = selectorTargets(rule.selectorText || '');
-          if (targets.length === 1) slideStyles[targets[0]].push(material);
-          else globalStyles.push(material);
+          if (targets?.length === 1) slideStyles[targets[0]].push(material);
+          else if (targets === null || targets.length > 1) globalStyles.push(material);
           continue;
         }
         if (rule.cssRules && typeof rule.conditionText === 'string') {
@@ -492,7 +492,7 @@ async function main() {
     const existingProfiles = existing ? Object.keys(existing.viewports || {}) : [];
     const existingTitles = existing?.slides?.map(record => record.title) || [];
     const compatible = existing
-      && existing.schema_version === 6
+      && existing.schema_version === 7
       && existing.mode === args.mode
       && existing.review_risk === args.reviewRisk
       && JSON.stringify(existingProfiles) === JSON.stringify(profiles)
@@ -705,7 +705,7 @@ async function main() {
     }
   }
   const manifest = {
-    schema_version: 6,
+    schema_version: 7,
     review_workspace: {
       storage: args.workspaceStorage,
       workspace: args.workspace,

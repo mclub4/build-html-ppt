@@ -31,9 +31,9 @@ PROFILE_SPECS = {
 BASE_PROFILES = ("normal", "short", "zoom150")
 RESPONSIVE_PROFILES = BASE_PROFILES + ("tablet", "mobile")
 CHECKS_BY_CHANGE = {
-    "all": ("crop", "aspect_ratio", "resolution", "content_match", "overflow", "occlusion", "text", "text_bounds", "density", "controls"),
+    "all": ("crop", "aspect_ratio", "resolution", "content_match", "completion", "overflow", "occlusion", "text", "text_bounds", "density", "controls"),
     "text": ("text", "text_bounds", "density"),
-    "image": ("crop", "aspect_ratio", "resolution", "content_match"),
+    "image": ("crop", "aspect_ratio", "resolution", "content_match", "completion"),
     "navigation": ("controls",),
 }
 AUTOMATION_CHECKS_BY_CHANGE = {
@@ -482,8 +482,8 @@ def main() -> int:
         return report([f"invalid review manifest: {exc}"])
     if not isinstance(manifest, dict):
         return report(["review manifest root must be an object"])
-    if manifest.get("schema_version") != 6:
-        errors.append("schema_version must be 6; regenerate evidence with render_slides.js")
+    if manifest.get("schema_version") != 7:
+        errors.append("schema_version must be 7; regenerate evidence with render_slides.js")
     mode = manifest.get("mode")
     if mode not in {"quick", "full"}:
         errors.append("mode must be 'quick' or 'full'")

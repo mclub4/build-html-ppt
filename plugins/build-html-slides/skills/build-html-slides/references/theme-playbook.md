@@ -96,6 +96,8 @@ Before the first render, confirm that `assets/runtime-shell.html` supplied only 
 - The demo dark-blue/purple palette is gone unless the topic independently calls for it.
 - The three-card sample is not the dominant layout.
 - No large sparse card or placeholder-like empty shape remains; every large surface carries proportionate information or a deliberate visual role.
+- No `PLACE NOTE`, image-here label, temporary/dummy media, empty frame, or generic replacement graphic remains. If a promised factual image is unavailable, redesign the composition instead of styling the missing slot.
+- Display and body fonts were deliberately selected for this subject and writing system; the neutral runtime-shell font stack is no longer the art direction.
 - At least five composition families are visible in the storyboard.
 - The cover and closing are designed for this subject.
 - The deck's visual identity is recognizable with the text blurred.

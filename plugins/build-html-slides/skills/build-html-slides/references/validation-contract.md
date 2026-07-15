@@ -56,7 +56,9 @@ Add `tablet` 1024×768 and `mobile` 390×844 only when responsive device support
 
 ## Quick Draft
 
-Run the deterministic deck, notes, source-cache, interaction semantics, real-browser navigation/print E2E, and Chromium geometry checks. Render all slides at all canonical profiles. Automated text bounds, container-density measurement, control geometry, and image geometry must complete before any AI inspection. Geometry issues block review; low-density container warnings route the affected slide and profile to AI inspection instead of failing automatically.
+Run the deterministic deck, visible-placeholder/incomplete-asset gate, notes, source-cache, interaction semantics, real-browser navigation/print E2E, and Chromium geometry checks. The placeholder gate runs in every phase and mode, including navigation-only revisions, and blocks `PLACE NOTE`, image-here instructions, dummy asset markers, and other explicit unfinished media before AI review. Render all slides at all canonical profiles. Automated text bounds, container-density measurement, control geometry, and image geometry must complete before any AI inspection. Geometry issues block review; low-density container warnings route the affected slide and profile to AI inspection instead of failing automatically.
+
+`data-placeholder-literal="true"` may exempt visible wording only when the slide is genuinely teaching or comparing placeholder behavior. It does not exempt suspicious class names, asset filenames, or media-state markers, and it must never be used to bypass an unfinished visual.
 
 AI inspects only:
 
@@ -71,7 +73,7 @@ Quick Draft does not calculate the 24-point quality score, run independent cross
 
 ## Full Validation
 
-Run all deterministic validators, source checks, and Chromium geometry checks. AI inspects `normal` for every slide. Cover, closing, explicit critical slides, responsive targets, and warning-triggered profiles receive their adaptive stress profiles.
+Run all deterministic validators, source checks, and Chromium geometry checks. AI inspects `normal` for every slide and records `completion` for all/image scope. Any visible placeholder, empty media promise, or generic substitute for an expected real subject image blocks delivery regardless of the final quality score. Cover, closing, explicit critical slides, responsive targets, and warning-triggered profiles receive their adaptive stress profiles.
 
 Choose review risk by reasoning about consequences, uncertainty, distribution, technical complexity, visual complexity, and audience sensitivity:
 
@@ -96,7 +98,7 @@ Full Validation preparation:
 python3 scripts/validate_all.py OUTPUT.html --mode full --review-risk standard --phase prepare
 ```
 
-After filling the listed AI batches, run `python3 scripts/validate_all.py OUTPUT.html --phase verify`. For Full Validation, then run `--phase finalize`, fill the one quality score and required cross-reviews, and run `--phase verify` once more. The entrypoint executes structure, notes, source cache, reuse, locality, static interaction, browser E2E, render/geometry, and evidence checks in the required order. Use `--responsive` only for requested tablet/mobile support.
+After filling the listed AI batches, run `python3 scripts/validate_all.py OUTPUT.html --phase verify`. For Full Validation, then run `--phase finalize`, fill the one quality score and required cross-reviews, and run `--phase verify` once more. The entrypoint executes structure, placeholder completion, notes, source cache, reuse, locality, static interaction, browser E2E, render/geometry, and evidence checks in the required order. Use `--responsive` only for requested tablet/mobile support.
 
 ## Incremental Revision
 
@@ -115,7 +117,7 @@ Run checks by change type:
 | Change | Automated and AI scope |
 | --- | --- |
 | Text | text, text bounds, and container density |
-| Image | crop, aspect ratio, and resolution |
+| Image | crop, aspect ratio, resolution, content match, and completion |
 | Navigation | controls and interaction |
 | Mixed/global | all checks |
 

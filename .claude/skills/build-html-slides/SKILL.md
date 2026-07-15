@@ -56,12 +56,12 @@ The preflight never installs software. If it fails, report the exact missing or 
 
 1. Inspect supplied files and successful prior decks. Extract useful rhythm, density, composition range, and interaction behavior without copying identity or defects.
 2. Read `references/audience-story-routing.md`. Identify audience groups, decision owner, desired room outcome, baseline knowledge, likely objections, locale, and distribution scope. Order information for the actual room. Put shared stakes and decisions before specialist depth when that improves attention; do not apply a generic outline.
-3. Read `references/quality-bar.md`, `references/theme-playbook.md`, and `references/theme-gallery.md`. Write a one-line theme contract covering mood, typography, palette roles, shape language, imagery, density, and motion. Choose several composition families rather than repeating one card grid.
-4. Read `references/style-presets.md`. Copy `assets/runtime-shell.html` to the output path. Replace all placeholder sections while preserving the stage fitter and navigation runtime. The shell has no art direction; the subject and audience must determine the design.
+3. Read `references/quality-bar.md`, `references/theme-playbook.md`, and `references/theme-gallery.md`. Write a one-line theme contract covering mood, named display/body font stacks, palette roles, shape language, imagery, density, and motion. Choose several composition families rather than repeating one card grid. Unless the user supplied a brand type system, infer an attractive language- and topic-appropriate pairing without asking a separate font question.
+4. Read `references/style-presets.md`. Copy `assets/runtime-shell.html` to the output path. Replace all placeholder sections while preserving the stage fitter and navigation runtime. The shell has no art direction; replace its neutral font variables and styling with the chosen theme system.
 5. Plan official/supplied/sourced/generated assets and diagrams. Read `references/architecture-diagrams.md` when systems, flows, deployment, integrations, or trust boundaries matter.
 6. Implement semantic `<section class="slide" data-title="…">` elements. Give every slide exactly one direct `.slide-media` and `.slide-content` child. Keep meaningful copy and non-croppable visuals in the content-safe layer.
 7. Create `OUTPUT-notes.md` from `assets/speaker-notes-template.md`. Use the exact slide number and title. Include purpose/audience, natural 30–90 second talk track, emphasis, transition, and source/caveat guidance without repeating slide text.
-8. Run the selected mode through `python3 scripts/validate_all.py OUTPUT.html --mode quick|full --phase prepare`. Fix deterministic failures before opening captures, then use the same entrypoint for `verify` and `finalize`. After scoped edits, pass `--slides` and rerender only the changed slides and immediate neighbors unless shared runtime or styles changed.
+8. Run the selected mode through `python3 scripts/validate_all.py OUTPUT.html --mode quick|full --phase prepare`. The placeholder gate runs in every mode and phase. Fix deterministic failures before opening captures, then use the same entrypoint for `verify` and `finalize`. After scoped edits, pass `--slides` and rerender only the changed slides and immediate neighbors unless shared runtime or styles changed.
 9. Deliver the HTML, notes, sources cache, asset provenance, selected mode, and only the checks actually performed. Report the validation workspace separately; never present it as a deliverable.
 
 Full Validation controls assurance depth, not research breadth. For 20-25 slides, target 40-90 minutes. When a request asks for many, as many as possible, or a large collection of fan artworks, read `references/fan-art-budget.md` before searching. Use its planning targets to protect implementation and validation time, but treat them as checkpoints rather than hard caps. If the task is likely to exceed 90 minutes, explain why and ask whether to continue discovery or freeze the current set; do not abruptly stop the work.
@@ -77,6 +77,7 @@ Full Validation controls assurance depth, not research breadth. For 20-25 slides
 ## Art Direction
 
 - Translate the theme into type, surfaces, shapes, imagery, information density, and motion, not color alone.
+- Choose typography proactively from the language, subject, audience, and room. Declare `--font-display`, `--font-body`, and `--font-mono`; use a deliberate display/body contrast when the theme benefits from it. Do not ship the shell's neutral font stack unchanged or fall back to bare `system-ui` as the final art direction.
 - Use the theme gallery as a vocabulary, not a template library. Combine composition families coherently within one visual system.
 - Test the longest title and densest body copy in the actual writing system before committing to typography.
 - Do not ship generic demo styling, repeated three-card layouts, decorative gradient blobs, or a recognizable reference deck copied pixel for pixel.
@@ -96,6 +97,7 @@ Full Validation controls assurance depth, not research breadth. For 20-25 slides
 8. Classify media as decorative, meaningful, or mixed. Decorative media may use `cover`; logos, title art, products, posters, screenshots, diagrams, character art, and edge-important key visuals use `contain`. Mixed media may use a covered backdrop plus a contained foreground copy.
 9. Avoid stretching and careless reuse. A continuity asset may appear twice only when the two appearances have different narrative roles and one is clearly subordinate.
 10. Maintain `sources.json` schema 2 with local path, hash, asset roles, source kind, URL where applicable, verification time, and credit. `data-identity-reference` files are cache entries even when not rendered and must use an authoritative source kind. Run `source_cache.py --update` before researching a revision and revisit only `needs-review` records.
+11. Placeholders may exist only in the private authoring workspace. Neither Quick Draft nor Full Validation may deliver visible labels such as `PLACE NOTE`, image-here instructions, dummy assets, empty image frames, or generic substitute graphics standing in for an expected place, product, person, character, venue, or event image. Acquire or generate an appropriate asset, redesign the slide without that visual promise, or disclose the limitation before delivery; never disguise missing work as a finished card.
 
 ## Runtime And Interaction
 
@@ -113,6 +115,7 @@ Full Validation controls assurance depth, not research breadth. For 20-25 slides
 - Keep body copy at least 16px and code at least 13px on the logical 1280×720 canvas unless the user explicitly requires denser material.
 - Keep UTF-8 throughout. Replacement characters and mojibake are blocking defects.
 - No text, logo, key visual, diagram, screenshot, badge, or control may cross the safe canvas or be hidden behind another layer.
+- No visible placeholder, temporary asset label, empty media promise, or generic fallback graphic may remain. `completion` is a blocking visual verdict, not a minor quality-score deduction.
 - Check rendered geometry rather than trusting CSS intent. Read `references/visual-qa.md` for the visual inspection checklist.
 
 ## Deliverable
@@ -143,7 +146,7 @@ For Edit Only, explicitly state that no new render or validation was run. Never 
 - `references/asset-discovery.md`: broad, topic-aware image discovery and original-source tracing.
 - `references/fan-art-budget.md`: bounded fan-art search, provenance, processing, and validation limits.
 - `scripts/validate_all.py`: canonical prepare, verify, and finalize entrypoint.
-- `scripts/validate_deck.py`, `validate_speaker_notes.py`, `validate_image_reuse.py`, `validate_interactions.py`, and `validate_browser_e2e.js`: deterministic deliverable and real-browser behavior checks.
+- `scripts/validate_deck.py`, `validate_placeholders.py`, `validate_speaker_notes.py`, `validate_image_reuse.py`, `validate_interactions.py`, and `validate_browser_e2e.js`: deterministic deliverable, completion, and real-browser behavior checks.
 - `scripts/render_slides.js` and `validate_visual_review.py`: Chromium evidence, true page-scale zoom, and adaptive review validation.
 - `scripts/check_environment.py`: non-mutating Python, Node.js, Playwright, and Chromium preflight.
 - `scripts/measure_container_density.js`: rendered warning detector for oversized low-information surfaces.

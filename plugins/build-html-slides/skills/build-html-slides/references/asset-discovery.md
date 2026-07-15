@@ -34,4 +34,8 @@ Use general web and image search as routing layers. Add site-specific searches w
 5. Internal or personal decks may use suitable creator-hosted fan work with visible credit when it fits the user's context. Public or commercial decks require verified reuse rights or an official, licensed, supplied, or original replacement.
 6. Convert the selected raster file to WebP and keep its original aspect ratio.
 
+## Missing-Asset Decision
+
+Never turn an unsuccessful search into a finished-looking placeholder card. `PLACE NOTE`, image-here labels, empty frames, dummy thumbnails, and generic geometric stand-ins are authoring artifacts and cannot appear in either delivered mode. When no suitable asset is available, choose one of three honest outcomes: continue within the agreed discovery budget, generate an appropriate non-factual illustration when allowed, or redesign the slide so it no longer promises a real image. If the requested factual subject image is essential and none can be secured, disclose that limitation before delivery instead of concealing it with decorative fallback art.
+
 Normally stop searching when each important visual role has at least one strong candidate and the selected set is varied enough that one image is not carrying the whole deck. At the upper planning target, assess coverage, quality, and the time still needed for implementation and validation. Continue when more discovery would materially improve the result and the schedule remains reasonable. If total work is likely to exceed 90 minutes for a 20-25 slide deck, ask whether to keep searching or finish with the current set.

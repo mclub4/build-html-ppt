@@ -42,7 +42,13 @@ def deterministic_commands(
     deck: Path, notes: Path, sources: Path, change_type: str
 ) -> list[tuple[str, list[str]]]:
     python = sys.executable
-    commands = [("deck structure", [python, str(SCRIPTS / "validate_deck.py"), str(deck)])]
+    commands = [
+        ("deck structure", [python, str(SCRIPTS / "validate_deck.py"), str(deck)]),
+        (
+            "placeholder and incomplete-asset gate",
+            [python, str(SCRIPTS / "validate_placeholders.py"), str(deck)],
+        ),
+    ]
     if change_type in {"all", "text"}:
         commands.append(
             ("presenter notes", [python, str(SCRIPTS / "validate_speaker_notes.py"), str(deck), str(notes)])

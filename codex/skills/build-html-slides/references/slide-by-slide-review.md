@@ -29,6 +29,7 @@ For `all` scope:
 - `aspect_ratio`: images, logos, screenshots, and diagrams are not stretched;
 - `resolution`: raster detail is adequate at displayed size;
 - `content_match`: each meaningful image actually depicts and supports the slide's claimed subject, event, product, place, or concept; labels are not evidence;
+- `completion`: no visible placeholder, temporary/dummy asset, empty media frame, or generic substitute graphic stands in for a promised real subject image; `PLACE NOTE` is an automatic failure, not a design label;
 - `overflow`: text and components remain inside their intended regions;
 - `occlusion`: media and decoration do not obscure copy or controls;
 - `text`: copy is readable and visually coherent;
@@ -37,7 +38,7 @@ For `all` scope:
 - `controls`: navigation and interactive elements are centered, readable, and usable.
 - `identity`: on explicitly or automatically identity-routed slides, every candidate matches its canonical WebP reference and the intended character/person variant.
 
-Text-only changes use `text`, `text_bounds`, and `density`; image-only changes use crop, aspect ratio, resolution, and content match; navigation-only changes use controls. Identity-required `all` and `image` reviews also include `identity` and one cue-based `identity_review` entry per target.
+Text-only changes use `text`, `text_bounds`, and `density`; image-only changes use crop, aspect ratio, resolution, content match, and completion; navigation-only changes use controls. Identity-required `all` and `image` reviews also include `identity` and one cue-based `identity_review` entry per target.
 
 ## Concrete Observations
 

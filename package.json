@@ -11,7 +11,7 @@
     "check": "python3 scripts/validate_repository.py",
     "check:browser": "python3 codex/skills/build-html-slides/scripts/check_environment.py",
     "test": "cd codex/skills/build-html-slides && python3 -m unittest discover -s scripts -p 'test_*.py'",
-    "test:unit": "cd codex/skills/build-html-slides && python3 -m unittest scripts.test_check_environment scripts.test_workflow_contract scripts.test_source_cache scripts.test_validate_deck scripts.test_validate_interactions scripts.test_validate_all scripts.test_validate_visual_review",
+    "test:unit": "cd codex/skills/build-html-slides && python3 -m unittest scripts.test_check_environment scripts.test_workflow_contract scripts.test_source_cache scripts.test_validate_deck scripts.test_validate_placeholders scripts.test_validate_interactions scripts.test_validate_all scripts.test_validate_visual_review",
     "test:e2e": "cd codex/skills/build-html-slides && python3 -m unittest scripts.test_render_pipeline"
   },
   "devDependencies": {
