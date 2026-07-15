@@ -129,6 +129,8 @@ install_path() {
 }
 
 installed_any=0
+installed_claude=0
+installed_codex=0
 if [ "$DO_CLAUDE" = "yes" ] || { [ "$DO_CLAUDE" = "auto" ] && command -v claude >/dev/null 2>&1; }; then
   echo "== Claude Code =="
   install_path "$CLAUDE_SOURCE" "$CLAUDE_HOME/skills/build-html-slides" dir
@@ -136,6 +138,7 @@ if [ "$DO_CLAUDE" = "yes" ] || { [ "$DO_CLAUDE" = "auto" ] && command -v claude 
     install_path "$agent" "$CLAUDE_HOME/agents/$(basename "$agent")" file
   done
   installed_any=1
+  installed_claude=1
 elif [ "$DO_CLAUDE" = "auto" ]; then
   echo "== Claude Code: skipped (claude not found) =="
 fi
@@ -144,6 +147,7 @@ if [ "$DO_CODEX" = "yes" ] || { [ "$DO_CODEX" = "auto" ] && command -v codex >/d
   echo "== Codex =="
   install_path "$CODEX_SOURCE" "$CODEX_HOME/skills/build-html-slides" dir
   installed_any=1
+  installed_codex=1
 elif [ "$DO_CODEX" = "auto" ]; then
   echo "== Codex: skipped (codex not found) =="
 fi
@@ -153,5 +157,20 @@ if [ "$installed_any" -eq 0 ]; then
   exit 1
 fi
 
-echo "Claude Code: start a new session and invoke /build-html-slides."
-echo "Codex: start a new task and invoke \$build-html-slides."
+if [ "$installed_claude" -eq 1 ]; then
+  echo "Claude Code: start a new session and invoke /build-html-slides."
+fi
+if [ "$installed_codex" -eq 1 ]; then
+  echo "Codex: start a new task and invoke \$build-html-slides."
+fi
+echo
+echo "Post-install guidance:"
+echo "- Optional Korean polish: epoko77-ai/im-not-ai provides humanize-korean for slide copy and presenter notes after facts, numbers, names, and citations are settled. It is not bundled or installed automatically."
+echo "- After installing im-not-ai separately, invoke /humanize-korean in Claude Code or \$humanize-korean in Codex; Codex uses its Fast single-call mode."
+if [ "$installed_claude" -eq 1 ]; then
+  echo "- Claude Code can inspect rendered images but does not include a raster image generator by default. Connect a compatible image-generation plugin, MCP server, or external tool separately if generated imagery is needed."
+  echo "- Do not install or configure an image generator, credentials, or a paid service without explicit user consent. The slide skill still works without one."
+fi
+if [ "$installed_codex" -eq 1 ]; then
+  echo "- Codex can use ImageGen only when the current Codex environment exposes it; image generation is optional."
+fi

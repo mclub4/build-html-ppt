@@ -94,6 +94,21 @@ def main() -> None:
         require(re.search(r"^name: build-html-slides-[a-z-]+$", content, re.MULTILINE) is not None, f"Claude agent name invalid: {agent.name}")
         require("model: inherit" in content, f"Claude agent must inherit the session model: {agent.name}")
 
+    agent_guidance = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    claude_guidance = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    installer = (ROOT / "install.sh").read_text(encoding="utf-8")
+    require("final response MUST include" in agent_guidance, "agent post-install reporting contract is missing")
+    require("im-not-ai" in agent_guidance and "humanize-korean" in agent_guidance, "agent im-not-ai guidance is missing")
+    require("/humanize-korean" in agent_guidance and "$humanize-korean" in agent_guidance, "agent im-not-ai invocation guidance is missing")
+    require("does not include a raster image generator" in agent_guidance, "agent Claude image-generation guidance is missing")
+    require("Read and follow `AGENTS.md`" in claude_guidance, "Claude repository guidance does not inherit AGENTS.md")
+    require("AI 에이전트에게 설치를 맡긴 경우" in readme, "README AI-agent installation guidance is missing")
+    require("Claude Code 기본 설치에는 래스터 이미지 생성기가 포함되지 않습니다" in readme, "README Claude image-generation notice is missing")
+    require("Post-install guidance:" in installer, "installer post-install guidance is missing")
+    require("epoko77-ai/im-not-ai" in installer, "installer im-not-ai notice is missing")
+    require("does not include a raster image generator by default" in installer, "installer Claude image-generation notice is missing")
+
     print(f"Repository validation passed ({len(tree_hashes(STANDALONE))} shared skill files).")
 
 
