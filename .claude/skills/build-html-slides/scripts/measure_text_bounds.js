@@ -2,29 +2,54 @@
   const tolerance = 2;
   const active = document.querySelector('.slide.active');
   const issues = [];
-  if (!active) return { ok: false, checked: 0, issues: ['Missing active slide'] };
+  const warnings = [];
+  if (!active) return { ok: false, checked: 0, line_checks: 0, issues: ['Missing active slide'], warnings };
 
   const visible = element => {
     const style = getComputedStyle(element);
     const rect = element.getBoundingClientRect();
-    return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0;
+    return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0
+      && rect.width > 0 && rect.height > 0;
   };
   const label = element => {
     const explicit = element.getAttribute('data-title') || element.getAttribute('aria-label') || element.id;
-    const text = (element.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 56);
-    return explicit || text || element.tagName.toLowerCase();
+    const content = (element.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 56);
+    return explicit || content || element.tagName.toLowerCase();
   };
   const outside = (inner, outer) => (
-    inner.left < outer.left - tolerance || inner.right > outer.right + tolerance ||
-    inner.top < outer.top - tolerance || inner.bottom > outer.bottom + tolerance
+    inner.left < outer.left - tolerance || inner.right > outer.right + tolerance
+    || inner.top < outer.top - tolerance || inner.bottom > outer.bottom + tolerance
   );
-  const selectors = [
+  const intersection = (left, right) => ({
+    width: Math.max(0, Math.min(left.right, right.right) - Math.max(left.left, right.left)),
+    height: Math.max(0, Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top)),
+  });
+  const directText = element => [...element.childNodes].some(node => (
+    node.nodeType === Node.TEXT_NODE && node.nodeValue.trim()
+  ));
+  const inlineTextTags = new Set(['SPAN', 'BR', 'EM', 'STRONG', 'B', 'I', 'SMALL', 'MARK', 'S', 'U']);
+  const inlineTextWrapper = element => {
+    const display = getComputedStyle(element).display;
+    return element.childElementCount > 0
+      && !display.includes('grid') && !display.includes('flex')
+      && (element.textContent || '').trim()
+      && [...element.children].every(child => inlineTextTags.has(child.tagName));
+  };
+  const textSelectors = [
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li', 'dt', 'dd', 'td', 'th',
     'button', 'a', 'label', 'figcaption', 'blockquote', 'pre', 'code',
-    '.eyebrow', '.kicker', '.caption', '.source', '.footnote', '.badge', '.chip',
-    '[data-text-box]', '[data-text-container]'
+    '.display-type', '.headline', '.title', '.quote', '.eyebrow', '.kicker',
+    '.caption', '.source', '.footnote', '.badge', '.chip',
+    '[data-display-text]', '[data-text-box]', '[data-text-container]'
   ].join(',');
+  const displaySelectors = [
+    'h1', 'h2', 'h3', 'blockquote', '.display-type', '.headline', '.title', '.quote',
+    '[data-display-text]'
+  ].join(',');
+
   const slideRect = active.getBoundingClientRect();
+  const logicalSlideWidth = active.offsetWidth || slideRect.width;
+  const stageScale = logicalSlideWidth ? slideRect.width / logicalSlideWidth : 1;
   const viewportWidth = document.documentElement.clientWidth;
   const viewportHeight = document.documentElement.clientHeight;
   if (
@@ -36,8 +61,20 @@
       + `${Math.round(slideRect.right)},${Math.round(slideRect.bottom)} vs ${viewportWidth}x${viewportHeight}`
     );
   }
-  const elements = [...new Set(active.querySelectorAll(selectors))].filter(element => (
-    visible(element) && (element.textContent || '').trim() && !element.hasAttribute('data-text-bounds-ignore')
+
+  const semanticElements = [...active.querySelectorAll(textSelectors)];
+  const allHtmlElements = [...active.querySelectorAll('*')].filter(element => (
+    element.namespaceURI === 'http://www.w3.org/1999/xhtml'
+  ));
+  const directTextElements = allHtmlElements.filter(directText);
+  const inlineTextWrapperCandidates = allHtmlElements.filter(inlineTextWrapper);
+  const inlineTextWrappers = inlineTextWrapperCandidates.filter(element => (
+    !element.parentElement?.closest(textSelectors)
+    && !inlineTextWrapperCandidates.some(owner => owner !== element && owner.contains(element))
+  ));
+  const elements = [...new Set([...semanticElements, ...directTextElements, ...inlineTextWrappers])].filter(element => (
+    visible(element) && (element.textContent || '').trim()
+    && !element.closest('[data-text-bounds-ignore]')
   ));
 
   for (const element of elements) {
@@ -75,5 +112,193 @@
     }
   }
 
-  return { ok: issues.length === 0, checked: elements.length, issues: [...new Set(issues)] };
+  const explicitLineOwners = elements.filter(element => (
+    element.matches(textSelectors) || inlineTextWrapper(element)
+  ));
+  const lineOwners = [...new Set([...explicitLineOwners, ...elements.filter(element => (
+    directText(element)
+    && !explicitLineOwners.some(owner => owner !== element && owner.contains(element))
+  ))])];
+  const segmenter = typeof Intl.Segmenter === 'function'
+    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    : null;
+  const segments = value => {
+    if (segmenter) return [...segmenter.segment(value)].map(item => ({ text: item.segment, index: item.index }));
+    const result = [];
+    let index = 0;
+    for (const text of Array.from(value)) {
+      result.push({ text, index });
+      index += text.length;
+    }
+    return result;
+  };
+
+  const collectLines = element => {
+    const glyphs = [];
+    let order = 0;
+    const leftToRight = getComputedStyle(element).direction !== 'rtl';
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
+      acceptNode: node => {
+        if (!node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        const parent = node.parentElement;
+        if (!parent || !visible(parent) || parent.closest('[data-text-bounds-ignore]')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        const nestedOwner = lineOwners.find(candidate => (
+          candidate !== element && element.contains(candidate) && candidate.contains(parent)
+        ));
+        return nestedOwner ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      for (const part of segments(node.nodeValue)) {
+        const range = document.createRange();
+        range.setStart(node, part.index);
+        range.setEnd(node, part.index + part.text.length);
+        const rect = [...range.getClientRects()].find(candidate => candidate.width > 0 && candidate.height > 0);
+        range.detach();
+        if (!rect) continue;
+        glyphs.push({ text: part.text, order, rect });
+        order += 1;
+      }
+    }
+
+    const lines = [];
+    for (const glyph of glyphs) {
+      let target = null;
+      let nearest = Number.POSITIVE_INFINITY;
+      for (const line of lines) {
+        const delta = Math.abs(glyph.rect.top - line.anchorTop);
+        const limit = Math.max(2, Math.min(glyph.rect.height, line.height) * 0.18);
+        const overlap = Math.max(0, Math.min(glyph.rect.bottom, line.bottom) - Math.max(glyph.rect.top, line.top));
+        const overlapRatio = overlap / Math.max(1, Math.min(glyph.rect.height, line.height));
+        const continuesInline = leftToRight && overlapRatio > 0.5 && glyph.rect.left >= line.right - 2;
+        if ((delta <= limit || continuesInline) && delta < nearest) {
+          target = line;
+          nearest = delta;
+        }
+      }
+      if (!target) {
+        target = {
+          anchorTop: glyph.rect.top,
+          top: glyph.rect.top,
+          right: glyph.rect.right,
+          bottom: glyph.rect.bottom,
+          left: glyph.rect.left,
+          height: glyph.rect.height,
+          glyphs: [],
+        };
+        lines.push(target);
+      }
+      target.glyphs.push(glyph);
+      target.top = Math.min(target.top, glyph.rect.top);
+      target.right = Math.max(target.right, glyph.rect.right);
+      target.bottom = Math.max(target.bottom, glyph.rect.bottom);
+      target.left = Math.min(target.left, glyph.rect.left);
+      target.height = target.bottom - target.top;
+    }
+    return lines
+      .sort((left, right) => left.top - right.top)
+      .map(line => ({
+        ...line,
+        text: line.glyphs.sort((left, right) => left.order - right.order).map(glyph => glyph.text).join(''),
+        width: line.right - line.left,
+      }));
+  };
+
+  const lineRecords = [];
+  for (const element of lineOwners) {
+    const style = getComputedStyle(element);
+    if (!style.writingMode.startsWith('horizontal')) continue;
+    const lines = collectLines(element);
+    if (!lines.length) continue;
+    lineRecords.push({ element, lines });
+    if (lines.length < 2) continue;
+
+    const name = label(element);
+    const fullText = lines.map(line => line.text).join('');
+    const core = value => Array.from(value.normalize('NFC').replace(/[\s\p{P}\p{S}]/gu, ''));
+    const lastCore = core(lines.at(-1).text);
+    const previousCore = core(lines.at(-2).text);
+    const fullCore = core(fullText);
+    const hasHangul = /[\uAC00-\uD7A3]/.test(fullText);
+    const displayText = element.matches(displaySelectors) || Number.parseFloat(style.fontSize) >= 32;
+    if (element.hasAttribute('data-line-break-ok')) {
+      warnings.push(`${name}: intentional final-line exemption requires visual inspection`);
+    } else {
+      if (displayText && fullCore.length >= 8 && lastCore.length === 0) {
+        issues.push(`${name}: punctuation is stranded on its own final line`);
+      } else if (displayText && fullCore.length >= 8 && previousCore.length >= 4 && hasHangul && lastCore.length <= 2) {
+        issues.push(`${name}: stranded Korean ending leaves only ${lastCore.length} readable character(s) on the final line`);
+      }
+    }
+
+    const fontSize = Number.parseFloat(style.fontSize);
+    const minimumAdvanceRatio = hasHangul ? 0.86 : 0.8;
+    const axisAligned = style.transform === 'none';
+    let collision = false;
+    for (let index = 1; index < lines.length && !collision; index += 1) {
+      const previous = lines[index - 1];
+      const current = lines[index];
+      const advance = current.top - previous.top;
+      const advanceRatio = fontSize > 0 ? advance / (fontSize * stageScale) : 1;
+      const overlap = Math.max(0, previous.bottom - current.top);
+      const overlapRatio = overlap / Math.max(1, Math.min(previous.height, current.height));
+      collision = axisAligned && (advanceRatio < minimumAdvanceRatio || overlapRatio > 0.4);
+    }
+    if (collision) {
+      issues.push(`${name}: rendered text lines collide; increase line-height or reduce/reflow the display type`);
+    }
+  }
+
+  const readableCount = record => Array.from(
+    record.lines.map(line => line.text).join('').replace(/[\s\p{P}\p{S}]/gu, '')
+  ).length;
+  for (const record of lineRecords) {
+    if (record.element.closest('[data-text-overlap-ok]')) {
+      warnings.push(`${label(record.element)}: intentional text-overlap exemption requires visual inspection`);
+    }
+  }
+  for (let leftIndex = 0; leftIndex < lineRecords.length; leftIndex += 1) {
+    const leftRecord = lineRecords[leftIndex];
+    for (let rightIndex = leftIndex + 1; rightIndex < lineRecords.length; rightIndex += 1) {
+      const rightRecord = lineRecords[rightIndex];
+      const leftElement = leftRecord.element;
+      const rightElement = rightRecord.element;
+      if (leftElement.contains(rightElement) || rightElement.contains(leftElement)) continue;
+      if (leftElement.closest('[data-text-overlap-ok]') || rightElement.closest('[data-text-overlap-ok]')) continue;
+      if (readableCount(leftRecord) <= 1 || readableCount(rightRecord) <= 1) continue;
+      const overlaps = leftRecord.lines.some(leftLine => rightRecord.lines.some(rightLine => {
+        const area = intersection(leftLine, rightLine);
+        const verticalRatio = area.height / Math.max(1, Math.min(leftLine.height, rightLine.height));
+        const horizontalRatio = area.width / Math.max(1, Math.min(leftLine.width, rightLine.width));
+        return area.width > 4 && area.height > 4 && verticalRatio > 0.35 && horizontalRatio > 0.12;
+      }));
+      if (overlaps) {
+        issues.push(`${label(leftElement)} / ${label(rightElement)}: rendered text regions overlap`);
+      }
+    }
+  }
+
+  const nav = document.querySelector('.nav');
+  if (nav && visible(nav)) {
+    const navRect = nav.getBoundingClientRect();
+    for (const record of lineRecords) {
+      const covered = record.lines.some(line => {
+        const area = intersection(line, navRect);
+        return area.width > 4 && area.height > 4
+          && area.height / Math.max(1, line.height) > 0.15;
+      });
+      if (covered) issues.push(`${label(record.element)}: rendered text is covered by navigation controls`);
+    }
+  }
+
+  return {
+    ok: issues.length === 0,
+    checked: elements.length,
+    line_checks: lineRecords.length,
+    issues: [...new Set(issues)],
+    warnings: [...new Set(warnings)],
+  };
 })()

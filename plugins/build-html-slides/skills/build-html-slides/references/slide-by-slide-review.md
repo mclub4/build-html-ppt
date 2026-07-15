@@ -32,8 +32,8 @@ For `all` scope:
 - `completion`: no visible placeholder, temporary/dummy asset, empty media frame, or generic substitute graphic stands in for a promised real subject image; `PLACE NOTE` is an automatic failure, not a design label;
 - `overflow`: text and components remain inside their intended regions;
 - `occlusion`: media and decoration do not obscure copy or controls;
-- `text`: copy is readable and visually coherent;
-- `text_bounds`: text remains inside its box, cell, button, badge, column, and safe area;
+- `text`: copy is readable and visually coherent, with natural phrase-boundary wrapping and no one- or two-character Korean final line;
+- `text_bounds`: text remains inside its box, cell, button, badge, column, and safe area; rendered rows do not collide with each other or sibling copy, and navigation covers no caption, source, or footer text;
 - `density`: cards, panels, and decorative shapes justify their area and do not leave sparse copy stranded in oversized empty boxes;
 - `controls`: navigation and interactive elements are centered, readable, and usable.
 - `identity`: on explicitly or automatically identity-routed slides, every candidate matches its canonical WebP reference and the intended character/person variant.

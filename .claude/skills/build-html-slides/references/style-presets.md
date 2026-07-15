@@ -176,6 +176,16 @@ These values scale with the stage. Do not use viewport-width font sizing that ch
 
 Check Korean glyph quality, punctuation, numerals, and Latin/Korean mixing. Avoid unrelated fallback faces. Keep letter spacing at zero unless a short all-caps/mono label has a specific reason.
 
+### Rendered line safety
+
+Validate settled browser lines after local fonts finish loading. Element width and `scrollWidth` are insufficient because broken line composition can remain inside its box.
+
+- Do not leave only one or two Korean characters, a sentence ending such as `다.`, or closing punctuation on the last line of a display title or quote. Rephrase, rebalance the text box, reduce the display size, or add a phrase-boundary break.
+- Set Korean display line-height from the actual face and weight. Start with enough separation for the font's glyph metrics; never tighten multiline copy below `0.9` without rendered proof, and reject any visible row collision regardless of the declared CSS value.
+- Keep footer copy, credits, and captions outside the persistent navigation rectangle at every retained profile.
+- `measure_text_bounds.js` reconstructs Chromium lines, checks Korean final-line fragments, line advance, sibling text intersections, and navigation occlusion under the existing `text_bounds` automation gate.
+- `data-line-break-ok` is limited to an intentional one- or two-character poster/chapter treatment that remains visibly balanced. It bypasses only the orphan-line heuristic, never collision or bounds checks. `data-text-overlap-ok` is limited to deliberate legible overprint and still requires AI inspection; do not use either attribute to silence an accidental layout defect.
+
 ## Density
 
 Use these as warning thresholds, not mechanical templates:
@@ -239,5 +249,6 @@ Do not redefine profile sizes here or in deck-specific instructions. Use `valida
 - oversized low-information cards, empty outlined rectangles, and equal-height boxes containing only a few words;
 - repeated three-card grids as the default composition;
 - type shrunk below readable size to avoid splitting content;
+- a display title or quote with a one- or two-character Korean orphan line, punctuation-only line, colliding glyph rows, or text hidden under navigation;
 - page counters centered with padding guesses or transforms;
 - a starter palette treated as the deck's art direction.

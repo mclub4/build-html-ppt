@@ -269,6 +269,114 @@ const { chromium } = require('playwright');
             self.assertEqual(manifest["automation_gate"]["status"], "fail")
             self.assertEqual(manifest["review_batches"], [])
 
+    def test_text_geometry_blocks_orphan_line_collision_and_nav_occlusion(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "</style>",
+                """
+                .qa-orphan { position:absolute; left:48px; top:38px; width:980px; margin:0; font-size:58px; line-height:1.1; }
+                .qa-leading { position:absolute; left:48px; top:260px; width:850px; font-size:90px; line-height:.68; }
+                .qa-overlap-a { position:absolute; left:72px; top:540px; margin:0; font-size:34px; }
+                .qa-overlap-b { position:absolute; left:110px; top:548px; margin:0; font-size:34px; }
+                .qa-footer { position:absolute; right:18px; bottom:18px; margin:0; font-size:20px; }
+                </style>
+                """,
+                1,
+            ).replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                """
+                <div class="qa-orphan"><span>행사마다 표정은 달라도, 서점의 목소리는 하나입니</span><br><span>다.</span></div>
+                <div class="qa-leading">다음 장면을<br>함께 만들어가요.</div>
+                <p class="qa-overlap-a">First text region</p>
+                <p class="qa-overlap-b">Second text region</p>
+                <p class="qa-footer">One modular rule, many voices</p>
+                """,
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 1)
+            self.assertIn("automated geometry gate blocked AI review", render.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            failures = [failure["issue"] for failure in manifest["automation_gate"]["failures"]]
+            self.assertTrue(any("stranded Korean ending" in issue for issue in failures))
+            self.assertTrue(any("rendered text lines collide" in issue for issue in failures))
+            self.assertTrue(any("rendered text regions overlap" in issue for issue in failures))
+            self.assertTrue(any("covered by navigation controls" in issue for issue in failures))
+            self.assertEqual(manifest["review_batches"], [])
+
+    def test_text_geometry_accepts_balanced_multiline_display_type(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "</style>",
+                """
+                .qa-balanced { position:absolute; left:64px; top:72px; width:900px; margin:0; font-size:58px; line-height:1.08; }
+                .qa-safe-footer { position:absolute; left:64px; bottom:76px; margin:0; font-size:20px; }
+                </style>
+                """,
+                1,
+            ).replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                """
+                <h1 class="qa-balanced">행사마다 표정은 달라도,<br>서점의 목소리는 하나입니다.</h1>
+                <p class="qa-safe-footer">Campaign posters and event leaflets</p>
+                """,
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 0, render.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            failures = [failure for failure in manifest["automation_gate"]["failures"] if failure["slide"] == 2]
+            self.assertEqual(failures, [])
+
+    def test_line_break_exemption_routes_quick_slide_to_ai_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "</style>",
+                ".qa-exempt { position:absolute; left:64px; top:72px; margin:0; font-size:58px; line-height:1.08; }</style>",
+                1,
+            ).replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                '<h1 class="qa-exempt" data-line-break-ok>의도적인 포스터 문장 구성입니<br>다.</h1>',
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 0, render.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            warnings = [
+                warning for warning in manifest["automation_gate"]["warnings"]
+                if warning["slide"] == 2 and "final-line exemption" in warning["warning"]
+            ]
+            self.assertEqual({warning["profile"] for warning in warnings}, {"normal", "short", "zoom150"})
+            self.assertEqual(manifest["slides"][1]["required_ai_profiles"], ["normal", "short", "zoom150"])
+            self.assertTrue(any(2 in batch["slides"] for batch in manifest["review_batches"]))
+
     def test_underfilled_container_warns_and_routes_slide_to_ai_review(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -87,3 +87,4 @@ This rubric is used only in Full Validation. After the render/fix loop is settle
 - A named character/person slide lacks grounded identity targets, cue-based identity verdicts, or uses the wrong subject or variant.
 - Any slide contains a visible placeholder, temporary/dummy asset, empty media promise, or generic substitute graphic where the composition claims a real subject image. One occurrence blocks delivery regardless of the numeric score.
 - Typography remains the neutral runtime-shell stack, bare `system-ui`, or an unrelated generic face instead of a deliberate language- and topic-appropriate display/body system.
+- A display title or quote strands one or two Korean characters or punctuation on its final line, uses line-height that makes rendered glyph rows collide, overlaps another text region, or is covered by persistent navigation.

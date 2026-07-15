@@ -23,10 +23,13 @@ Use this checklist while inspecting the rendered slides selected by `validation-
 ## Typography
 
 - Titles fit without awkward single-character wraps or stranded punctuation.
+- Display titles and quotes do not leave one or two Korean characters, sentence endings such as `다.`, or closing punctuation alone on the final line.
+- Multiline display glyphs have visible separation; no row intersects the glyphs above or below it even when the element itself remains in bounds.
 - Body text remains readable on the logical 1280×720 canvas.
 - Korean and Latin glyphs look compatible.
 - Numerals, punctuation, units, and table alignment are consistent.
 - Long text stays inside its intended box, column, cell, badge, button, or safe region.
+- Footer text, captions, and sources remain clear of the persistent navigation panel.
 
 ## Imagery
 
@@ -72,6 +75,7 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 
 - cropped or stretched meaningful imagery;
 - text outside a box or safe area;
+- orphaned final-line characters or punctuation, colliding text rows, overlapping text regions, or copy covered by navigation;
 - unreadable contrast or foreground media over copy;
 - broken/missing local assets;
 - generic starter styling or repeated default composition;
