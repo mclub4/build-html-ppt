@@ -244,9 +244,7 @@ class VisualReviewTests(unittest.TestCase):
         }
         cross_reviews = []
         if phase == "final" and mode == "full":
-            required = {1, count}
-            if critical:
-                required.add(critical)
+            required = set(range(1, count + 1))
             cross_reviews = [self.cross_review(records[number - 1], responsive) for number in sorted(required)]
         review_batches = []
         ai_reviewed = [number for number in rendered if records[number - 1]["required_ai_profiles"]]
@@ -577,6 +575,32 @@ class VisualReviewTests(unittest.TestCase):
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
         self.assertIn("requires an independent final cross review", result.stdout)
+
+    def test_final_full_requires_cross_review_for_ordinary_slide(self) -> None:
+        deck = deck_for(3)
+        manifest = self.manifest(deck, 3, mode="full", phase="final")
+        manifest["cross_reviews"] = [
+            review for review in manifest["cross_reviews"] if review["slide"] != 2
+        ]
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("slide 2 requires an independent final cross review", result.stdout)
+
+    def test_cross_reviewer_must_be_outside_all_primary_reviewers(self) -> None:
+        deck = deck_for(4)
+        manifest = self.manifest(deck, 4, mode="full", phase="final")
+        manifest["cross_reviews"][0]["reviewer_ref"] = manifest["slides"][-1]["reviewer_ref"]
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("must be outside the primary reviewer set", result.stdout)
+
+    def test_cross_reviews_require_distinct_observations(self) -> None:
+        deck = deck_for(2)
+        manifest = self.manifest(deck, 2, mode="full", phase="final")
+        manifest["cross_reviews"][1]["observation"] = manifest["cross_reviews"][0]["observation"]
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("must not reuse the same observation", result.stdout)
 
     def test_full_quality_editor_must_be_independent(self) -> None:
         deck = deck_for(2)

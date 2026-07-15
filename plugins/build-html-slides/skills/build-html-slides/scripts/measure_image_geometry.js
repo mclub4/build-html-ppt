@@ -126,9 +126,9 @@
       const browserScale = window.visualViewport?.scale || 1;
       const density = 1 / Math.max(cssScale * window.devicePixelRatio * browserScale, 0.0001);
       item.pixelDensity = round(density);
-      if (!decorative && !element.hasAttribute('data-low-res-ok') && density < 0.85) {
+      if (!element.hasAttribute('data-low-res-ok') && density < 1) {
         issues.push(`${name}: effective raster resolution is only ${round(density)}x device pixels`);
-      } else if (!decorative && density < 1.1) {
+      } else if (!element.hasAttribute('data-low-res-ok') && density < 1.25) {
         warnings.push(`${name}: effective raster resolution is borderline at ${round(density)}x device pixels`);
       }
     }

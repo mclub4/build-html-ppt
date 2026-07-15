@@ -82,7 +82,7 @@ Choose review risk by reasoning about consequences, uncertainty, distribution, t
 
 Pass the decision to the renderer with `--review-risk standard|high`. Assign contiguous slide ranges. Vision batches contain at most four slides, independent of reviewer range size.
 
-After fixes settle, run `--finalize`, assign an independent presentation editor, calculate the quality score once, and cross-review the cover, closing, and slides explicitly marked `data-visual-critical="true"` with a reviewer different from each slide's primary reviewer. CSS classes such as `logo`, `key-visual`, `title-art`, or `diagram` do not independently expand cross-review scope. Unresolved high/medium findings or a failing score block delivery.
+After fixes settle, run `--finalize`, assign an independent presentation editor, calculate the quality score once, and independently cross-review every slide. The cross-reviewer must be outside the complete primary-reviewer set, not merely different from the primary reviewer assigned to that slide. This second pass intentionally catches repeated-layout defects, image-specific whitespace and scale failures, and primary-review misses. Unresolved high/medium findings or a failing score block delivery.
 
 ## Commands
 
@@ -122,6 +122,8 @@ Run checks by change type:
 | Mixed/global | all checks |
 
 Do not recalculate the quality score during the fix loop. Full Validation scores only after the settled final render.
+
+Any reviewer FAIL is monotonic for that render: do not rewrite it to PASS. Fix the deck, rerun `prepare`, inspect the new capture hashes, and record a new verdict. A shared CSS, runtime, or layout-family edit invalidates every affected slide review; do not preserve or reconstruct old observations. Review JSON is evidence output, not a checklist to complete programmatically.
 
 ## Evidence Meaning
 

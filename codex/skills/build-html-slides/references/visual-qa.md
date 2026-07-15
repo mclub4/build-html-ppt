@@ -39,12 +39,16 @@ Use this checklist while inspecting the rendered slides selected by `validation-
 - Official marks retain aspect ratio and clear space.
 - Key visuals use `contain` when faces, products, title art, UI, diagrams, or edges matter.
 - Decorative `cover` crops do not remove meaningful content.
-- Raster assets are sharp enough and stored as WebP.
+- Raster assets are sharp enough at the actual full-size presentation capture and stored as WebP. Converting a small or damaged JPEG to WebP does not improve it.
+- Product packaging, faces, screenshots, diagrams, and embedded labels retain crisp edges and readable detail. Reject obvious thumbnails, prior upscales, blur, ringing, mosquito noise, block artifacts, banding, and over-compression.
+- Prefer at least 1.25 source pixels per maximum rendered device pixel. Treat less than 1.0 as blocking unless an irreplaceable user-supplied historical asset is explicitly marked, disclosed, and presented small enough to look intentional.
 - Reused imagery serves a different narrative role and does not look like filler.
 - Sources, credits, signatures, and watermarks remain accurate.
 - Each meaningful image visibly matches the subject and narrative claim of its slide; filenames, alt text, captions, folders, and search tags are not proof.
 - Named characters and people match a separate official/authoritative reference, including the intended costume, age, form, and distinguishing traits. Uncertain identity is a failure.
 - Every apparent media slot is finished. Labels such as `PLACE NOTE`, dummy/temporary art, empty image frames, and repeated generic substitute graphics fail when the slide promises a real place, product, person, character, venue, or event image.
+- Judge the visible subject separately from the raster canvas. Large intrinsic white or transparent margins that make the subject look tiny are a composition failure even when `object-fit: contain` passes.
+- Compare repeated image frames as a family. One unusually tall, wide, or whitespace-heavy asset must not push a shared grid track, divider, caption, or label out of alignment.
 
 For games and animation, inspect official key art, wallpapers, title art, screenshots, and creator-hosted fan work against spoiler boundaries and distribution rights. Public or commercial decks require verified reuse rights or safer replacements.
 
@@ -54,6 +58,7 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - Text does not straddle incompatible light/dark regions without a stable scrim or backing.
 - Body text and controls target at least 4.5:1 contrast; large display text targets at least 3:1.
 - Decorative shapes do not create accidental tangencies or obscure hierarchy.
+- Dividers, card edges, captions, and labels remain visually separate from imagery. A product or screenshot crossing a divider or entering its caption region is blocking occlusion even when no DOM bounding box leaves the slide.
 
 ## Geometry And Runtime
 
@@ -78,6 +83,7 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - orphaned final-line characters or punctuation, colliding text rows, overlapping text regions, or copy covered by navigation;
 - unreadable contrast or foreground media over copy;
 - broken/missing local assets;
+- visibly blurry, thumbnail-sized, previously upscaled, or heavily compressed raster imagery, regardless of file extension or nominal dimensions;
 - generic starter styling or repeated default composition;
 - a report-like, image-starved treatment of a materially observable subject despite suitable factual imagery being reasonably available;
 - wrong region, unsupported factual claims, or misleading provenance;
@@ -85,3 +91,5 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - any visible placeholder or generic replacement graphic standing in for missing factual or subject-specific media;
 - an unconsidered generic font stack or typography that conflicts with the subject, language, or audience;
 - stale captures presented as current evidence.
+- a reviewer FAIL replaced with PASS without a new render and independent inspection of the new capture hashes;
+- synthetic or bulk-generated visual observations and reviewer identities that do not correspond to actual inspection.

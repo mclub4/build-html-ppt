@@ -883,11 +883,7 @@ def main() -> int:
             errors.append(f"duplicate cross review for slide {number}")
             continue
         cross_by_slide[number] = review
-    required_cross = {1, len(titles)} | {
-        index
-        for index, slide in enumerate(slide_parser.slides, 1)
-        if bool(slide["visual_critical"])
-    }
+    required_cross = set(expected_slides) if phase == "final" and mode == "full" else set()
     if phase == "final" and mode == "full":
         for number in sorted(required_cross - set(cross_by_slide)):
             errors.append(f"slide {number} requires an independent final cross review")
@@ -896,8 +892,8 @@ def main() -> int:
         reviewer_ref = str(review.get("reviewer_ref", "")).strip()
         if not reviewer or len(reviewer_ref) < 8 or reviewer_ref == reviewer:
             errors.append(f"cross review slide {number} needs reviewer and stable reviewer_ref")
-        if reviewer_ref == primary_refs.get(number):
-            errors.append(f"cross review slide {number} must use a different reviewer_ref")
+        if reviewer_ref in distinct_primary_refs:
+            errors.append(f"cross review slide {number} reviewer_ref must be outside the primary reviewer set")
         required_profiles = by_number.get(number, {}).get("required_ai_profiles", [])
         if review.get("review_method") != "vision-batched-full-size":
             errors.append(f"cross review slide {number} review_method must be 'vision-batched-full-size'")
@@ -932,6 +928,14 @@ def main() -> int:
             )
         if str(review.get("status", "")).lower() != "pass":
             errors.append(f"cross review slide {number} overall status did not pass")
+
+    cross_observations = [
+        str(review.get("observation", "")).strip()
+        for review in cross_by_slide.values()
+        if valid_observation(review.get("observation"))
+    ]
+    if len(cross_observations) != len(set(cross_observations)):
+        errors.append("cross-reviewed slides must not reuse the same observation")
 
     if not errors and os.environ.get("BUILD_HTML_SLIDES_UNIT_TEST") != "1":
         validate_current_fingerprints(args.deck.resolve(), manifest, errors)

@@ -52,4 +52,4 @@ For every entry in `identity_targets`, open both the rendered slide PNG and `ref
 
 Fail when identity is uncertain, a lookalike is more likely, the intended variant is wrong, the named subject is too small to verify, a `primary` subject is not dominant, or the image conflicts with the slide's claim, tone, spoiler boundary, or audience. Replace uncertain imagery instead of rationalizing it.
 
-The primary reviewer performs this comparison. During Full Validation, the quality editor repeats identity and appropriateness checks while inspecting every normal capture; critical identity slides also need hash-bound `identity_review` entries in their independent cross-review.
+The primary reviewer performs this comparison. During Full Validation, the independent final reviewer repeats identity and appropriateness checks and supplies hash-bound `identity_review` entries for every identity-routed slide.

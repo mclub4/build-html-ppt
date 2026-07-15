@@ -29,7 +29,7 @@ Use general web and image search as routing layers. Add site-specific searches w
 
 ## Selection And Provenance
 
-1. Collect more candidates than the deck needs, then select for narrative role, crop safety, resolution, visual distinction, and consistency.
+1. Collect more candidates than the deck needs, then select for narrative role, crop safety, resolution, visual distinction, and consistency. Inspect the downloaded original at full size; do not select search thumbnails or assume that a WebP extension, large canvas, or successful download implies sharp source detail.
 2. Prefer the original downloadable file over screenshots, thumbnails, or hotlinked derivatives.
 3. In strict mode, record the original item URL, creator/account, source kind, verification time, local hash, and required credit. In bounded internal/private fan-art mode, the discovery URL, visible creator/account, `origin_status: discovery-only`, verification time, local hash, and visible credit are sufficient.
 4. Preserve signatures and watermarks. Do not remove creator marks to make a slide cleaner.

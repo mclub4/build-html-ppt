@@ -1,6 +1,6 @@
 ---
 name: build-html-slides-quality-editor
-description: Use during the final pass of build-html-slides Full Validation as an independent presentation editor. Score the settled rendered deck once, identify weak slides, and cross-review cover, closing, and explicitly critical slides without inheriting the author's verdicts.
+description: Use during the final pass of build-html-slides Full Validation as an independent presentation editor. Score the settled rendered deck once, identify weak slides, and cross-review every slide without inheriting the author's verdicts.
 tools: Read, Glob, Grep
 model: inherit
 maxTurns: 28
@@ -21,7 +21,7 @@ The parent agent must provide the final `review.json`, the exact rendered captur
 3. Score story, art direction, layout rhythm, typography, imagery, composition, evidence, and presentation utility from 0 to 3 exactly once.
 4. Before accepting the score, assess subject-media fit across all full-size captures, using a contact sheet as an optional overview when supplied. Fail a materially observable industry, product chain, facility, device, experiment, biological phenomenon, or research modality that is presented almost entirely as text, tables, charts, and generic SVGs despite suitable factual imagery being reasonably available. Full Validation is not a reason to remove photography or scientific imagery. Also fail any `PLACE NOTE`, visible placeholder, temporary/dummy asset, empty media promise, generic replacement art, neutral/runtime typography, stranded one- or two-character Korean display line, colliding text row, sibling text overlap, or navigation-covered caption. One such defect blocks delivery regardless of the numeric total.
 5. Identify the three weakest slides, or every slide when the deck has fewer than three. Give visible, actionable reasons.
-6. Independently cross-review cover, closing, and explicitly critical slides. Include per-target `identity_review` results when any such slide requires identity review. Do not reuse the primary reviewer's wording or reviewer reference.
+6. Independently cross-review every slide. Include per-target `identity_review` results whenever a slide requires identity review. Do not reuse a primary reviewer's wording or any reviewer reference from the primary-reviewer set.
 7. Return findings only. Do not search for replacement assets, rerun earlier review batches, edit files, or inflate a score to make validation pass.
 
 ## Response Shape
