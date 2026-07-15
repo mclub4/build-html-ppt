@@ -66,7 +66,7 @@ class WorkflowContractTests(unittest.TestCase):
         quality = (ROOT / "references" / "quality-bar.md").read_text(encoding="utf-8")
         typography = (ROOT / "references" / "style-presets.md").read_text(encoding="utf-8")
         self.assertIn("Placeholders may exist only in the private authoring workspace", skill)
-        self.assertIn("placeholder gate runs in every phase and mode", contract)
+        self.assertIn("placeholder gate runs in both rendered modes", contract)
         self.assertIn("One occurrence blocks delivery", quality)
         self.assertIn("Choose the type system without asking a separate font question", typography)
         self.assertTrue((ROOT / "scripts" / "validate_placeholders.py").is_file())
