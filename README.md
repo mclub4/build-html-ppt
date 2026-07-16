@@ -19,6 +19,12 @@
 </h2>
 
 <p align="center">
+  <a href="https://html-ppt-gallery.unequaled-condor.workers.dev/">
+    <img src="assets/gallery-preview.webp" alt="Build HTML Slides 작품 갤러리 미리 보기" width="100%" />
+  </a>
+</p>
+
+<p align="center">
   <strong>갤러리의 발표 자료는 모두 Build HTML Slides로 뽑은 실제 작품 예시입니다.</strong>
 </p>
 
@@ -301,7 +307,7 @@ python3 codex/skills/build-html-slides/scripts/validate_all.py OUTPUT.html --pha
 python3 codex/skills/build-html-slides/scripts/validate_all.py OUTPUT.html --phase finalize-verify
 ```
 
-증분 수정의 `--change-type`은 최적화 힌트입니다. 실제 텍스트·이미지·구조·스타일·외부 로컬 의존성 해시가 더 넓게 바뀌면 검증기가 자동으로 `all`로 확대합니다. 표준 Full Validation의 최종 교차 검토는 핵심·경고·분산 표본만 다시 보며, 고위험에서만 모든 슬라이드를 다시 봅니다.
+증분 수정의 `--change-type`은 최적화 힌트입니다. 실제 지문을 기준으로 문구·이미지·슬라이드 전용 CSS는 영향받은 장만, 구조·순서·전환처럼 인접 맥락이 바뀌면 앞뒤 장까지, 공통 CSS·런타임은 전체를 다시 렌더링합니다. 수정 루프의 `verify`는 새 캡처만 픽셀 검사하고 최종 확정 때 전체 증거를 한 번 대조합니다. 실패가 나면 해당 슬라이드와 검사 종류에 집중하며, 캡처 해시가 그대로인 독립 교차검토는 보존합니다. 표준 Full Validation의 최종 교차 검토는 핵심·경고·분산 표본만 다시 보며, 고위험에서만 모든 슬라이드를 다시 봅니다.
 
 ## 작업 파일 위치
 

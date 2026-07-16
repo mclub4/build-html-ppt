@@ -51,9 +51,9 @@ Do not reuse generic approval text across slides. Do not claim a model or person
 
 ## Fix Loop
 
-After a scoped edit, rerun `validate_all.py --phase prepare` with `--slides` and the matching `--change-type`. The renderer keeps a CSS rule that matches one slide in that slide's fingerprint; shared styles and runtime changes still force a full render. Reopen every refreshed slide routed to AI review, then run `validate_all.py --phase verify`.
+After a scoped edit, rerun `validate_all.py --phase prepare` with `--slides` and the matching `--change-type`. Pure copy, image, and slide-local CSS changes refresh only affected slides. Structure, order, transition, and adjacency-sensitive changes add immediate neighbors. Shared deck-wide CSS and runtime changes force a full render. CSS rules matching a finite slide subset and their background assets stay bound to that subset. Reopen every refreshed slide routed to AI review, then run `validate_all.py --phase verify`.
 
-Never change a FAIL record to PASS in place. A FAIL requires a deck change, a new render run, and inspection of the new capture hashes. Do not bulk-generate reviewer labels, observations, checks, or PASS statuses. If a reviewer reports a defect after the main agent believes it is fixed, the reviewer verdict wins until a new independent inspection closes it.
+Never change a FAIL record to PASS in place. A FAIL requires a deck change, a new render run, and inspection of the new capture hashes. Focus that loop on the failed slide and check family; do not rerun unrelated validators or reopen unaffected captures. Do not bulk-generate reviewer labels, observations, checks, or PASS statuses. If a reviewer reports a defect after the main agent believes it is fixed, the reviewer verdict wins until a new independent inspection closes it.
 
 ## Full Validation Final Pass
 
@@ -65,7 +65,7 @@ After all findings are settled:
 4. bind cross-reviews to current capture hashes;
 5. run `validate_all.py --phase finalize-verify`.
 
-Standard risk uses a bounded set containing visual-critical, warning-triggered, and distributed sample slides. High risk includes every slide. Do not expand a standard final pass to all slides unless the generated batches or a new finding requires it.
+Standard risk uses a bounded set containing visual-critical, warning-triggered, and distributed sample slides. High risk includes every slide. This independent pass is not removed as duplicate checking. Do not expand a standard final pass to all slides unless the generated batches or a new finding requires it. After a focused repair, reuse a passing independent review only when the slide capture hash and review contract are unchanged; regenerate the failed or changed slide's review.
 
 Quick Draft skips quality scoring and cross-review.
 

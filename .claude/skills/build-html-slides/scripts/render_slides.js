@@ -22,11 +22,17 @@ const PROFILES = Object.fromEntries(Object.entries(CONTRACT.profiles).map(([name
 const CHECKS_BY_CHANGE = CONTRACT.checks_by_change;
 const AUTOMATION_CHECKS_BY_CHANGE = CONTRACT.automation_checks_by_change;
 const REVIEW_BATCH_SIZE = CONTRACT.review_batch_size;
+const IMPACT_SCOPES = new Set(CONTRACT.impact_scopes);
+const CONTENT_CHANGE_CATEGORIES = new Set(CONTRACT.content_change_categories);
 const MEDIA_WAIT_TIMEOUT_MS = 15000;
 const QUALITY_DIMENSIONS = [
   'story', 'art_direction', 'layout_rhythm', 'typography',
   'imagery', 'composition', 'evidence', 'presentation_utility',
 ];
+const CHROMIUM_LAUNCH_OPTIONS = {
+  headless: true,
+  args: ['--allow-file-access-from-files'],
+};
 const MOTION_OVERRIDE = `
   *, *::before, *::after {
     animation: none !important;
@@ -41,7 +47,8 @@ function usage(message) {
   process.stderr.write(
     'usage: node render_slides.js DECK.html [REVIEW_DIR] --mode quick|full '
     + '[--review-risk standard|high] [--slides 3,5-7] '
-    + '[--change-type all|text|image|navigation] [--responsive]\n'
+    + '[--change-type all|text|image|navigation] [--responsive] '
+    + '[--fingerprint-cache PATH]\n'
     + '       node render_slides.js DECK.html [REVIEW_DIR] --finalize-prepare\n'
     + '       node render_slides.js --check\n'
     + '       node render_slides.js --fingerprints DECK.html\n'
@@ -122,6 +129,7 @@ function parseArguments(argv) {
   let reviewRisk = 'standard';
   let phase = 'iteration';
   let finalizeOnly = false;
+  let fingerprintCache = null;
   for (let index = optionStart; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--mode' && argv[index + 1]) {
@@ -137,6 +145,8 @@ function parseArguments(argv) {
     } else if (argument === '--finalize-prepare' || argument === '--finalize') {
       phase = 'final';
       finalizeOnly = true;
+    } else if (argument === '--fingerprint-cache' && argv[index + 1]) {
+      fingerprintCache = path.resolve(argv[++index]);
     } else {
       usage(`unknown argument: ${argument}`);
     }
@@ -163,6 +173,7 @@ function parseArguments(argv) {
     responsive,
     phase,
     finalizeOnly,
+    fingerprintCache,
   };
 }
 
@@ -200,23 +211,63 @@ async function waitForMedia(page) {
   await waitForFrames(page);
 }
 
+async function waitForStyles(page) {
+  await page.evaluate(async timeoutMs => {
+    const pending = [...document.querySelectorAll('link[rel~="stylesheet"]')]
+      .filter(link => !link.sheet)
+      .map(link => new Promise(resolve => {
+        link.addEventListener('load', resolve, { once: true });
+        link.addEventListener('error', resolve, { once: true });
+      }));
+    if (!pending.length) return;
+    await Promise.race([
+      Promise.all(pending),
+      new Promise(resolve => setTimeout(resolve, timeoutMs)),
+    ]);
+  }, MEDIA_WAIT_TIMEOUT_MS);
+}
+
 async function waitForFrames(page) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
 async function preparePage(page, url) {
-  await page.goto(url, { waitUntil: 'load' });
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.addStyleTag({ content: MOTION_OVERRIDE, attributes: { 'data-slide-validation-motion': 'off' } });
+  await waitForStyles(page);
   await waitForMedia(page);
 }
 
-function hashLocalAsset(url) {
+async function prepareFingerprintPage(page, url) {
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  await page.addStyleTag({ content: MOTION_OVERRIDE, attributes: { 'data-slide-validation-motion': 'off' } });
+  await waitForStyles(page);
+  await waitForFrames(page);
+}
+
+function hashLocalAsset(url, cache = null) {
+  if (cache?.has(url)) return cache.get(url).fingerprint;
   if (!url || !url.startsWith('file:')) return url || '';
   try {
     const filePath = fileURLToPath(url);
-    return fs.statSync(filePath).isFile() ? `${url}:${sha256(fs.readFileSync(filePath))}` : url;
+    const stat = fs.statSync(filePath, { bigint: true });
+    if (!stat.isFile()) return url;
+    const digest = sha256(fs.readFileSync(filePath));
+    const fingerprint = `${url}:${digest}`;
+    cache?.set(url, {
+      url,
+      path: filePath,
+      size: String(stat.size),
+      mtime_ns: String(stat.mtimeNs),
+      ctime_ns: String(stat.ctimeNs),
+      sha256: digest,
+      fingerprint,
+    });
+    return fingerprint;
   } catch (_error) {
-    return `${url}:missing`;
+    const fingerprint = `${url}:missing`;
+    cache?.set(url, { url, path: '', size: '', mtime_ns: '', sha256: '', fingerprint });
+    return fingerprint;
   }
 }
 
@@ -308,18 +359,24 @@ async function collectFingerprints(page) {
     body.querySelectorAll('section.slide').forEach(node => node.remove());
     const globalStyles = [];
     const slideStyles = slides.map(() => []);
-    const dependencies = new Set();
+    const slideAssets = slides.map(() => new Set());
+    const globalStyleAssets = new Set();
+    const globalStructureAssets = new Set();
+    const runtimeDependencies = new Set();
+    const sourceFiles = new Set();
 
-    const collectCssDependencies = (cssText, baseUrl) => {
+    const cssDependencies = (cssText, baseUrl) => {
+      const found = [];
       for (const match of cssText.matchAll(/url\(\s*(?:"([^"]+)"|'([^']+)'|([^)'"\s]+))\s*\)/gi)) {
         const value = match[1] || match[2] || match[3] || '';
         if (!value || value.startsWith('#') || value.startsWith('data:')) continue;
         try {
-          dependencies.add(new URL(value, baseUrl || document.baseURI).href);
+          found.push(new URL(value, baseUrl || document.baseURI).href);
         } catch (_error) {
-          dependencies.add(value);
+          found.push(value);
         }
       }
+      return found;
     };
 
     const selectorTargets = selectorText => {
@@ -341,10 +398,17 @@ async function collectFingerprints(page) {
       for (const rule of [...rules]) {
         if (rule.type === CSSRule.STYLE_RULE) {
           const material = `${context}${rule.cssText}`;
-          collectCssDependencies(material, baseUrl);
+          const assets = cssDependencies(material, baseUrl);
           const targets = selectorTargets(rule.selectorText || '');
-          if (targets?.length === 1) slideStyles[targets[0]].push(material);
-          else if (targets === null || targets.length > 1) globalStyles.push(material);
+          if (targets?.length && targets.length < slides.length) {
+            targets.forEach(index => {
+              slideStyles[index].push(material);
+              assets.forEach(asset => slideAssets[index].add(asset));
+            });
+          } else if (targets === null || targets?.length === slides.length) {
+            globalStyles.push(material);
+            assets.forEach(asset => globalStyleAssets.add(asset));
+          }
           continue;
         }
         if (rule.cssRules && typeof rule.conditionText === 'string') {
@@ -352,31 +416,41 @@ async function collectFingerprints(page) {
           continue;
         }
         const material = `${context}${rule.cssText}`;
-        collectCssDependencies(material, baseUrl);
+        cssDependencies(material, baseUrl).forEach(asset => globalStyleAssets.add(asset));
         globalStyles.push(material);
       }
     };
     for (const sheet of [...document.styleSheets]) {
       const owner = sheet.ownerNode;
       if (owner?.hasAttribute?.('data-slide-validation-motion')) continue;
-      if (sheet.href) dependencies.add(sheet.href);
       const explicit = (owner?.dataset?.slideScope || '').split(',')
         .map(value => Number.parseInt(value.trim(), 10))
         .filter(number => number >= 1 && number <= slides.length);
       if (explicit.length) {
-        explicit.forEach(number => slideStyles[number - 1].push(owner?.textContent || ''));
-        collectCssDependencies(owner?.textContent || '', sheet.href || document.baseURI);
+        const material = owner?.textContent || '';
+        const assets = cssDependencies(material, sheet.href || document.baseURI);
+        explicit.forEach(number => {
+          slideStyles[number - 1].push(material);
+          assets.forEach(asset => slideAssets[number - 1].add(asset));
+        });
         continue;
       }
       try {
         classifyRules(sheet.cssRules, '', sheet.href || document.baseURI);
+        if (sheet.href) {
+          sourceFiles.add(sheet.href);
+        }
       } catch (_error) {
+        if (sheet.href) globalStyleAssets.add(sheet.href);
         globalStyles.push(`unreadable-stylesheet:${sheet.href || owner?.outerHTML || ''}`);
       }
     }
     document.querySelectorAll('script[src], link[href]').forEach(element => {
       const value = element.src || element.href;
-      if (value) dependencies.add(value);
+      if (value && !element.matches('link[rel~="stylesheet"]')) {
+        if (element.matches('script[src]')) runtimeDependencies.add(value);
+        else globalStructureAssets.add(value);
+      }
     });
 
     const srcsetUrls = value => {
@@ -424,7 +498,7 @@ async function collectFingerprints(page) {
     };
     document.querySelectorAll('link[imagesrcset], img, source, video, image').forEach(element => {
       if (!element.closest('section.slide')) {
-        mediaAssets(element).forEach(value => dependencies.add(value));
+        mediaAssets(element).forEach(value => globalStructureAssets.add(value));
       }
     });
 
@@ -446,30 +520,61 @@ async function collectFingerprints(page) {
         structure: structure.outerHTML,
         styles: slideStyles[index],
         media: mediaElements.map(element => element.outerHTML),
-        assets: mediaElements.flatMap(mediaAssets),
+        assets: [
+          ...mediaElements.flatMap(mediaAssets),
+          ...[...(slide.hasAttribute('style') ? [slide] : []), ...slide.querySelectorAll('[style]')]
+            .flatMap(element => cssDependencies(element.getAttribute('style') || '', document.baseURI)),
+          ...slideAssets[index],
+        ],
       };
     };
+    head.querySelectorAll('style, link[rel~="stylesheet"]').forEach(node => node.remove());
+    body.querySelectorAll('style, link[rel~="stylesheet"]').forEach(node => node.remove());
+    const globalRuntime = [
+      ...head.querySelectorAll('script'),
+      ...body.querySelectorAll('script, button, input, select, textarea, [role="button"]'),
+    ].map(node => node.outerHTML).join('\n');
+    head.querySelectorAll('script').forEach(node => node.remove());
+    body.querySelectorAll('script').forEach(node => node.remove());
     return {
       titles: slides.map(slide => slide.dataset.title || ''),
       criticalSlides: slides.map((slide, index) => (
         slide.dataset.visualCritical === 'true' ? index + 1 : null
       )).filter(Boolean),
-      global: `${head.innerHTML}\n${body.innerHTML}\n${globalStyles.join('\n')}`,
-      dependencies: [...dependencies],
+      globalRuntime,
+      globalStructure: `${head.outerHTML}\n${body.outerHTML}`,
+      globalStyles: globalStyles.join('\n'),
+      runtimeDependencies: [...runtimeDependencies],
+      globalStructureAssets: [...globalStructureAssets],
+      globalStyleAssets: [...globalStyleAssets],
+      sourceFiles: [...sourceFiles],
       slides: slides.map(slideMaterial),
     };
   });
-  const dependencyHashes = materials.dependencies.map(hashLocalAsset).sort();
+  const assetCache = new Map();
+  const runtimeDependencyHashes = materials.runtimeDependencies.map(url => hashLocalAsset(url, assetCache)).sort();
+  const globalStructureAssetHashes = materials.globalStructureAssets
+    .map(url => hashLocalAsset(url, assetCache)).sort();
+  const globalStyleAssetHashes = materials.globalStyleAssets.map(url => hashLocalAsset(url, assetCache)).sort();
+  materials.sourceFiles.forEach(url => hashLocalAsset(url, assetCache));
+  const globalComponents = {
+    runtime_sha256: sha256(`${materials.globalRuntime}\n${runtimeDependencyHashes.join('\n')}`),
+    structure_sha256: sha256(`${materials.globalStructure}\n${globalStructureAssetHashes.join('\n')}`),
+    styles_sha256: sha256(`${materials.globalStyles}\n${globalStyleAssetHashes.join('\n')}`),
+  };
   const components = {};
   const slides = {};
   materials.slides.forEach((slide, index) => {
-    const assetHashes = slide.assets.map(hashLocalAsset).sort();
+    const assetHashes = slide.assets.map(url => hashLocalAsset(url, assetCache)).sort();
     const number = String(index + 1);
     components[number] = {
       text_sha256: sha256(slide.text.join('\n')),
       media_sha256: sha256(`${slide.media.join('\n')}\n${assetHashes.join('\n')}`),
       structure_sha256: sha256(slide.structure),
       styles_sha256: sha256(slide.styles.join('\n')),
+      transition_sha256: sha256(
+        slide.styles.filter(material => /(?:^|[;{\s-])(?:transition|animation)(?:[\s:-]|$)/i.test(material)).join('\n')
+      ),
     };
     slides[number] = sha256(
       `${slide.html}\n${slide.styles.join('\n')}\n${assetHashes.join('\n')}`
@@ -478,8 +583,18 @@ async function collectFingerprints(page) {
   return {
     titles: materials.titles,
     critical_slides: materials.criticalSlides,
-    global_sha256: sha256(`${materials.global}\n${dependencyHashes.join('\n')}`),
-    dependencies: dependencyHashes,
+    global_sha256: sha256(
+      `${globalComponents.runtime_sha256}\n${globalComponents.structure_sha256}\n${globalComponents.styles_sha256}`
+    ),
+    global_components: globalComponents,
+    dependencies: [
+      ...runtimeDependencyHashes, ...globalStructureAssetHashes, ...globalStyleAssetHashes,
+    ].sort(),
+    global_assets: [...new Set([
+      ...materials.runtimeDependencies, ...materials.globalStructureAssets, ...materials.globalStyleAssets,
+    ])],
+    slide_assets: Object.fromEntries(materials.slides.map((slide, index) => [String(index + 1), slide.assets])),
+    local_files: [...assetCache.values()].map(({ fingerprint: _fingerprint, ...entry }) => entry),
     components,
     slides,
   };
@@ -487,11 +602,15 @@ async function collectFingerprints(page) {
 
 async function fingerprintsForDeck(deck) {
   const playwright = loadPlaywright();
-  const browser = await playwright.chromium.launch({ headless: true });
+  const browser = await playwright.chromium.launch(CHROMIUM_LAUNCH_OPTIONS);
   try {
-    const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-    await preparePage(page, `${pathToFileURL(deck).href}#1`);
-    return await collectFingerprints(page);
+    const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+    await blockFingerprintVisuals(context);
+    const page = await context.newPage();
+    await prepareFingerprintPage(page, `${pathToFileURL(deck).href}#1`);
+    const fingerprints = await collectFingerprints(page);
+    await context.close();
+    return fingerprints;
   } finally {
     await browser.close();
   }
@@ -522,6 +641,45 @@ function emptyRecord(number, title, sourceHash, changeType) {
   };
 }
 
+function refreshedRecord(number, title, sourceHash, changeType, previous = null) {
+  const record = emptyRecord(number, title, sourceHash, changeType);
+  if (previous && !['all', 'image'].includes(changeType)) {
+    record.identity_required = previous.identity_required === true;
+    record.identity_detection = previous.identity_detection || 'none';
+    record.identity_targets = JSON.parse(JSON.stringify(previous.identity_targets || []));
+  }
+  return record;
+}
+
+function allowedImageUrls(fingerprints, renderTargets) {
+  const allowed = new Set(fingerprints.global_assets || []);
+  for (const number of renderTargets) {
+    for (const url of fingerprints.slide_assets?.[String(number)] || []) allowed.add(url);
+  }
+  return allowed;
+}
+
+async function restrictImagesTo(context, allowed) {
+  await context.route('**/*', async route => {
+    const request = route.request();
+    if (['image', 'media'].includes(request.resourceType()) && !allowed.has(request.url())) {
+      await route.abort();
+      return;
+    }
+    await route.continue();
+  });
+}
+
+async function blockFingerprintVisuals(context) {
+  await context.route('**/*', async route => {
+    if (['image', 'media', 'font'].includes(route.request().resourceType())) {
+      await route.abort();
+    } else {
+      await route.continue();
+    }
+  });
+}
+
 function loadExistingManifest(output) {
   const manifestPath = path.join(output, 'review.json');
   if (!fs.existsSync(manifestPath)) return null;
@@ -530,6 +688,50 @@ function loadExistingManifest(output) {
   } catch (error) {
     throw new Error(`existing review manifest is invalid: ${error.message}`);
   }
+}
+
+function localFingerprintFilesUnchanged(entries) {
+  if (!Array.isArray(entries)) return false;
+  return entries.every(entry => {
+    if (!entry || !entry.path || !entry.size || !entry.mtime_ns || !entry.ctime_ns) return false;
+    try {
+      const stat = fs.statSync(entry.path, { bigint: true });
+      return stat.isFile()
+        && String(stat.size) === entry.size
+        && String(stat.mtimeNs) === entry.mtime_ns
+        && String(stat.ctimeNs) === entry.ctime_ns;
+    } catch (_error) {
+      return false;
+    }
+  });
+}
+
+function loadFingerprintCache(cachePath, deck, deckHash) {
+  if (!cachePath || !fs.existsSync(cachePath)) return null;
+  try {
+    const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+    if (
+      cache.schema_version !== 1
+      || cache.deck !== deck
+      || cache.deck_sha256 !== deckHash
+      || !cache.fingerprints
+      || !localFingerprintFilesUnchanged(cache.fingerprints.local_files)
+    ) return null;
+    return cache.fingerprints;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeFingerprintCache(cachePath, deck, fingerprints) {
+  if (!cachePath) return;
+  fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+  fs.writeFileSync(cachePath, `${JSON.stringify({
+    schema_version: 1,
+    deck,
+    deck_sha256: sha256(fs.readFileSync(deck)),
+    fingerprints,
+  })}\n`);
 }
 
 function changedSlideNumbers(existingFingerprints, currentFingerprints) {
@@ -542,36 +744,106 @@ function changedSlideNumbers(existingFingerprints, currentFingerprints) {
   return changed;
 }
 
-function detectedChangeType(existingFingerprints, currentFingerprints, changed, globalChanged) {
-  if (globalChanged) return 'all';
-  if (!changed.size) return 'none';
+function reorderedTitles(before, after) {
+  if (!Array.isArray(before) || !Array.isArray(after) || before.length !== after.length) return false;
+  if (JSON.stringify(before) === JSON.stringify(after)) return false;
+  return JSON.stringify([...before].sort()) === JSON.stringify([...after].sort());
+}
+
+function applyOrderImpact(details, orderChanged) {
+  if (!orderChanged || details.impact === 'full') return details;
+  return {
+    detected: 'all',
+    impact: 'neighbors',
+    navigationChanged: details.navigationChanged,
+    contentChanges: [...new Set([...details.contentChanges, 'structure'])],
+  };
+}
+
+function detectedChangeDetails(existingFingerprints, currentFingerprints, changed, globalChanged) {
+  if (globalChanged) {
+    const before = existingFingerprints?.global_components;
+    const after = currentFingerprints?.global_components;
+    const navigationChanged = !before || !after || before.runtime_sha256 !== after.runtime_sha256;
+    const contentChanges = [];
+    if (!before || !after || before.styles_sha256 !== after.styles_sha256) contentChanges.push('style');
+    if (!before || !after || before.structure_sha256 !== after.structure_sha256) contentChanges.push('structure');
+    if (navigationChanged) contentChanges.push('runtime');
+    if (changed.size) {
+      const slideDetails = detectedChangeDetails(existingFingerprints, currentFingerprints, changed, false);
+      contentChanges.push(...slideDetails.contentChanges);
+    }
+    return {
+      detected: 'all',
+      impact: 'full',
+      navigationChanged,
+      contentChanges: [...new Set(contentChanges)],
+    };
+  }
+  if (!changed.size) {
+    return { detected: 'none', impact: 'direct', navigationChanged: false, contentChanges: [] };
+  }
   const previous = existingFingerprints?.components;
   const current = currentFingerprints.components;
-  if (!previous || !current) return 'all';
+  if (!previous || !current) {
+    return {
+      detected: 'all',
+      impact: 'full',
+      navigationChanged: true,
+      contentChanges: ['text', 'image', 'structure', 'style', 'runtime'],
+    };
+  }
   const categories = new Set();
+  let structureChanged = false;
+  let stylesChanged = false;
+  let transitionChanged = false;
   for (const number of changed) {
     const before = previous[String(number)];
     const after = current[String(number)];
-    if (!before || !after) return 'all';
-    if (
-      before.structure_sha256 !== after.structure_sha256
-      || before.styles_sha256 !== after.styles_sha256
-    ) return 'all';
+    if (!before || !after) {
+      return {
+        detected: 'all',
+        impact: 'full',
+        navigationChanged: true,
+        contentChanges: ['text', 'image', 'structure', 'style', 'runtime'],
+      };
+    }
+    structureChanged ||= before.structure_sha256 !== after.structure_sha256;
+    stylesChanged ||= before.styles_sha256 !== after.styles_sha256;
+    transitionChanged ||= before.transition_sha256 !== after.transition_sha256;
     const textChanged = before.text_sha256 !== after.text_sha256;
     const imageChanged = before.media_sha256 !== after.media_sha256;
     if (textChanged) categories.add('text');
     if (imageChanged) categories.add('image');
-    if (!textChanged && !imageChanged && existingFingerprints.slides?.[String(number)] !== currentFingerprints.slides[String(number)]) {
-      return 'all';
+    if (!textChanged && !imageChanged && !structureChanged && !stylesChanged
+      && existingFingerprints.slides?.[String(number)] !== currentFingerprints.slides[String(number)]) {
+      return {
+        detected: 'all', impact: 'neighbors', navigationChanged: false, contentChanges: ['structure'],
+      };
     }
   }
-  if (categories.size !== 1) return categories.size ? 'all' : 'none';
-  return [...categories][0];
+  const contentChanges = [...categories];
+  if (structureChanged) contentChanges.push('structure');
+  if (stylesChanged) contentChanges.push('style');
+  if (structureChanged) {
+    return { detected: 'all', impact: 'neighbors', navigationChanged: false, contentChanges };
+  }
+  if (transitionChanged) {
+    return { detected: 'all', impact: 'neighbors', navigationChanged: false, contentChanges };
+  }
+  if (stylesChanged || categories.size > 1) {
+    return { detected: 'all', impact: 'direct', navigationChanged: false, contentChanges };
+  }
+  if (categories.size === 1) {
+    return {
+      detected: [...categories][0], impact: 'direct', navigationChanged: false, contentChanges,
+    };
+  }
+  return { detected: 'none', impact: 'direct', navigationChanged: false, contentChanges: [] };
 }
 
 function effectiveChangeType(requested, detected) {
-  if (requested === 'all' || detected === 'none' || requested === detected) return requested;
-  return 'all';
+  return detected === 'none' ? requested : detected;
 }
 
 function standardCrossReviewSlides(records, automationWarnings) {
@@ -628,26 +900,52 @@ function emptyCrossReview(record, batchId) {
   };
 }
 
-function prepareCrossReviews(records, automationWarnings, reviewRisk) {
+function reusableCrossReview(review, record, primaryRefs) {
+  if (!review || review.status !== 'pass' || primaryRefs.has(review.reviewer_ref)) return false;
+  const profiles = record.required_ai_profiles || [];
+  const hashes = Object.fromEntries(profiles.map(profile => [profile, record.captures[profile]?.sha256 || '']));
+  const expectedChecks = checksFor(record.review_scope, record.identity_required);
+  return review.review_method === 'vision-batched-full-size'
+    && review.inspected_profiles?.length === profiles.length
+    && review.inspected_profiles.every((profile, index) => profile === profiles[index])
+    && JSON.stringify(review.capture_sha256) === JSON.stringify(hashes)
+    && review.checks
+    && Object.keys(review.checks).join('|') === expectedChecks.join('|')
+    && expectedChecks.every(check => review.checks[check] === 'pass');
+}
+
+function prepareCrossReviews(records, automationWarnings, reviewRisk, retained = []) {
   const required = [...requiredCrossReviewSlides(records, automationWarnings, reviewRisk)]
     .sort((left, right) => left - right);
   const reviews = [];
   const batches = [];
-  for (let offset = 0; offset < required.length; offset += REVIEW_BATCH_SIZE) {
-    const slides = required.slice(offset, offset + REVIEW_BATCH_SIZE);
-    const id = `cross-batch-${String(batches.length + 1).padStart(2, '0')}`;
-    batches.push({
-      id,
-      slides,
-      capture_profiles: Object.fromEntries(slides.map(number => [
-        String(number),
-        records[number - 1].required_ai_profiles,
-      ])),
-      status: 'pending',
-    });
-    slides.forEach(number => reviews.push(emptyCrossReview(records[number - 1], id)));
+  const primaryRefs = new Set(records.map(record => record.reviewer_ref).filter(Boolean));
+  const retainedBySlide = new Map(retained.filter(review => Number.isInteger(review?.slide)).map(review => [review.slide, review]));
+  const completed = required.filter(number => reusableCrossReview(retainedBySlide.get(number), records[number - 1], primaryRefs));
+  const pending = required.filter(number => !completed.includes(number));
+  for (const [status, numbers] of [['complete', completed], ['pending', pending]]) {
+    for (let offset = 0; offset < numbers.length; offset += REVIEW_BATCH_SIZE) {
+      const slides = numbers.slice(offset, offset + REVIEW_BATCH_SIZE);
+      const id = `cross-batch-${String(batches.length + 1).padStart(2, '0')}`;
+      batches.push({
+        id,
+        slides,
+        capture_profiles: Object.fromEntries(slides.map(number => [
+          String(number),
+          records[number - 1].required_ai_profiles,
+        ])),
+        status,
+      });
+      slides.forEach(number => {
+        if (status === 'complete') {
+          reviews.push({ ...JSON.parse(JSON.stringify(retainedBySlide.get(number))), review_batch_id: id });
+        } else {
+          reviews.push(emptyCrossReview(records[number - 1], id));
+        }
+      });
+    }
   }
-  return { reviews, batches };
+  return { reviews, batches, reused: completed.length, pending: pending.length };
 }
 
 async function main() {
@@ -677,22 +975,34 @@ async function main() {
   }
   const profiles = profileNames(args.responsive);
 
-  const browser = await playwright.chromium.launch({ headless: true });
+  const browser = await playwright.chromium.launch(CHROMIUM_LAUNCH_OPTIONS);
   const browserVersion = browser.version();
   const fileUrl = pathToFileURL(args.deck).href;
   let fingerprints;
   let renderTargets;
   let directlyChanged;
   let detectedChange = 'all';
+  let changeDetails = {
+    detected: 'all',
+    impact: 'full',
+    navigationChanged: true,
+    contentChanges: ['text', 'image', 'structure', 'style', 'runtime'],
+  };
   let strategy = 'full';
   let records;
   let previousDeckHash = existing?.deck_sha256 || null;
 
   try {
-    const inspectionPage = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-    await preparePage(inspectionPage, `${fileUrl}#1`);
-    fingerprints = await collectFingerprints(inspectionPage);
-    await inspectionPage.close();
+    fingerprints = loadFingerprintCache(args.fingerprintCache, args.deck, deckHash);
+    if (!fingerprints) {
+      const inspectionContext = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+      await blockFingerprintVisuals(inspectionContext);
+      const inspectionPage = await inspectionContext.newPage();
+      await prepareFingerprintPage(inspectionPage, `${fileUrl}#1`);
+      fingerprints = await collectFingerprints(inspectionPage);
+      await inspectionContext.close();
+    }
+    if (args.fingerprintCache) fs.rmSync(args.fingerprintCache, { force: true });
     const slideCount = fingerprints.titles.length;
     if (!slideCount || fingerprints.titles.some(title => !title.trim())) {
       throw new Error('every slide needs a non-empty data-title');
@@ -709,21 +1019,47 @@ async function main() {
       && existing.mode === args.mode
       && existing.review_risk === args.reviewRisk
       && JSON.stringify(existingProfiles) === JSON.stringify(profiles)
-      && JSON.stringify(existingTitles) === JSON.stringify(fingerprints.titles);
+      && existingTitles.length === fingerprints.titles.length;
     const globalChanged = compatible
       && existing.source_fingerprints?.global_sha256 !== fingerprints.global_sha256;
     directlyChanged = compatible
       ? changedSlideNumbers(existing.source_fingerprints, fingerprints)
       : new Set(allSlides);
-    detectedChange = compatible
-      ? detectedChangeType(existing.source_fingerprints, fingerprints, directlyChanged, globalChanged)
-      : 'all';
+    if (compatible && !globalChanged) {
+      const unresolved = new Set([
+        ...(existing.slides || [])
+          .filter(record => String(record?.status).toLowerCase() === 'fail')
+          .map(record => record.slide),
+        ...(existing.cross_reviews || [])
+          .filter(review => String(review?.status).toLowerCase() === 'fail')
+          .map(review => review.slide),
+      ].filter(Number.isInteger));
+      const unchangedFailures = [...unresolved].filter(number => !directlyChanged.has(number));
+      if (unchangedFailures.length) {
+        throw new Error(
+          `reviewer FAIL requires a source fix and new capture for slide(s) `
+          + `${unchangedFailures.sort((left, right) => left - right).join(',')}`
+        );
+      }
+    }
+    changeDetails = compatible
+      ? applyOrderImpact(
+        detectedChangeDetails(existing.source_fingerprints, fingerprints, directlyChanged, globalChanged),
+        reorderedTitles(existingTitles, fingerprints.titles)
+      )
+      : {
+        detected: 'all',
+        impact: 'full',
+        navigationChanged: true,
+        contentChanges: ['text', 'image', 'structure', 'style', 'runtime'],
+      };
+    detectedChange = changeDetails.detected;
     args.changeType = args.slides && compatible && !globalChanged
       ? effectiveChangeType(args.changeType, detectedChange)
       : 'all';
     if (args.changeType !== requestedChangeType) {
       process.stderr.write(
-        `WARNING: requested change type ${requestedChangeType} widened to ${args.changeType} `
+        `WARNING: requested change type ${requestedChangeType} resolved to ${args.changeType} `
         + `because the rendered source diff was ${detectedChange}\n`
       );
     }
@@ -754,28 +1090,34 @@ async function main() {
       const finalReview = prepareCrossReviews(
         existing.slides,
         existing.automation_gate?.warnings || [],
-        existing.review_risk || 'standard'
+        existing.review_risk || 'standard',
+        existing.retained_cross_reviews || []
       );
       existing.cross_reviews = finalReview.reviews;
       existing.cross_review_batches = finalReview.batches;
+      existing.retained_cross_reviews = [];
       fs.writeFileSync(path.join(args.output, 'review.json'), `${JSON.stringify(existing, null, 2)}\n`);
       process.stdout.write(
         `OK: prepared final review without re-rendering; complete quality_score and `
-        + `${finalReview.batches.length} cross-review batch(es), then run finalize-verify\n`
+        + `${finalReview.pending} pending cross-review slide(s) in ${finalReview.batches.length} batch(es); `
+        + `${finalReview.reused} unchanged cross-review slide(s) reused, then run finalize-verify\n`
         + `${path.join(args.output, 'review.json')}\n`
       );
       return;
     }
 
-    if (args.slides && compatible && !globalChanged) {
+    if (args.slides && compatible && changeDetails.impact !== 'full') {
       strategy = 'incremental';
-      renderTargets = expandWithNeighbors(new Set([...args.slides, ...directlyChanged]), slideCount);
+      const selected = new Set([...args.slides, ...directlyChanged]);
+      renderTargets = changeDetails.impact === 'neighbors'
+        ? expandWithNeighbors(selected, slideCount)
+        : selected;
       records = existing.slides.map(record => JSON.parse(JSON.stringify(record)));
       fs.mkdirSync(args.output, { recursive: true });
     } else {
       renderTargets = allSlides;
       directlyChanged = compatible ? directlyChanged : allSlides;
-      records = fingerprints.titles.map((title, index) => emptyRecord(
+      records = fingerprints.titles.map((title, index) => refreshedRecord(
         index + 1, title, fingerprints.slides[String(index + 1)], 'all'
       ));
       fs.rmSync(args.output, { recursive: true, force: true });
@@ -783,11 +1125,12 @@ async function main() {
     }
 
     for (const number of renderTargets) {
-      records[number - 1] = emptyRecord(
+      records[number - 1] = refreshedRecord(
         number,
         fingerprints.titles[number - 1],
         fingerprints.slides[String(number)],
-        strategy === 'full' ? 'all' : args.changeType
+        strategy === 'full' ? 'all' : args.changeType,
+        existing?.slides?.[number - 1] || null
       );
     }
     for (let number = 1; number <= slideCount; number += 1) {
@@ -796,19 +1139,29 @@ async function main() {
         || fingerprints.critical_slides.includes(number);
     }
 
+    const automationChecks = AUTOMATION_CHECKS_BY_CHANGE[strategy === 'full' ? 'all' : args.changeType];
+    const measuredChecks = new Set(automationChecks);
+    const firstProfile = PROFILES[profiles[0]];
+    const context = await browser.newContext({
+      viewport: { width: firstProfile.viewport[0], height: firstProfile.viewport[1] },
+      deviceScaleFactor: 1,
+    });
+    if (strategy === 'incremental') {
+      await restrictImagesTo(context, allowedImageUrls(fingerprints, renderTargets));
+    }
+    const page = await context.newPage();
+    await preparePage(page, `${fileUrl}#1`);
+    const cdp = await context.newCDPSession(page);
     for (const profileName of profiles) {
       const profile = PROFILES[profileName];
-      const context = await browser.newContext({
-        viewport: { width: profile.viewport[0], height: profile.viewport[1] },
-        deviceScaleFactor: 1,
-      });
-      const page = await context.newPage();
-      await preparePage(page, `${fileUrl}#1`);
+      await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
+      await page.setViewportSize({ width: profile.viewport[0], height: profile.viewport[1] });
+      await waitForFrames(page);
       if (profile.scaleMode === 'browser-page') {
-        const cdp = await context.newCDPSession(page);
         await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: profile.zoom });
         await waitForFrames(page);
       }
+      await waitForMedia(page);
       const viewportEvidence = await page.evaluate(() => ({
         layout: [window.innerWidth, window.innerHeight],
         visual: [window.visualViewport?.width || 0, window.visualViewport?.height || 0],
@@ -839,11 +1192,19 @@ async function main() {
         if (!active || active.slide !== slideNumber || active.title !== fingerprints.titles[slideNumber - 1]) {
           throw new Error(`active slide mismatch for ${profileName} slide ${slideNumber}`);
         }
-        const textGeometry = await page.evaluate(source => (0, eval)(source), textBoundsScript);
-        const containerDensity = await page.evaluate(source => (0, eval)(source), containerDensityScript);
-        const controlGeometry = await page.evaluate(source => (0, eval)(source), controlGeometryScript);
-        const imageGeometry = await page.evaluate(source => (0, eval)(source), imageGeometryScript);
-        await waitForFrames(page);
+        const measurements = {};
+        if (measuredChecks.has('text_bounds')) {
+          measurements.text_geometry = await page.evaluate(source => (0, eval)(source), textBoundsScript);
+        }
+        if (measuredChecks.has('container_density')) {
+          measurements.container_density = await page.evaluate(source => (0, eval)(source), containerDensityScript);
+        }
+        if (measuredChecks.has('controls')) {
+          measurements.control_geometry = await page.evaluate(source => (0, eval)(source), controlGeometryScript);
+        }
+        if (measuredChecks.has('image_geometry')) {
+          measurements.image_geometry = await page.evaluate(source => (0, eval)(source), imageGeometryScript);
+        }
         const filename = `slide-${String(slideNumber).padStart(2, '0')}.png`;
         const capturePath = path.join(profileDir, filename);
         await page.screenshot({ path: capturePath, fullPage: false });
@@ -862,26 +1223,36 @@ async function main() {
           source_sha256: fingerprints.slides[String(slideNumber)],
           render_run_id: runId,
           motion_disabled: true,
-          text_geometry: textGeometry,
-          container_density: containerDensity,
-          control_geometry: controlGeometry,
-          image_geometry: imageGeometry,
+          ...measurements,
         };
       }
-      await context.close();
     }
+    await context.close();
   } finally {
     await browser.close();
   }
 
   const renderedSlides = [...renderTargets].sort((left, right) => left - right);
   const renderedSet = new Set(renderedSlides);
-  for (const number of renderedSlides) {
-    bindIdentityEvidence(records[number - 1], path.dirname(args.deck), profiles);
+  const retainedCrossReviewBySlide = new Map();
+  for (const review of [
+    ...(existing?.retained_cross_reviews || []),
+    ...(existing?.cross_reviews || []),
+  ]) {
+    if (review?.status === 'pass' && Number.isInteger(review.slide) && !renderedSet.has(review.slide)) {
+      retainedCrossReviewBySlide.set(review.slide, JSON.parse(JSON.stringify(review)));
+    }
   }
   const automationChecks = AUTOMATION_CHECKS_BY_CHANGE[strategy === 'full' ? 'all' : args.changeType];
+  if (automationChecks.includes('image_geometry')) {
+    for (const number of renderedSlides) {
+      bindIdentityEvidence(records[number - 1], path.dirname(args.deck), profiles);
+    }
+  }
   const automationFailures = [];
-  const automationWarnings = [];
+  const automationWarnings = strategy === 'incremental'
+    ? (existing?.automation_gate?.warnings || []).filter(warning => !renderedSet.has(warning?.slide))
+    : [];
   const geometryField = {
     text_bounds: 'text_geometry',
     container_density: 'container_density',
@@ -904,14 +1275,12 @@ async function main() {
     }
   }
 
-  const responsiveVisionProfiles = args.responsive ? RESPONSIVE_PROFILES : [];
   for (const number of renderedSlides) {
     const record = records[number - 1];
     const slideWarnings = automationWarnings.filter(warning => warning.slide === number);
     const required = new Set();
     if (args.mode === 'full') {
       required.add('normal');
-      responsiveVisionProfiles.forEach(profile => required.add(profile));
     }
     if (record.visual_critical) profiles.forEach(profile => required.add(profile));
     if (record.identity_required && ['all', 'image'].includes(record.review_scope)) required.add('normal');
@@ -928,7 +1297,11 @@ async function main() {
   }
 
   const reviewBatches = [];
-  const aiReviewSlides = renderedSlides.filter(number => records[number - 1].required_ai_profiles.length);
+  const aiReviewSlides = records
+    .filter(record => record.required_ai_profiles.length && (
+      renderedSet.has(record.slide) || String(record.status).toLowerCase() === 'pending'
+    ))
+    .map(record => record.slide);
   if (!automationFailures.length) {
     for (let offset = 0; offset < aiReviewSlides.length; offset += REVIEW_BATCH_SIZE) {
       const slides = aiReviewSlides.slice(offset, offset + REVIEW_BATCH_SIZE);
@@ -971,11 +1344,19 @@ async function main() {
       animations_disabled: true,
       requested_change_type: requestedChangeType,
       detected_change_type: strategy === 'full' ? 'all' : detectedChange,
+      impact_scope: strategy === 'full' ? 'full' : changeDetails.impact,
+      navigation_changed: changeDetails.navigationChanged,
+      content_changes: changeDetails.contentChanges,
+      review_slides: automationFailures.length ? [] : aiReviewSlides,
     },
     source_fingerprints: {
       global_sha256: fingerprints.global_sha256,
       previous_global_sha256: existing?.source_fingerprints?.global_sha256 || null,
       dependencies: fingerprints.dependencies,
+      global_components: fingerprints.global_components,
+      global_assets: fingerprints.global_assets,
+      slide_assets: fingerprints.slide_assets,
+      local_files: fingerprints.local_files,
       components: fingerprints.components,
       slides: fingerprints.slides,
     },
@@ -1005,6 +1386,7 @@ async function main() {
     },
     cross_reviews: [],
     cross_review_batches: [],
+    retained_cross_reviews: [...retainedCrossReviewBySlide.values()].sort((left, right) => left.slide - right.slide),
     slides: records,
   };
   const manifestPath = path.join(args.output, 'review.json');
@@ -1025,7 +1407,7 @@ async function main() {
 
 async function checkTools() {
   const playwright = loadPlaywright();
-  const browser = await playwright.chromium.launch({ headless: true });
+  const browser = await playwright.chromium.launch(CHROMIUM_LAUNCH_OPTIONS);
   try {
     const page = await browser.newPage({ viewport: { width: 320, height: 180 } });
     await page.setContent('<!doctype html><html><body style="margin:0;background:#111;color:#fff"><h1>render check</h1></body></html>');
@@ -1050,7 +1432,8 @@ async function classifyChangeCommand(
   requested = 'all',
   mode,
   reviewRisk,
-  responsiveValue
+  responsiveValue,
+  cacheArgument
 ) {
   const deck = requireDeck('--classify-change', deckArgument);
   if (!reviewArgument) usage('--classify-change requires a review directory');
@@ -1068,22 +1451,43 @@ async function classifyChangeCommand(
     && existing.responsive === responsive
     && JSON.stringify(Object.keys(existing.viewports || {})) === JSON.stringify(profileNames(responsive));
   if (!compatible) {
-    process.stdout.write(`${JSON.stringify({ requested, detected: 'all', effective: 'all', changed_slides: [] })}\n`);
+    process.stdout.write(`${JSON.stringify({
+      requested, detected: 'all', effective: 'all', impact: 'full',
+      navigation_changed: true,
+      content_changes: ['text', 'image', 'structure', 'style', 'runtime'],
+      changed_slides: [],
+    })}\n`);
     return;
   }
   const current = await fingerprintsForDeck(deck);
+  writeFingerprintCache(cacheArgument ? path.resolve(cacheArgument) : null, deck, current);
   const titles = existing.slides?.map(record => record.title) || [];
-  if (JSON.stringify(titles) !== JSON.stringify(current.titles)) {
-    process.stdout.write(`${JSON.stringify({ requested, detected: 'all', effective: 'all', changed_slides: [] })}\n`);
+  if (titles.length !== current.titles.length) {
+    process.stdout.write(`${JSON.stringify({
+      requested, detected: 'all', effective: 'all', impact: 'full',
+      navigation_changed: true,
+      content_changes: ['text', 'image', 'structure', 'style', 'runtime'],
+      changed_slides: [],
+    })}\n`);
     return;
   }
   const globalChanged = existing.source_fingerprints?.global_sha256 !== current.global_sha256;
   const changed = changedSlideNumbers(existing.source_fingerprints, current);
-  const detected = detectedChangeType(existing.source_fingerprints, current, changed, globalChanged);
+  const details = applyOrderImpact(
+    detectedChangeDetails(existing.source_fingerprints, current, changed, globalChanged),
+    reorderedTitles(titles, current.titles)
+  );
+  if (!IMPACT_SCOPES.has(details.impact)
+    || details.contentChanges.some(value => !CONTENT_CHANGE_CATEGORIES.has(value))) {
+    throw new Error('internal change classifier produced an unsupported impact category');
+  }
   process.stdout.write(`${JSON.stringify({
     requested,
-    detected,
-    effective: effectiveChangeType(requested, detected),
+    detected: details.detected,
+    effective: effectiveChangeType(requested, details.detected),
+    impact: details.impact,
+    navigation_changed: details.navigationChanged,
+    content_changes: details.contentChanges,
     changed_slides: [...changed].sort((left, right) => left - right),
   })}\n`);
 }
@@ -1109,7 +1513,9 @@ if (command.length === 1 && command[0] === '--check') {
 } else if (command[0] === '--fingerprints') {
   operation = fingerprintCommand(command[1]);
 } else if (command[0] === '--classify-change') {
-  operation = classifyChangeCommand(command[1], command[2], command[3], command[4], command[5], command[6]);
+  operation = classifyChangeCommand(
+    command[1], command[2], command[3], command[4], command[5], command[6], command[7]
+  );
 } else if (command[0] === '--workspace-dir') {
   process.stdout.write(`${defaultWorkspaceDirectory(requireDeck('--workspace-dir', command[1]))}\n`);
   operation = Promise.resolve();

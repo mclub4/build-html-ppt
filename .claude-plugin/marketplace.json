@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "청중 중심 HTML 발표자료와 발표 노트, Chromium 시각 검증을 제공하는 Claude Code 플러그인",
-    "version": "0.4.1",
+    "version": "0.5.0",
     "pluginRoot": "."
   },
   "plugins": [
@@ -13,7 +13,7 @@
       "name": "build-html-slides",
       "source": "./",
       "description": "주제별 아트 디렉션, WebP 이미지, 발표자 노트, 적응형 시각 검토를 포함한 HTML 프레젠테이션 제작 스킬",
-      "version": "0.4.1",
+      "version": "0.5.0",
       "keywords": [
         "html-slides",
         "presentation",

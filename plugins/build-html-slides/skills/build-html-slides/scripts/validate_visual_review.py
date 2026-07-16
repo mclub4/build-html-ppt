@@ -9,11 +9,13 @@ import json
 import math
 import os
 import re
+import stat as stat_module
 import subprocess
 import unicodedata
 import zlib
 from datetime import datetime
 from html.parser import HTMLParser
+from io import BytesIO
 from pathlib import Path
 
 try:
@@ -45,6 +47,8 @@ CHECKS_BY_CHANGE = {name: tuple(checks) for name, checks in CONTRACT["checks_by_
 AUTOMATION_CHECKS_BY_CHANGE = {
     name: tuple(checks) for name, checks in CONTRACT["automation_checks_by_change"].items()
 }
+IMPACT_SCOPES = set(CONTRACT["impact_scopes"])
+CONTENT_CHANGE_CATEGORIES = set(CONTRACT["content_change_categories"])
 QUALITY_DIMENSIONS = (
     "story", "art_direction", "layout_rhythm", "typography",
     "imagery", "composition", "evidence", "presentation_utility",
@@ -285,23 +289,23 @@ def paeth(left: int, up: int, upper_left: int) -> int:
     return (left, up, upper_left)[distances.index(min(distances))]
 
 
-def png_info(path: Path) -> tuple[tuple[int, int], int, int]:
+def png_info(path: Path) -> tuple[tuple[int, int], int, int, str]:
     data = path.read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
     if not data.startswith(PNG_SIGNATURE):
         raise ValueError("not a PNG image")
     if Image is not None:
         try:
-            with Image.open(path) as image:
+            with Image.open(BytesIO(data)) as image:
                 if image.format != "PNG" or image.mode not in {"RGB", "RGBA"}:
                     raise ValueError("review capture must be an 8-bit RGB or RGBA PNG")
                 dimensions = image.size
-                image.verify()
-            with Image.open(path) as image:
+                image.load()
                 rgb = image.convert("RGB")
                 colors = rgb.getcolors(maxcolors=4)
                 color_count = 5 if colors is None else len(colors)
                 extrema = rgb.convert("L").getextrema()
-            return dimensions, color_count, extrema[1] - extrema[0]
+            return dimensions, color_count, extrema[1] - extrema[0], digest
         except ValueError:
             raise
         except (OSError, SyntaxError) as exc:
@@ -385,7 +389,7 @@ def png_info(path: Path) -> tuple[tuple[int, int], int, int]:
                 maximum_luma = max(maximum_luma, luma)
             pixel_index += 1
         previous = current
-    return dimensions, len(colors), maximum_luma - minimum_luma
+    return dimensions, len(colors), maximum_luma - minimum_luma, digest
 
 
 def parse_size(value: object, field: str, errors: list[str]) -> tuple[int, int] | None:
@@ -477,14 +481,57 @@ def validate_current_fingerprints(deck: Path, manifest: dict, errors: list[str])
         errors.append("slide source fingerprints do not match the current HTML or local assets")
     if actual.get("components") != expected.get("components"):
         errors.append("typed slide source fingerprints do not match the current HTML or local assets")
+    if actual.get("global_components") != expected.get("global_components"):
+        errors.append("runtime/shared-style source fingerprints do not match the current HTML")
     if actual.get("dependencies") != expected.get("dependencies"):
         errors.append("external local dependency fingerprints do not match the current deck")
+
+
+def validate_local_file_metadata(source_fingerprints: dict, errors: list[str]) -> None:
+    entries = source_fingerprints.get("local_files")
+    if not isinstance(entries, list):
+        errors.append("source_fingerprints local_files must be an array")
+        return
+    required = {"path", "size", "mtime_ns", "ctime_ns", "sha256"}
+    for position, entry in enumerate(entries, 1):
+        if not isinstance(entry, dict) or not required <= set(entry):
+            errors.append(f"local fingerprint entry {position} is incomplete")
+            continue
+        path = Path(str(entry.get("path", "")))
+        try:
+            stat = path.stat()
+        except OSError:
+            errors.append(f"local fingerprint entry {position} is missing: {path}")
+            continue
+        if not stat_module.S_ISREG(stat.st_mode):
+            errors.append(f"local fingerprint entry {position} is not a file: {path}")
+            continue
+        if (
+            str(stat.st_size) != str(entry.get("size"))
+            or str(stat.st_mtime_ns) != str(entry.get("mtime_ns"))
+            or str(stat.st_ctime_ns) != str(entry.get("ctime_ns"))
+        ):
+            errors.append(f"local fingerprint entry {position} changed after rendering: {path}")
+        if not valid_hash(entry.get("sha256")):
+            errors.append(f"local fingerprint entry {position} needs a valid sha256")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("deck", type=Path)
     parser.add_argument("manifest", type=Path, nargs="?")
+    parser.add_argument(
+        "--capture-scope",
+        choices=("full", "refreshed", "metadata"),
+        default="full",
+        help="Choose which capture files receive expensive pixel and hash validation.",
+    )
+    parser.add_argument(
+        "--source-fingerprint-scope",
+        choices=("full", "metadata"),
+        default="full",
+        help="Use metadata checks during edit loops and a full browser recomputation at finalization.",
+    )
     args = parser.parse_args()
     args.deck = args.deck.expanduser().resolve()
     args.manifest = (
@@ -580,11 +627,7 @@ def main() -> int:
         errors.append("render_run detected_change_type is invalid")
     if requested_change_type in CHECKS_BY_CHANGE and detected_change_type in {*CHECKS_BY_CHANGE, "none"}:
         effective_change_type = (
-            requested_change_type
-            if requested_change_type == "all"
-            or detected_change_type == "none"
-            or requested_change_type == detected_change_type
-            else "all"
+            requested_change_type if detected_change_type == "none" else detected_change_type
         )
         if render_run.get("strategy") == "full":
             effective_change_type = "all"
@@ -596,26 +639,59 @@ def main() -> int:
     reused = render_run.get("reused_slides")
     requested = render_run.get("requested_slides")
     directly_changed = render_run.get("directly_changed_slides")
-    for name, value in (("rendered_slides", rendered), ("reused_slides", reused), ("requested_slides", requested), ("directly_changed_slides", directly_changed)):
+    review_slides = render_run.get("review_slides")
+    for name, value in (
+        ("rendered_slides", rendered),
+        ("reused_slides", reused),
+        ("requested_slides", requested),
+        ("directly_changed_slides", directly_changed),
+        ("review_slides", review_slides),
+    ):
         if not isinstance(value, list) or any(not isinstance(number, int) or isinstance(number, bool) for number in value):
             errors.append(f"render_run {name} must be an integer array")
+        elif len(value) != len(set(value)) or any(number not in expected_slides for number in value):
+            errors.append(f"render_run {name} must contain unique valid slide numbers")
     rendered_set = set(rendered) if isinstance(rendered, list) else set()
     reused_set = set(reused) if isinstance(reused, list) else set()
     requested_set = set(requested) if isinstance(requested, list) else set()
     changed_set = set(directly_changed) if isinstance(directly_changed, list) else set()
+    review_set = set(review_slides) if isinstance(review_slides, list) else set()
     if rendered_set & reused_set or rendered_set | reused_set != expected_slides:
         errors.append("rendered_slides and reused_slides must partition the deck exactly")
     if render_run.get("strategy") == "full" and rendered_set != expected_slides:
         errors.append("full render strategy must render every slide")
+    impact_scope = render_run.get("impact_scope")
+    if impact_scope not in IMPACT_SCOPES:
+        errors.append("render_run impact_scope must be direct, neighbors, or full")
+        impact_scope = "full"
+    if not isinstance(render_run.get("navigation_changed"), bool):
+        errors.append("render_run navigation_changed must be boolean")
+    content_changes = render_run.get("content_changes")
+    if (
+        not isinstance(content_changes, list)
+        or len(content_changes) != len(set(content_changes))
+        or any(value not in CONTENT_CHANGE_CATEGORIES for value in content_changes)
+    ):
+        errors.append("render_run content_changes must be a unique array of known change categories")
+        content_changes = []
+    if isinstance(render_run.get("navigation_changed"), bool) and (
+        render_run.get("navigation_changed") != ("runtime" in content_changes)
+    ):
+        errors.append("render_run navigation_changed must agree with the runtime change category")
+    if render_run.get("strategy") == "full" and impact_scope != "full":
+        errors.append("full render strategy requires full impact_scope")
     if render_run.get("strategy") == "incremental":
-        expected_neighbors = {
-            candidate
-            for number in requested_set | changed_set
-            for candidate in (number - 1, number, number + 1)
-            if candidate in expected_slides
-        }
-        if not expected_neighbors <= rendered_set:
-            errors.append("incremental render must include requested/changed slides and their immediate neighbors")
+        selected = requested_set | changed_set
+        expected_rendered = selected
+        if impact_scope == "neighbors":
+            expected_rendered = {
+                candidate
+                for number in selected
+                for candidate in (number - 1, number, number + 1)
+                if candidate in expected_slides
+            }
+        if impact_scope == "full" or rendered_set != expected_rendered:
+            errors.append("incremental rendered_slides do not match the detected impact scope")
 
     source_fingerprints = manifest.get("source_fingerprints")
     if not isinstance(source_fingerprints, dict) or not valid_hash(source_fingerprints.get("global_sha256")):
@@ -629,7 +705,9 @@ def main() -> int:
         errors.append("source_fingerprints slides must contain one SHA-256 per slide")
         slide_hashes = {}
     component_hashes = source_fingerprints.get("components")
-    component_names = {"text_sha256", "media_sha256", "structure_sha256", "styles_sha256"}
+    component_names = {
+        "text_sha256", "media_sha256", "structure_sha256", "styles_sha256", "transition_sha256"
+    }
     if not isinstance(component_hashes, dict) or set(component_hashes) != expected_hash_keys or any(
         not isinstance(value, dict)
         or set(value) != component_names
@@ -640,6 +718,14 @@ def main() -> int:
     dependencies = source_fingerprints.get("dependencies")
     if not isinstance(dependencies, list) or any(not isinstance(value, str) for value in dependencies):
         errors.append("source_fingerprints dependencies must be a string array")
+    global_components = source_fingerprints.get("global_components")
+    if (
+        not isinstance(global_components, dict)
+        or set(global_components) != {"runtime_sha256", "structure_sha256", "styles_sha256"}
+        or any(not valid_hash(value) for value in global_components.values())
+    ):
+        errors.append("source_fingerprints global_components must separate runtime, structure, and shared-style hashes")
+    validate_local_file_metadata(source_fingerprints, errors)
     if render_run.get("strategy") == "incremental" and source_fingerprints.get("previous_global_sha256") != source_fingerprints.get("global_sha256"):
         errors.append("incremental render cannot reuse slides after a global style/runtime change")
 
@@ -682,19 +768,23 @@ def main() -> int:
         errors.append("automation_gate warnings must be an array")
         automation_warnings = []
 
+    routing_records = {
+        record.get("slide"): record
+        for record in manifest.get("slides", [])
+        if isinstance(record, dict) and isinstance(record.get("slide"), int)
+    }
     expected_ai_profiles: dict[int, list[str]] = {}
-    for number in sorted(rendered_set):
+    for number in sorted(expected_slides):
         expected_critical = number in {1, len(titles)} or bool(
             slide_parser.slides[number - 1]["visual_critical"]
         )
         required_profiles: set[str] = set()
         if mode == "full":
             required_profiles.add("normal")
-            if responsive:
-                required_profiles.update(("tablet", "mobile"))
         if expected_critical:
             required_profiles.update(profiles)
-        if bool(slide_parser.slides[number - 1]["identity_required"]) and change_type in {"all", "image"}:
+        slide_scope = change_type if number in rendered_set else routing_records.get(number, {}).get("review_scope")
+        if bool(slide_parser.slides[number - 1]["identity_required"]) and slide_scope in {"all", "image"}:
             required_profiles.add("normal")
         slide_warning_profiles = {
             warning.get("profile")
@@ -707,7 +797,11 @@ def main() -> int:
             required_profiles.add("normal")
             required_profiles.update(slide_warning_profiles)
         expected_ai_profiles[number] = [profile for profile in profiles if profile in required_profiles]
-    expected_ai_slides = {number for number, required in expected_ai_profiles.items() if required}
+    routed_ai_slides = {number for number, required in expected_ai_profiles.items() if required}
+    if not (rendered_set & routed_ai_slides) <= review_set:
+        errors.append("every refreshed AI-routed slide must appear in render_run review_slides")
+    if not review_set <= routed_ai_slides:
+        errors.append("render_run review_slides contains a slide outside adaptive AI routing")
 
     review_batches = manifest.get("review_batches")
     if not isinstance(review_batches, list):
@@ -740,8 +834,8 @@ def main() -> int:
             if number in batch_by_slide:
                 errors.append(f"slide {number} appears in more than one review batch")
             batch_by_slide[number] = (batch_id, capture_profiles.get(str(number)))
-    if set(batch_by_slide) != expected_ai_slides:
-        errors.append("review_batches must partition exactly the refreshed slides routed to AI review")
+    if set(batch_by_slide) != review_set:
+        errors.append("review_batches must partition exactly render_run review_slides")
 
     records = manifest.get("slides")
     if not isinstance(records, list):
@@ -792,8 +886,8 @@ def main() -> int:
 
         reviewer = str(record.get("reviewer", "")).strip()
         reviewer_ref = str(record.get("reviewer_ref", "")).strip()
-        current_ai_review = number in expected_ai_slides
-        current_automation_only = number in rendered_set and not current_ai_review and mode == "quick"
+        current_ai_review = number in review_set
+        current_automation_only = number in rendered_set and number not in routed_ai_slides and mode == "quick"
         automation_only = current_automation_only or (
             number not in rendered_set and record.get("review_method") == "automated-geometry-only"
         )
@@ -834,22 +928,29 @@ def main() -> int:
             if not capture_path.is_file():
                 errors.append(f"slide {number} {profile} capture not found: {relative}")
                 continue
-            try:
-                dimensions, color_count, luma_range = png_info(capture_path)
-            except (OSError, ValueError) as exc:
-                errors.append(f"slide {number} {profile} capture is invalid: {exc}")
-                continue
-            expected_dimensions = screenshot_sizes.get(profile)
-            if expected_dimensions is not None and dimensions != expected_dimensions:
-                errors.append(
-                    f"slide {number} {profile} capture dimensions {dimensions[0]}x{dimensions[1]} "
-                    f"do not match {expected_dimensions[0]}x{expected_dimensions[1]}"
-                )
-            if color_count < 4 or luma_range < 8:
-                errors.append(f"slide {number} {profile} capture appears blank or near-solid")
-            actual_hash = sha256(capture_path)
-            if capture.get("sha256") != actual_hash:
-                errors.append(f"slide {number} {profile} capture sha256 mismatch")
+            inspect_pixels = args.capture_scope == "full" or (
+                args.capture_scope == "refreshed" and number in (rendered_set | review_set)
+            )
+            if inspect_pixels:
+                try:
+                    dimensions, color_count, luma_range, actual_hash = png_info(capture_path)
+                except (OSError, ValueError) as exc:
+                    errors.append(f"slide {number} {profile} capture is invalid: {exc}")
+                    continue
+                expected_dimensions = screenshot_sizes.get(profile)
+                if expected_dimensions is not None and dimensions != expected_dimensions:
+                    errors.append(
+                        f"slide {number} {profile} capture dimensions {dimensions[0]}x{dimensions[1]} "
+                        f"do not match {expected_dimensions[0]}x{expected_dimensions[1]}"
+                    )
+                if color_count < 4 or luma_range < 8:
+                    errors.append(f"slide {number} {profile} capture appears blank or near-solid")
+                if capture.get("sha256") != actual_hash:
+                    errors.append(f"slide {number} {profile} capture sha256 mismatch")
+            else:
+                actual_hash = str(capture.get("sha256", ""))
+                if not valid_hash(actual_hash):
+                    errors.append(f"slide {number} {profile} capture needs a valid retained sha256")
             capture_hashes[number][profile] = actual_hash
             if capture.get("active_slide") != number or capture.get("active_title") != titles[number - 1]:
                 errors.append(f"slide {number} {profile} active slide evidence does not match the HTML")
@@ -884,48 +985,50 @@ def main() -> int:
                         errors.append(f"slide {number} {profile} rendered image geometry did not pass")
 
         inspected_profiles = record.get("inspected_profiles")
+        ordered_required = expected_ai_profiles[number]
         if number in rendered_set:
             expected_critical = number in {1, len(titles)} or bool(slide_parser.slides[number - 1]["visual_critical"])
             if record.get("visual_critical") is not expected_critical:
                 errors.append(f"slide {number} visual_critical does not match the HTML/cover/closing contract")
-            ordered_required = expected_ai_profiles[number]
             if record.get("required_ai_profiles") != ordered_required:
                 errors.append(f"slide {number} required_ai_profiles do not match adaptive review routing")
-            if current_automation_only:
-                if inspected_profiles != [] or record.get("review_batch_id") or record.get("observation"):
-                    errors.append(f"quick slide {number} automation-only record must not claim vision inspection")
-                if record.get("checks") != {} or record.get("status") != "automation-pass":
-                    errors.append(f"quick slide {number} automation-only record must carry automation-pass status")
+        if current_automation_only:
+            if inspected_profiles != [] or record.get("review_batch_id") or record.get("observation"):
+                errors.append(f"quick slide {number} automation-only record must not claim vision inspection")
+            if record.get("checks") != {} or record.get("status") != "automation-pass":
+                errors.append(f"quick slide {number} automation-only record must carry automation-pass status")
+        elif current_ai_review:
+            if record.get("required_ai_profiles") != ordered_required:
+                errors.append(f"slide {number} required_ai_profiles do not match adaptive review routing")
+            if inspected_profiles != ordered_required:
+                errors.append(f"slide {number} AI review must inspect its adaptive profile set once")
+            batch_id, batch_profiles = batch_by_slide.get(number, ("", None))
+            if record.get("review_batch_id") != batch_id or batch_profiles != ordered_required:
+                errors.append(f"slide {number} review batch does not bind its adaptive capture set")
+            observation = record.get("observation")
+            if not valid_observation(observation):
+                errors.append(f"slide {number} needs one concrete slide-level vision observation")
             else:
-                if inspected_profiles != ordered_required:
-                    errors.append(f"slide {number} AI review must inspect its adaptive profile set once")
-                batch_id, batch_profiles = batch_by_slide.get(number, ("", None))
-                if record.get("review_batch_id") != batch_id or batch_profiles != ordered_required:
-                    errors.append(f"slide {number} review batch does not bind its adaptive capture set")
-                observation = record.get("observation")
-                if not valid_observation(observation):
-                    errors.append(f"slide {number} needs one concrete slide-level vision observation")
-                else:
-                    observations.append(observation.strip())
-                checks = record.get("checks")
-                expected_checks = required_checks(scope, expected_identity_required)
-                if not isinstance(checks, dict) or tuple(checks) != expected_checks:
-                    errors.append(f"slide {number} checks must match its {scope} review scope exactly")
-                else:
-                    for check in expected_checks:
-                        if str(checks.get(check, "")).lower() != "pass":
-                            errors.append(f"slide {number} check did not pass: {check}")
-                if expected_identity_required and scope in {"all", "image"}:
-                    validate_identity_review(
-                        record.get("identity_review"), identity_targets, number, "primary review", errors
-                    )
-                elif record.get("identity_review") not in ([], None):
-                    errors.append(f"slide {number} identity_review is out of scope for a {scope} change")
+                observations.append(observation.strip())
+            checks = record.get("checks")
+            expected_checks = required_checks(scope, expected_identity_required)
+            if not isinstance(checks, dict) or tuple(checks) != expected_checks:
+                errors.append(f"slide {number} checks must match its {scope} review scope exactly")
+            else:
+                for check in expected_checks:
+                    if str(checks.get(check, "")).lower() != "pass":
+                        errors.append(f"slide {number} check did not pass: {check}")
+            if expected_identity_required and scope in {"all", "image"}:
+                validate_identity_review(
+                    record.get("identity_review"), identity_targets, number, "primary review", errors
+                )
+            elif record.get("identity_review") not in ([], None):
+                errors.append(f"slide {number} identity_review is out of scope for a {scope} change")
         expected_status = "automation-pass" if automation_only else "pass"
         if str(record.get("status", "")).lower() != expected_status:
             errors.append(f"slide {number} overall status must be {expected_status}")
     if len(observations) != len(set(observations)):
-        errors.append("rendered slides must not reuse the same AI observation")
+        errors.append("slides reviewed in the current run must not reuse the same AI observation")
 
     distinct_primary_refs = {reference for reference in primary_refs.values() if reference}
     minimum_reviewers = 1 if mode == "quick" else (3 if review_risk == "high" else 2)
@@ -983,6 +1086,7 @@ def main() -> int:
         batch_id = str(batch.get("id", ""))
         slides = batch.get("slides")
         capture_profiles = batch.get("capture_profiles")
+        batch_status = batch.get("status")
         if not batch_id or batch_id in cross_batch_ids:
             errors.append(f"cross-review batch {position} needs a unique id")
         cross_batch_ids.add(batch_id)
@@ -997,6 +1101,8 @@ def main() -> int:
         if not isinstance(capture_profiles, dict) or set(capture_profiles) != {str(number) for number in slides}:
             errors.append(f"cross-review batch {batch_id} capture_profiles must match its slides")
             capture_profiles = {}
+        if phase == "final" and mode == "full" and batch_status != "complete":
+            errors.append(f"cross-review batch {batch_id} must be marked complete before final verification")
         for number in slides:
             if number in cross_batch_by_slide:
                 errors.append(f"slide {number} appears in more than one cross-review batch")
@@ -1056,7 +1162,11 @@ def main() -> int:
     if len(cross_observations) != len(set(cross_observations)):
         errors.append("cross-reviewed slides must not reuse the same observation")
 
-    if not errors and os.environ.get("BUILD_HTML_SLIDES_UNIT_TEST") != "1":
+    if (
+        not errors
+        and args.source_fingerprint_scope == "full"
+        and os.environ.get("BUILD_HTML_SLIDES_UNIT_TEST") != "1"
+    ):
         validate_current_fingerprints(args.deck.resolve(), manifest, errors)
     if errors:
         return report(errors)

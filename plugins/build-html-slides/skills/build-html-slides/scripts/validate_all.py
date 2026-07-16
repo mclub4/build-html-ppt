@@ -18,6 +18,9 @@ except ModuleNotFoundError:  # Allows unittest imports from the skill root.
 
 
 SCRIPTS = Path(__file__).resolve().parent
+CONTRACT = json.loads((SCRIPTS / "validation_contract.json").read_text(encoding="utf-8"))
+IMPACT_SCOPES = set(CONTRACT["impact_scopes"])
+CONTENT_CHANGE_CATEGORIES = set(CONTRACT["content_change_categories"])
 COMMAND_TIMEOUT_SECONDS = int(os.environ.get("BUILD_HTML_SLIDES_COMMAND_TIMEOUT", "900"))
 
 
@@ -51,9 +54,23 @@ def run(label: str, command: list[str]) -> None:
 
 
 def deterministic_commands(
-    deck: Path, notes: Path, sources: Path, change_type: str
+    deck: Path,
+    notes: Path,
+    sources: Path,
+    change_type: str,
+    *,
+    browser_e2e: bool = False,
+    content_changes: list[str] | None = None,
 ) -> list[tuple[str, list[str]]]:
     python = sys.executable
+    if content_changes is None:
+        content_changes = {
+            "all": ["text", "image", "structure", "style", "runtime"],
+            "text": ["text"],
+            "image": ["image"],
+            "navigation": ["runtime"],
+        }[change_type]
+    changed = set(content_changes)
     commands = [
         ("deck structure", [python, str(SCRIPTS / "validate_deck.py"), str(deck)]),
         (
@@ -61,21 +78,21 @@ def deterministic_commands(
             [python, str(SCRIPTS / "validate_placeholders.py"), str(deck)],
         ),
     ]
-    if change_type in {"all", "text"}:
+    if changed & {"text", "structure"}:
         commands.append(
             ("presenter notes", [python, str(SCRIPTS / "validate_speaker_notes.py"), str(deck), str(notes)])
         )
-    if change_type in {"all", "image"}:
+    if "image" in changed:
         commands.append(("source locality", [python, str(SCRIPTS / "validate_source_locality.py"), str(deck)]))
     assets = local_assets(deck)
-    if change_type in {"all", "image"}:
+    if "image" in changed:
         if assets or sources.exists():
             commands.append((
                 "hash-bound source cache",
                 [python, str(SCRIPTS / "source_cache.py"), str(deck), str(sources), "--check"],
             ))
         commands.append(("image reuse", [python, str(SCRIPTS / "validate_image_reuse.py"), str(deck)]))
-    if change_type in {"all", "navigation"}:
+    if "runtime" in changed or change_type == "navigation" or browser_e2e:
         commands.extend((
             ("interaction semantics", [python, str(SCRIPTS / "validate_interactions.py"), str(deck)]),
             ("browser interaction and print E2E", ["node", str(SCRIPTS / "validate_browser_e2e.js"), str(deck)]),
@@ -104,7 +121,8 @@ def classify_change_scope(
     mode: str,
     review_risk: str,
     responsive: bool,
-) -> str:
+    cache: Path,
+) -> dict[str, object]:
     result = subprocess.run(
         [
             "node",
@@ -116,6 +134,7 @@ def classify_change_scope(
             mode,
             review_risk,
             str(responsive).lower(),
+            str(cache),
         ],
         capture_output=True,
         text=True,
@@ -131,12 +150,23 @@ def classify_change_scope(
     effective = classification.get("effective")
     if effective not in {"all", "text", "image", "navigation"}:
         raise RuntimeError("change classifier returned an invalid effective scope")
+    if classification.get("impact") not in IMPACT_SCOPES:
+        raise RuntimeError("change classifier returned an invalid impact scope")
+    if not isinstance(classification.get("navigation_changed"), bool):
+        raise RuntimeError("change classifier returned an invalid navigation flag")
+    content_changes = classification.get("content_changes")
+    if (
+        not isinstance(content_changes, list)
+        or len(content_changes) != len(set(content_changes))
+        or any(value not in CONTENT_CHANGE_CATEGORIES for value in content_changes)
+    ):
+        raise RuntimeError("change classifier returned invalid content change categories")
     if effective != requested:
         print(
-            f"NOTICE: requested change type {requested} widened to {effective} "
+            f"NOTICE: requested change type {requested} resolved to {effective} "
             f"after detecting {classification.get('detected', 'unknown')} changes"
         )
-    return effective
+    return classification
 
 
 def main() -> int:
@@ -171,31 +201,52 @@ def main() -> int:
     notes = (args.notes or default_notes(deck)).resolve()
     sources = (args.sources or deck.with_name("sources.json")).resolve()
     started = time.monotonic()
+    fingerprint_cache: Path | None = None
 
     try:
         review = review_directory(deck, args.review_dir)
         manifest = review / "review.json"
-        validation_scope = args.change_type
-        if args.phase != "prepare" and manifest.is_file():
-            try:
-                validation_scope = json.loads(manifest.read_text(encoding="utf-8")).get("change_type", "all")
-            except (UnicodeDecodeError, json.JSONDecodeError):
-                validation_scope = "all"
         if args.phase == "prepare":
-            run("tool preflight", [sys.executable, str(SCRIPTS / "check_environment.py")])
+            if not args.slides:
+                run("tool preflight", [sys.executable, str(SCRIPTS / "check_environment.py")])
+            classification: dict[str, object] = {
+                "effective": "all" if not args.slides else args.change_type,
+                "impact": "full" if not args.slides else "direct",
+                "navigation_changed": True if not args.slides else args.change_type == "navigation",
+                "content_changes": (
+                    ["text", "image", "structure", "style", "runtime"]
+                    if not args.slides
+                    else {
+                        "all": ["text", "image", "structure", "style", "runtime"],
+                        "text": ["text"],
+                        "image": ["image"],
+                        "navigation": ["runtime"],
+                    }[args.change_type]
+                ),
+            }
             if args.slides:
-                validation_scope = classify_change_scope(
+                fingerprint_cache = review / ".fingerprint-cache.json"
+                classification = classify_change_scope(
                     deck,
                     review,
                     args.change_type,
                     args.mode,
                     args.review_risk,
                     args.responsive,
+                    fingerprint_cache,
                 )
-        for label, command in deterministic_commands(deck, notes, sources, validation_scope):
-            run(label, command)
+            validation_scope = str(classification["effective"])
+            for label, command in deterministic_commands(
+                deck,
+                notes,
+                sources,
+                validation_scope,
+                browser_e2e=bool(classification["navigation_changed"])
+                or args.change_type == "navigation",
+                content_changes=list(classification["content_changes"]),
+            ):
+                run(label, command)
 
-        if args.phase == "prepare":
             command = [
                 "node", str(SCRIPTS / "render_slides.js"), str(deck), str(review),
                 "--mode", args.mode, "--review-risk", args.review_risk,
@@ -205,17 +256,37 @@ def main() -> int:
                 command.extend(("--slides", args.slides))
             if args.responsive:
                 command.append("--responsive")
+            if fingerprint_cache and fingerprint_cache.is_file():
+                command.extend(("--fingerprint-cache", str(fingerprint_cache)))
             run("Chromium render and geometry gate", command)
             print(f"NEXT: complete only the AI batches listed in {manifest}, then run --phase verify")
         elif args.phase == "verify":
             run(
                 "visual evidence contract",
-                [sys.executable, str(SCRIPTS / "validate_visual_review.py"), str(deck), str(manifest)],
+                [
+                    sys.executable,
+                    str(SCRIPTS / "validate_visual_review.py"),
+                    str(deck),
+                    str(manifest),
+                    "--capture-scope",
+                    "refreshed",
+                    "--source-fingerprint-scope",
+                    "metadata",
+                ],
             )
         elif args.phase == "finalize-prepare":
             run(
                 "iteration evidence before finalization",
-                [sys.executable, str(SCRIPTS / "validate_visual_review.py"), str(deck), str(manifest)],
+                [
+                    sys.executable,
+                    str(SCRIPTS / "validate_visual_review.py"),
+                    str(deck),
+                    str(manifest),
+                    "--capture-scope",
+                    "metadata",
+                    "--source-fingerprint-scope",
+                    "metadata",
+                ],
             )
             run(
                 "prepare final review without rerender",
@@ -228,9 +299,20 @@ def main() -> int:
         else:
             run(
                 "final quality score and cross-review evidence",
-                [sys.executable, str(SCRIPTS / "validate_visual_review.py"), str(deck), str(manifest)],
+                [
+                    sys.executable,
+                    str(SCRIPTS / "validate_visual_review.py"),
+                    str(deck),
+                    str(manifest),
+                    "--capture-scope",
+                    "full",
+                    "--source-fingerprint-scope",
+                    "metadata",
+                ],
             )
     except (OSError, RuntimeError, ValueError) as exc:
+        if fingerprint_cache:
+            fingerprint_cache.unlink(missing_ok=True)
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 

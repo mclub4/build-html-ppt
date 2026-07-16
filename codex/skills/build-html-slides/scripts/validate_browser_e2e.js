@@ -22,6 +22,13 @@ async function main() {
   const errors = [];
   try {
     const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+    await context.route('**/*', async route => {
+      if (['image', 'media'].includes(route.request().resourceType())) {
+        await route.abort();
+      } else {
+        await route.continue();
+      }
+    });
     const page = await context.newPage();
     await page.addInitScript(() => {
       window.__slideValidationFullscreenRequests = 0;
@@ -42,11 +49,12 @@ async function main() {
     await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important}' });
     await page.evaluate(async () => {
       if (document.fonts?.ready) await document.fonts.ready;
-      await Promise.all([...document.images].map(image => image.complete ? null : new Promise(resolve => {
-        image.addEventListener('load', resolve, { once: true });
-        image.addEventListener('error', resolve, { once: true });
-      })));
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     });
+    await page.waitForFunction(() => (
+      document.querySelectorAll('section.slide.active').length === 1
+      && document.getElementById('pageInput')
+    ));
 
     const count = await page.locator('section.slide').count();
     if (count < 2) throw new Error('browser E2E requires at least two slides');

@@ -52,6 +52,7 @@ class ValidateAllTests(unittest.TestCase):
                 [
                     "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "quick",
                     "--notes", str(notes_path), "--review-dir", str(review),
+                    "--change-type", "text",
                 ],
                 capture_output=True,
                 text=True,
@@ -116,6 +117,16 @@ class ValidateAllTests(unittest.TestCase):
                 label for label, _command in deterministic_commands(deck, notes_path, sources, "navigation")
             }
             image_labels = {label for label, _command in deterministic_commands(deck, notes_path, sources, "image")}
+            style_labels = {
+                label for label, _command in deterministic_commands(
+                    deck, notes_path, sources, "all", content_changes=["style"]
+                )
+            }
+            structure_labels = {
+                label for label, _command in deterministic_commands(
+                    deck, notes_path, sources, "all", content_changes=["structure"]
+                )
+            }
             self.assertNotIn("browser interaction and print E2E", text_labels)
             self.assertNotIn("image reuse", text_labels)
             self.assertIn("placeholder and incomplete-asset gate", text_labels)
@@ -124,6 +135,13 @@ class ValidateAllTests(unittest.TestCase):
             self.assertNotIn("presenter notes", navigation_labels)
             self.assertIn("source locality", image_labels)
             self.assertNotIn("source locality", text_labels)
+            self.assertEqual(
+                style_labels,
+                {"deck structure", "placeholder and incomplete-asset gate"},
+            )
+            self.assertIn("presenter notes", structure_labels)
+            self.assertNotIn("source locality", structure_labels)
+            self.assertNotIn("browser interaction and print E2E", structure_labels)
 
     def test_incremental_prepare_widens_a_misdeclared_text_change(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -168,7 +186,7 @@ class ValidateAllTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(revised.returncode, 0, revised.stdout + revised.stderr)
-            self.assertIn("requested change type text widened to all", revised.stdout)
+            self.assertIn("requested change type text resolved to all", revised.stdout)
             manifest = json.loads((review / "review.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["change_type"], "all")
             self.assertEqual(manifest["render_run"]["requested_change_type"], "text")
@@ -197,8 +215,10 @@ class ValidateAllTests(unittest.TestCase):
                 "quick",
                 "high",
                 False,
+                review / ".fingerprint-cache.json",
             )
-            self.assertEqual(effective, "all")
+            self.assertEqual(effective["effective"], "all")
+            self.assertEqual(effective["impact"], "full")
 
 
 if __name__ == "__main__":

@@ -62,7 +62,7 @@ Add `tablet` 1024×768 and `mobile` 390×844 only when responsive device support
 
 ## Quick Draft
 
-Run the deterministic deck, visible-placeholder/incomplete-asset gate, notes, source-cache, interaction semantics, real-browser navigation/print E2E, and Chromium geometry checks. The placeholder gate runs in both rendered modes and every `validate_all` phase, including navigation-only revisions, and blocks `PLACE NOTE`, image-here instructions, dummy asset markers, CSS-generated placeholder copy, and other explicit unfinished media before AI review. Render all slides at all canonical profiles. Automated text bounds, rendered-line composition, cross-layer occlusion, container-density measurement, control geometry, and image geometry must complete before any AI inspection. The rendered-line pass blocks Korean display orphans, punctuation-only final lines, colliding glyph rows, sibling text intersections, navigation-covered copy, and opaque unrelated layers covering text. Geometry failures block review. Low-density surfaces and meaningful `object-fit: cover` crops are warnings that route the affected slide and profile to AI inspection, because automation can detect risk but cannot decide semantic crop quality.
+During `prepare`, run the deterministic deck and visible-placeholder/incomplete-asset gates, plus only the notes, source, image, or browser-interaction gates relevant to the detected source change. The placeholder gate therefore runs once for every new or edited source before AI review, not again in evidence-only phases. It blocks `PLACE NOTE`, image-here instructions, dummy asset markers, CSS-generated placeholder copy, and other explicit unfinished media. Initial renders capture all slides at all canonical profiles. Automated text bounds, rendered-line composition, cross-layer occlusion, container-density measurement, control geometry, and image geometry must complete before any AI inspection; incremental renders execute only the geometry families relevant to the detected edit. The rendered-line pass blocks Korean display orphans, punctuation-only final lines, colliding glyph rows, sibling text intersections, navigation-covered copy, and opaque unrelated layers covering text. Geometry failures block review. Low-density surfaces and meaningful `object-fit: cover` crops are warnings that route the affected slide and profile to AI inspection, because automation can detect risk but cannot decide semantic crop quality.
 
 `data-placeholder-literal="true"` may exempt visible wording only when the slide is genuinely teaching or comparing placeholder behavior. It does not exempt suspicious class names, asset filenames, or media-state markers, and it must never be used to bypass an unfinished visual.
 
@@ -79,7 +79,7 @@ Quick Draft does not calculate the 24-point quality score, run independent cross
 
 ## Full Validation
 
-Run all deterministic validators, source checks, and Chromium geometry checks. AI inspects `normal` for every slide and records `completion` for all/image scope. Any visible placeholder, empty media promise, or generic substitute for an expected real subject image blocks delivery regardless of the final quality score. Cover, closing, explicit critical slides, responsive targets, and warning-triggered profiles receive their adaptive stress profiles.
+The initial Full preparation runs the complete deterministic suite and Chromium geometry checks. Later edits run only gates that the typed change can affect. AI inspects `normal` for every refreshed slide and records `completion` for all/image scope. Any visible placeholder, empty media promise, or generic substitute for an expected real subject image blocks delivery regardless of the final quality score. Cover, closing, explicit critical slides, and warning-triggered profiles receive their adaptive stress profiles. When responsive support was requested, tablet/mobile captures remain automated evidence for ordinary slides and become AI-required only for critical or warning-routed slides.
 
 Choose review risk by reasoning about consequences, uncertainty, distribution, technical complexity, visual complexity, and audience sensitivity:
 
@@ -88,7 +88,7 @@ Choose review risk by reasoning about consequences, uncertainty, distribution, t
 
 Pass the decision to the renderer with `--review-risk standard|high`. Assign contiguous slide ranges. Vision batches contain at most four slides, independent of reviewer range size.
 
-After fixes settle, run `--phase finalize-prepare`. This verifies the iteration evidence first, then generates the one quality-score record and bounded `cross_review_batches` without rerendering. Assign an independent presentation editor and calculate the quality score once. For standard risk, cross-review cover, closing, explicit visual-critical slides, automation-warning slides, and a deterministic distributed sample of ordinary slides. For high risk, cross-review every slide. Exact sampling values come from `validation_contract.json`. Every cross-reviewer must be outside the complete primary-reviewer set, not merely different from the primary reviewer assigned to that slide. This second pass targets repeated-layout defects, image-specific whitespace and scale failures, and primary-review misses without repeating all work on ordinary decks. Unresolved high/medium findings or a failing score block delivery.
+After fixes settle, run `--phase finalize-prepare`. This verifies iteration metadata, confirms the current source fingerprint, then generates the one quality-score record and bounded `cross_review_batches` without rerendering. Assign an independent presentation editor and calculate the quality score once. At standard risk, use a deck-wide overview for rhythm and media balance, then open full-size cover, closing, critical/warning, generated sample, and suspected weak slides; do not repeat every ordinary primary review merely to calculate the score. For standard risk, cross-review cover, closing, explicit visual-critical slides, automation-warning slides, and a deterministic distributed sample of ordinary slides. For high risk, cross-review every slide. Exact sampling values come from `validation_contract.json`. Every cross-reviewer must be outside the complete primary-reviewer set, not merely different from the primary reviewer assigned to that slide. This is intentional independent cross-validation, not a redundant machine rerun. After a focused fix, passing cross-reviews for unchanged captures remain reusable only when their capture hashes, required profiles, checks, and reviewer independence still match; the changed or failed slides receive new cross-review records. Unresolved high/medium findings or a failing score block delivery.
 
 ## Commands
 
@@ -104,7 +104,7 @@ Full Validation preparation:
 python3 scripts/validate_all.py OUTPUT.html --mode full --review-risk standard --phase prepare
 ```
 
-After filling the listed AI batches, run `python3 scripts/validate_all.py OUTPUT.html --phase verify`. Quick Draft ends there. For Full Validation, then run `--phase finalize-prepare`, fill the generated quality score and `cross_review_batches`, and run `--phase finalize-verify`. The entrypoint executes structure, placeholder completion, notes, source cache, reuse, locality, static interaction, browser E2E, render/geometry, and evidence checks in the required order. Use `--responsive` only for requested tablet/mobile support.
+After filling the listed AI batches, run `python3 scripts/validate_all.py OUTPUT.html --phase verify`. Quick Draft ends there. For Full Validation, then run `--phase finalize-prepare`, fill the generated quality score and `cross_review_batches`, and run `--phase finalize-verify`. `prepare` executes change-relevant deterministic gates and rendering; `verify` checks refreshed captures and any previously blocked captures entering AI review, while other retained evidence receives metadata checks only; `finalize-prepare` performs the one settled Chromium source-fingerprint confirmation and prepares final records without rerendering; `finalize-verify` checks every capture hash plus HTML/local-file freshness without recomputing the same browser fingerprint. Use `--responsive` only for requested tablet/mobile support.
 
 ## Incremental Revision
 
@@ -116,7 +116,13 @@ python3 scripts/validate_all.py OUTPUT.html --phase prepare \
   --slides N --change-type text|image|navigation|all
 ```
 
-The renderer refreshes changed slides and immediate neighbors. `--change-type` is a performance hint, not trusted proof. Before choosing validators, `validate_all.py` compares typed per-slide text, media, structure, and slide-local style hashes. A mismatched hint widens to `all`; it never narrows the detected change. A CSS rule with exactly one matching slide remains incremental. Shared styles, dynamic active-state selectors, runtime code, profile set, mode, review risk, slide-title changes, linked CSS/JavaScript bytes, and local assets referenced by HTML or CSS force broader invalidation when reuse is unsafe. Authors may also declare isolated rules with `<style data-slide-scope="N">`.
+`--change-type` is a performance hint, not trusted proof. Before choosing validators, `validate_all.py` compares typed per-slide text, media, structure, slide-local style, shared-style, runtime, linked-source, and local-asset fingerprints. It uses the actual detected type even when the hint was broader or wrong.
+
+- **Direct impact:** pure copy, image, title, or slide-local CSS changes refresh the requested and actually changed slides only. A CSS rule that matches a finite subset of slides refreshes that subset.
+- **Neighbor impact:** structure, order, transition, or adjacency-sensitive changes refresh affected slides plus immediate neighbors.
+- **Full impact:** shared CSS that affects the whole deck, dynamic active-state selectors, runtime/navigation code, profile set, mode, review risk, slide-count changes, or unsafe deck-wide dependencies refresh every slide.
+
+Linked CSS is read through Chromium CSSOM and attributed to matching slides when possible. CSS background assets and inline-style assets inherit the same scope. Authors may also declare isolated rules with `<style data-slide-scope="N">`. The classifier cache is reused by the renderer only while the deck and every tracked local file retain the same size, mtime, and ctime.
 
 Run checks by change type:
 
@@ -127,7 +133,7 @@ Run checks by change type:
 | Navigation | controls and interaction |
 | Mixed/global | all checks |
 
-Do not recalculate the quality score during the fix loop. Full Validation scores only after the settled final render.
+Do not recalculate the quality score during the fix loop. Full Validation scores only after the settled final render. A failed automated check blocks AI review; after repair, rerun only the failed/changed slide scope and relevant geometry family. A failed primary or cross-review verdict requires a new capture and inspection for the implicated slide, but does not invalidate unrelated current captures or valid independent cross-reviews.
 
 Any reviewer FAIL is monotonic for that render: do not rewrite it to PASS. Fix the deck, rerun `prepare`, inspect the new capture hashes, and record a new verdict. A shared CSS, runtime, or layout-family edit invalidates every affected slide review; do not preserve or reconstruct old observations. Review JSON is evidence output, not a checklist to complete programmatically.
 

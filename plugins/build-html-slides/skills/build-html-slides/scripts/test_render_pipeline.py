@@ -33,11 +33,11 @@ class RenderPipelineTests(unittest.TestCase):
             raise unittest.SkipTest(f"Playwright/Chromium preflight failed: {check.stderr.strip()}")
 
     def complete_rendered_reviews(self, manifest: dict) -> None:
-        rendered = set(manifest["render_run"]["rendered_slides"])
+        reviewed = set(manifest["render_run"].get("review_slides", manifest["render_run"]["rendered_slides"]))
         reviewer_count = 1 if manifest["mode"] == "quick" else (3 if manifest["review_risk"] == "high" else 2)
         group_size = (len(manifest["slides"]) + reviewer_count - 1) // reviewer_count
         for slide in manifest["slides"]:
-            if slide["slide"] not in rendered:
+            if slide["slide"] not in reviewed:
                 continue
             if not slide["required_ai_profiles"]:
                 self.assertEqual(slide["review_method"], "automated-geometry-only")
@@ -70,7 +70,7 @@ class RenderPipelineTests(unittest.TestCase):
             check=False,
         )
 
-    def create_webps(self, *targets: tuple[Path, str]) -> None:
+    def create_webps(self, *targets: tuple[Path, str] | tuple[Path, str, int]) -> None:
         script = r"""
 const fs = require('fs');
 const { loadPlaywright } = require(process.argv[2]);
@@ -80,23 +80,30 @@ const { chromium } = loadPlaywright();
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   for (const target of targets) {
-    const data = await page.evaluate(color => {
+    const data = await page.evaluate(({ color, size }) => {
       const canvas = document.createElement('canvas');
-      canvas.width = 800;
-      canvas.height = 800;
+      canvas.width = size || 800;
+      canvas.height = size || 800;
       const context = canvas.getContext('2d');
       context.fillStyle = color;
-      context.fillRect(0, 0, 800, 800);
+      context.fillRect(0, 0, canvas.width, canvas.height);
       context.fillStyle = '#fff';
       context.fillRect(280, 280, 240, 240);
       return canvas.toDataURL('image/webp', 0.82).split(',')[1];
-    }, target.color);
+    }, { color: target.color, size: target.size });
     fs.writeFileSync(target.path, Buffer.from(data, 'base64'));
   }
   await browser.close();
 })();
 """
-        payload = [{"path": str(path), "color": color} for path, color in targets]
+        payload = [
+            {
+                "path": str(target[0]),
+                "color": target[1],
+                "size": target[2] if len(target) == 3 else 800,
+            }
+            for target in targets
+        ]
         result = subprocess.run(
             [
                 "node",
@@ -147,7 +154,7 @@ const { chromium } = loadPlaywright();
 
             manifest_path = review_dir / "review.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self.assertEqual(manifest["schema_version"], 8)
+            self.assertEqual(manifest["schema_version"], 9)
             self.assertEqual(list(manifest["viewports"]), ["normal", "short", "zoom150"])
             self.assertEqual(manifest["viewports"]["zoom150"]["viewport"], "1920x1080")
             self.assertEqual(manifest["viewports"]["zoom150"]["visual_viewport"], "1280x720")
@@ -184,11 +191,12 @@ const { chromium } = loadPlaywright();
                 check=False,
             )
             self.assertEqual(incremental.returncode, 0, incremental.stderr)
-            self.assertIn("rendered 2/3 slides across 3 profiles (incremental", incremental.stdout)
+            self.assertIn("rendered 1/3 slides across 3 profiles (incremental", incremental.stdout)
 
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self.assertEqual(manifest["render_run"]["rendered_slides"], [1, 2])
-            self.assertEqual(manifest["render_run"]["reused_slides"], [3])
+            self.assertEqual(manifest["render_run"]["rendered_slides"], [1])
+            self.assertEqual(manifest["render_run"]["reused_slides"], [2, 3])
+            self.assertEqual(manifest["render_run"]["impact_scope"], "direct")
             self.assertEqual(manifest["slides"][0]["review_scope"], "text")
             self.assertEqual(list(manifest["slides"][0]["checks"]), ["text", "text_bounds", "density"])
             self.assertEqual(reused_capture.stat().st_mtime_ns, reused_mtime)
@@ -197,7 +205,7 @@ const { chromium } = loadPlaywright();
             manifest_path.write_text(f"{json.dumps(manifest, ensure_ascii=False, indent=2)}\n", encoding="utf-8")
             second_validation = self.validate(deck, manifest_path)
             self.assertEqual(second_validation.returncode, 0, second_validation.stdout + second_validation.stderr)
-            self.assertIn("2 refreshed slides use adaptive AI review", second_validation.stdout)
+            self.assertIn("1 refreshed slides use adaptive AI review", second_validation.stdout)
 
             selected_capture = review_dir / manifest["slides"][0]["captures"]["normal"]["path"]
             selected_mtime = selected_capture.stat().st_mtime_ns
@@ -263,6 +271,8 @@ const { chromium } = loadPlaywright();
                 )
                 review["checks"] = {name: "pass" for name in review["checks"]}
                 review["status"] = "pass"
+            for batch in manifest["cross_review_batches"]:
+                batch["status"] = "complete"
             manifest_path.write_text(f"{json.dumps(manifest, indent=2)}\n", encoding="utf-8")
             validation = self.validate(deck, manifest_path)
             self.assertEqual(validation.returncode, 0, validation.stdout + validation.stderr)
@@ -278,7 +288,140 @@ const { chromium } = loadPlaywright();
             self.assertIn("refusing to reset quality or cross-review evidence", repeated.stderr)
             self.assertEqual(manifest_path.read_bytes(), settled_evidence)
 
-    def test_image_change_declared_as_text_is_widened_to_all(self) -> None:
+    def test_incremental_fix_reuses_independent_cross_reviews_for_unchanged_slides(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "<!-- SLIDE_3_CONTENT -->", "<p>Initial copy</p>", 1
+            ).replace(
+                "    </main>",
+                '      <section class="slide" data-title="Slide 4"><div class="slide-media" aria-hidden="true"></div><div class="slide-content"><p>Four</p></div></section>\n'
+                '      <section class="slide" data-title="Slide 5"><div class="slide-media" aria-hidden="true"></div><div class="slide-content"><p>Five</p></div></section>\n'
+                "    </main>",
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            initial = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "full"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(initial.returncode, 0, initial.stderr)
+            manifest_path = review_dir / "review.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.complete_rendered_reviews(manifest)
+            manifest_path.write_text(f"{json.dumps(manifest, indent=2)}\n", encoding="utf-8")
+            finalize = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--finalize-prepare"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(finalize.returncode, 0, finalize.stderr)
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            initially_cross_reviewed = {review["slide"] for review in manifest["cross_reviews"]}
+            self.assertIn(3, initially_cross_reviewed)
+            for review in manifest["cross_reviews"]:
+                review["reviewer"] = "independent-reviewer"
+                review["reviewer_ref"] = "independent-review-run-001"
+                review["inspected_profiles"] = manifest["slides"][review["slide"] - 1]["required_ai_profiles"]
+                review["observation"] = (
+                    f"Independently inspected slide {review['slide']} against its current captures and found no visual defect."
+                )
+                review["checks"] = {name: "pass" for name in review["checks"]}
+                review["status"] = "pass"
+            manifest_path.write_text(f"{json.dumps(manifest, indent=2)}\n", encoding="utf-8")
+
+            deck.write_text(html.replace("Initial copy", "Revised copy"), encoding="utf-8")
+            revised = subprocess.run(
+                [
+                    "node", str(RENDERER), str(deck), str(review_dir), "--mode", "full",
+                    "--slides", "3", "--change-type", "text",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(revised.returncode, 0, revised.stderr)
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            retained = {review["slide"] for review in manifest["retained_cross_reviews"]}
+            self.assertEqual(retained, initially_cross_reviewed - {3})
+            self.complete_rendered_reviews(manifest)
+            manifest_path.write_text(f"{json.dumps(manifest, indent=2)}\n", encoding="utf-8")
+            finalize_again = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--finalize-prepare"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(finalize_again.returncode, 0, finalize_again.stderr)
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            complete_slides = {
+                number
+                for batch in manifest["cross_review_batches"]
+                if batch["status"] == "complete"
+                for number in batch["slides"]
+            }
+            pending_slides = {
+                number
+                for batch in manifest["cross_review_batches"]
+                if batch["status"] == "pending"
+                for number in batch["slides"]
+            }
+            self.assertEqual(complete_slides, retained)
+            self.assertEqual(pending_slides, {3})
+
+    def test_reviewer_fail_requires_source_change_before_new_capture(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "<!-- SLIDE_1_CONTENT -->", "<h1>Initial cover</h1>", 1
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            initial = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(initial.returncode, 0, initial.stderr)
+            manifest_path = review_dir / "review.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["slides"][0]["status"] = "fail"
+            manifest_path.write_text(f"{json.dumps(manifest, indent=2)}\n", encoding="utf-8")
+
+            unchanged = subprocess.run(
+                [
+                    "node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick",
+                    "--slides", "1", "--change-type", "text",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(unchanged.returncode, 1)
+            self.assertIn("reviewer FAIL requires a source fix", unchanged.stderr)
+
+            deck.write_text(html.replace("Initial cover", "Corrected cover"), encoding="utf-8")
+            corrected = subprocess.run(
+                [
+                    "node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick",
+                    "--slides", "1", "--change-type", "text",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(corrected.returncode, 0, corrected.stderr)
+            corrected_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(corrected_manifest["render_run"]["rendered_slides"], [1])
+
+    def test_image_change_declared_as_text_uses_detected_image_scope(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             assets = root / "assets"
@@ -321,13 +464,14 @@ const { chromium } = loadPlaywright();
                 check=False,
             )
             self.assertEqual(incremental.returncode, 0, incremental.stderr)
-            self.assertIn("widened to all", incremental.stderr)
+            self.assertIn("resolved to image", incremental.stderr)
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self.assertEqual(manifest["change_type"], "all")
+            self.assertEqual(manifest["change_type"], "image")
             self.assertEqual(manifest["render_run"]["detected_change_type"], "image")
-            self.assertEqual(manifest["slides"][1]["review_scope"], "all")
+            self.assertEqual(manifest["render_run"]["rendered_slides"], [2])
+            self.assertEqual(manifest["slides"][1]["review_scope"], "image")
 
-    def test_external_stylesheet_bytes_change_global_fingerprint(self) -> None:
+    def test_external_stylesheet_rule_is_scoped_to_matching_slides(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             stylesheet = root / "theme.css"
@@ -355,9 +499,19 @@ const { chromium } = loadPlaywright();
                 check=False,
             )
             self.assertEqual(after.returncode, 0, after.stderr)
+            before_fingerprints = json.loads(before.stdout)
+            after_fingerprints = json.loads(after.stdout)
+            self.assertEqual(
+                before_fingerprints["global_sha256"],
+                after_fingerprints["global_sha256"],
+            )
             self.assertNotEqual(
-                json.loads(before.stdout)["global_sha256"],
-                json.loads(after.stdout)["global_sha256"],
+                before_fingerprints["slides"]["1"],
+                after_fingerprints["slides"]["1"],
+            )
+            self.assertEqual(
+                before_fingerprints["slides"]["2"],
+                after_fingerprints["slides"]["2"],
             )
 
     def test_local_image_mutation_invalidates_existing_visual_evidence(self) -> None:
@@ -394,7 +548,7 @@ const { chromium } = loadPlaywright();
             self.create_webps((image, "#882255"))
             stale = self.validate(deck, manifest_path)
             self.assertEqual(stale.returncode, 1)
-            self.assertIn("slide source fingerprints do not match", stale.stdout)
+            self.assertIn("local fingerprint entry 1 changed after rendering", stale.stdout)
 
     def test_inactive_responsive_srcset_asset_is_fingerprinted(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -565,9 +719,231 @@ const { chromium } = loadPlaywright();
             second = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
             self.assertEqual(second["render_run"]["strategy"], "incremental")
             self.assertEqual(second["render_run"]["directly_changed_slides"], [2])
-            self.assertEqual(second["render_run"]["rendered_slides"], [1, 2, 3])
-            self.assertEqual(second["render_run"]["reused_slides"], [4, 5])
+            self.assertEqual(second["render_run"]["rendered_slides"], [2])
+            self.assertEqual(second["render_run"]["reused_slides"], [1, 3, 4, 5])
+            self.assertEqual(second["render_run"]["impact_scope"], "direct")
             self.assertEqual(second["source_fingerprints"]["global_sha256"], global_hash)
+
+    def test_structure_change_renders_changed_slide_and_neighbors(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "<!-- SLIDE_2_CONTENT -->", '<p class="scoped-copy">Scoped copy</p>', 1
+            ).replace(
+                "    </main>",
+                '      <section class="slide" data-title="Slide 4"><div class="slide-media" aria-hidden="true"></div><div class="slide-content"><p>Four</p></div></section>\n'
+                '      <section class="slide" data-title="Slide 5"><div class="slide-media" aria-hidden="true"></div><div class="slide-content"><p>Five</p></div></section>\n'
+                "    </main>",
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            initial = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(initial.returncode, 0, initial.stderr)
+            deck.write_text(
+                html.replace(
+                    '<p class="scoped-copy">Scoped copy</p>',
+                    '<div class="scoped-copy"><p>Scoped copy</p></div>',
+                ),
+                encoding="utf-8",
+            )
+            incremental = subprocess.run(
+                [
+                    "node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick",
+                    "--slides", "2", "--change-type", "text",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(incremental.returncode, 0, incremental.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["render_run"]["impact_scope"], "neighbors")
+            self.assertEqual(manifest["render_run"]["rendered_slides"], [1, 2, 3])
+            self.assertEqual(manifest["render_run"]["reused_slides"], [4, 5])
+            self.assertIn("structure", manifest["render_run"]["content_changes"])
+
+    def test_slide_scoped_transition_change_includes_neighbors(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "</style>", ".slide-2-motion{transition:transform 200ms ease}</style>", 1
+            ).replace(
+                "<!-- SLIDE_2_CONTENT -->", '<p class="slide-2-motion">Scoped motion</p>', 1
+            ).replace(
+                "    </main>",
+                '      <section class="slide" data-title="Slide 4"><div class="slide-media" aria-hidden="true"></div><div class="slide-content"><p>Four</p></div></section>\n'
+                '      <section class="slide" data-title="Slide 5"><div class="slide-media" aria-hidden="true"></div><div class="slide-content"><p>Five</p></div></section>\n'
+                "    </main>",
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            initial = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(initial.returncode, 0, initial.stderr)
+            deck.write_text(html.replace("200ms", "420ms"), encoding="utf-8")
+            revised = subprocess.run(
+                [
+                    "node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick",
+                    "--slides", "2", "--change-type", "all",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(revised.returncode, 0, revised.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["render_run"]["impact_scope"], "neighbors")
+            self.assertEqual(manifest["render_run"]["rendered_slides"], [1, 2, 3])
+
+    def test_slide_reordering_includes_neighbors_without_full_render(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "    </main>",
+                '      <section class="slide" data-title="Slide 4"><div class="slide-media" aria-hidden="true"></div><div class="slide-content"><p>Four</p></div></section>\n'
+                '      <section class="slide" data-title="Slide 5"><div class="slide-media" aria-hidden="true"></div><div class="slide-content"><p>Five</p></div></section>\n'
+                "    </main>",
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            initial = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(initial.returncode, 0, initial.stderr)
+            reordered = html.replace('data-title="Slide 2"', 'data-title="SWAP"', 1)
+            reordered = reordered.replace('data-title="Slide 3"', 'data-title="Slide 2"', 1)
+            reordered = reordered.replace('data-title="SWAP"', 'data-title="Slide 3"', 1)
+            deck.write_text(reordered, encoding="utf-8")
+            revised = subprocess.run(
+                [
+                    "node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick",
+                    "--slides", "2", "--change-type", "text",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(revised.returncode, 0, revised.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["render_run"]["impact_scope"], "neighbors")
+            self.assertEqual(manifest["render_run"]["rendered_slides"], [1, 2, 3, 4])
+            self.assertEqual(manifest["render_run"]["reused_slides"], [5])
+
+    def test_shared_css_change_renders_all_without_navigation_e2e_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "</style>", ".slide{--qa-accent:#123456}</style>", 1
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            initial = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(initial.returncode, 0, initial.stderr)
+            deck.write_text(html.replace("#123456", "#654321"), encoding="utf-8")
+            revised = subprocess.run(
+                [
+                    "node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick",
+                    "--slides", "2", "--change-type", "text",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(revised.returncode, 0, revised.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["render_run"]["strategy"], "full")
+            self.assertEqual(manifest["render_run"]["impact_scope"], "full")
+            self.assertEqual(manifest["render_run"]["rendered_slides"], [1, 2, 3])
+            self.assertFalse(manifest["render_run"]["navigation_changed"])
+            self.assertEqual(manifest["render_run"]["content_changes"], ["style"])
+
+    def test_global_wrapper_change_renders_all_without_navigation_e2e_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8")
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            initial = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(initial.returncode, 0, initial.stderr)
+            deck.write_text(html.replace('<main class="stage"', '<main class="stage qa-revised"', 1), encoding="utf-8")
+            revised = subprocess.run(
+                [
+                    "node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick",
+                    "--slides", "2", "--change-type", "all",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(revised.returncode, 0, revised.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["render_run"]["strategy"], "full")
+            self.assertFalse(manifest["render_run"]["navigation_changed"])
+            self.assertEqual(manifest["render_run"]["content_changes"], ["structure"])
+
+    def test_incremental_text_render_omits_unrelated_geometry_payloads(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "<!-- SLIDE_2_CONTENT -->", "<p>Initial copy</p>", 1
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            initial = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(initial.returncode, 0, initial.stderr)
+            deck.write_text(html.replace("Initial copy", "Revised copy"), encoding="utf-8")
+            revised = subprocess.run(
+                [
+                    "node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick",
+                    "--slides", "2", "--change-type", "text",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(revised.returncode, 0, revised.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            for capture in manifest["slides"][1]["captures"].values():
+                self.assertIn("text_geometry", capture)
+                self.assertIn("container_density", capture)
+                self.assertNotIn("image_geometry", capture)
+                self.assertNotIn("control_geometry", capture)
 
     def test_failed_image_geometry_blocks_review_batches(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -591,6 +967,55 @@ const { chromium } = loadPlaywright();
             manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["automation_gate"]["status"], "fail")
             self.assertEqual(manifest["review_batches"], [])
+
+    def test_fix_after_automation_failure_rerenders_only_failed_slide_then_batches_pending_reviews(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            assets = root / "assets"
+            assets.mkdir()
+            self.create_webps(
+                (assets / "small.webp", "#335577", 240),
+                (assets / "large.webp", "#335577", 1600),
+            )
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                '<img src="assets/small.webp" alt="Product detail" '
+                'style="width:500px;height:500px;object-fit:contain">',
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            failed = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(failed.returncode, 1)
+            first = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            self.assertEqual(first["review_batches"], [])
+
+            deck.write_text(html.replace("small.webp", "large.webp"), encoding="utf-8")
+            fixed = subprocess.run(
+                [
+                    "node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick",
+                    "--slides", "2", "--change-type", "image",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(fixed.returncode, 0, fixed.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["render_run"]["rendered_slides"], [2])
+            self.assertEqual(manifest["render_run"]["review_slides"], [1, 3])
+            self.assertEqual([batch["slides"] for batch in manifest["review_batches"]], [[1, 3]])
+            self.complete_rendered_reviews(manifest)
+            manifest_path = review_dir / "review.json"
+            manifest_path.write_text(f"{json.dumps(manifest, indent=2)}\n", encoding="utf-8")
+            validation = self.validate(deck, manifest_path)
+            self.assertEqual(validation.returncode, 0, validation.stdout + validation.stderr)
 
     def test_text_geometry_blocks_orphan_line_collision_and_nav_occlusion(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

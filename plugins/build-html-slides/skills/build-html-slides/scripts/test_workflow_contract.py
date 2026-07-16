@@ -69,9 +69,14 @@ class WorkflowContractTests(unittest.TestCase):
         contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
         machine = json.loads((ROOT / "scripts" / "validation_contract.json").read_text(encoding="utf-8"))
         self.assertIn("machine-readable authority", contract)
-        self.assertEqual(machine["schema_version"], 8)
+        self.assertEqual(machine["schema_version"], 9)
         self.assertEqual(machine["review_batch_size"], 4)
         self.assertEqual(machine["base_profiles"], ["normal", "short", "zoom150"])
+        self.assertEqual(machine["impact_scopes"], ["direct", "neighbors", "full"])
+        self.assertEqual(
+            machine["content_change_categories"],
+            ["text", "image", "structure", "style", "runtime"],
+        )
         self.assertRegex(machine["playwright_version"], r"^\d+\.\d+\.\d+$")
 
     def test_identity_review_is_automatic_and_webp_grounded(self) -> None:
@@ -87,10 +92,21 @@ class WorkflowContractTests(unittest.TestCase):
         quality = (ROOT / "references" / "quality-bar.md").read_text(encoding="utf-8")
         typography = (ROOT / "references" / "style-presets.md").read_text(encoding="utf-8")
         self.assertIn("Placeholders may exist only in the private authoring workspace", skill)
-        self.assertIn("placeholder gate runs in both rendered modes", contract)
+        self.assertIn("placeholder gate therefore runs once for every new or edited source", contract)
         self.assertIn("One occurrence blocks delivery", quality)
         self.assertIn("Choose the type system without asking a separate font question", typography)
         self.assertTrue((ROOT / "scripts" / "validate_placeholders.py").is_file())
+
+    def test_incremental_contract_scopes_work_without_dropping_independent_review(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
+        review = (ROOT / "references" / "slide-by-slide-review.md").read_text(encoding="utf-8")
+        self.assertIn("pure copy, image, or slide-local CSS refreshes only affected slides", skill)
+        self.assertIn("**Direct impact:**", contract)
+        self.assertIn("**Neighbor impact:**", contract)
+        self.assertIn("**Full impact:**", contract)
+        self.assertIn("intentional independent cross-validation", contract)
+        self.assertIn("Focus that loop on the failed slide and check family", review)
 
     def test_consumer_travel_routes_to_destination_magazine(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")

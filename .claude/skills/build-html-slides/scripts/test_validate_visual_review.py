@@ -223,6 +223,7 @@ class VisualReviewTests(unittest.TestCase):
         critical: int | None = None,
         review_risk: str = "standard",
         identity: int | None = None,
+        impact: str | None = None,
     ) -> dict:
         rendered = rendered or list(range(1, count + 1))
         requested = requested or list(rendered)
@@ -240,7 +241,7 @@ class VisualReviewTests(unittest.TestCase):
             number = record["slide"]
             is_critical = number in {1, count} or number == critical
             identity_review = number == identity and record["review_scope"] in {"all", "image"}
-            required = list(profiles) if is_critical else (["normal", *("tablet", "mobile")] if mode == "full" and responsive else (["normal"] if mode == "full" or identity_review else []))
+            required = list(profiles) if is_critical else (["normal"] if mode == "full" or identity_review else [])
             record["visual_critical"] = is_critical
             record["required_ai_profiles"] = required
             record["inspected_profiles"] = required
@@ -279,7 +280,7 @@ class VisualReviewTests(unittest.TestCase):
                     "capture_profiles": {
                         str(number): records[number - 1]["required_ai_profiles"] for number in batch_slides
                     },
-                    "status": "pending",
+                    "status": "complete",
                 })
                 cross_reviews.extend(
                     self.cross_review(records[number - 1], responsive, batch_id) for number in batch_slides
@@ -299,6 +300,30 @@ class VisualReviewTests(unittest.TestCase):
                 },
                 "status": "pending",
             })
+        strategy = (
+            "full"
+            if scope == "all" and rendered_set == set(range(1, count + 1))
+            else "incremental"
+        )
+        selected_set = set(requested) | set(changed)
+        neighbor_set = {
+            candidate
+            for number in selected_set
+            for candidate in (number - 1, number, number + 1)
+            if 1 <= candidate <= count
+        }
+        if impact is None:
+            impact = (
+                "full" if strategy == "full"
+                else "neighbors" if rendered_set == neighbor_set and rendered_set != selected_set
+                else "direct"
+            )
+        content_changes = {
+            "all": ["text", "image", "structure", "style", "runtime"] if strategy == "full" else ["style"],
+            "text": ["text"],
+            "image": ["image"],
+            "navigation": ["runtime"],
+        }[scope]
         return {
             "schema_version": CONTRACT["schema_version"],
             "mode": mode,
@@ -315,11 +340,7 @@ class VisualReviewTests(unittest.TestCase):
                 "contract_sha256": hashlib.sha256(CONTRACT_BYTES).hexdigest(),
                 "browser": "chromium 149.0.0.0",
                 "captured_at": "2026-07-14T00:00:00+00:00",
-                "strategy": (
-                    "full"
-                    if scope == "all" and rendered_set == set(range(1, count + 1))
-                    else "incremental"
-                ),
+                "strategy": strategy,
                 "requested_slides": requested,
                 "rendered_slides": rendered,
                 "directly_changed_slides": changed,
@@ -327,15 +348,28 @@ class VisualReviewTests(unittest.TestCase):
                 "animations_disabled": True,
                 "requested_change_type": scope,
                 "detected_change_type": "all" if scope == "all" else scope,
+                "impact_scope": impact,
+                "navigation_changed": "runtime" in content_changes,
+                "content_changes": content_changes,
+                "review_slides": ai_reviewed,
             },
             "source_fingerprints": {
                 "global_sha256": global_hash,
                 "previous_global_sha256": global_hash,
                 "dependencies": [],
+                "local_files": [],
+                "global_components": {
+                    "runtime_sha256": hashlib.sha256(b"runtime").hexdigest(),
+                    "structure_sha256": hashlib.sha256(b"structure").hexdigest(),
+                    "styles_sha256": hashlib.sha256(b"styles").hexdigest(),
+                },
                 "components": {
                     str(number): {
                         name: hashlib.sha256(f"{name}-{number}".encode()).hexdigest()
-                        for name in ("text_sha256", "media_sha256", "structure_sha256", "styles_sha256")
+                        for name in (
+                            "text_sha256", "media_sha256", "structure_sha256",
+                            "styles_sha256", "transition_sha256",
+                        )
                     }
                     for number in range(1, count + 1)
                 },
@@ -368,6 +402,7 @@ class VisualReviewTests(unittest.TestCase):
         missing_capture: str | None = None,
         blank_capture: str | None = None,
         stale_rendered: bool = False,
+        capture_scope: str = "full",
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -403,7 +438,10 @@ class VisualReviewTests(unittest.TestCase):
             environment = os.environ.copy()
             environment["BUILD_HTML_SLIDES_UNIT_TEST"] = "1"
             return subprocess.run(
-                ["python3", str(VALIDATOR), str(deck), str(review)],
+                [
+                    "python3", str(VALIDATOR), str(deck), str(review),
+                    "--capture-scope", capture_scope,
+                ],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -433,6 +471,13 @@ class VisualReviewTests(unittest.TestCase):
     def test_responsive_profiles_are_opt_in(self) -> None:
         deck = deck_for(2)
         result = self.validate(deck, self.manifest(deck, responsive=True))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_full_responsive_routes_ordinary_slides_to_normal_only(self) -> None:
+        deck = deck_for(3)
+        manifest = self.manifest(deck, count=3, mode="full", responsive=True)
+        self.assertEqual(manifest["slides"][1]["required_ai_profiles"], ["normal"])
+        result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_default_manifest_rejects_mobile_profile(self) -> None:
@@ -493,13 +538,13 @@ class VisualReviewTests(unittest.TestCase):
 
     def test_text_change_requires_only_text_checks(self) -> None:
         deck = deck_for(5)
-        manifest = self.manifest(deck, 5, rendered=[2, 3, 4], requested=[3], changed=[3], scope="text")
+        manifest = self.manifest(deck, 5, rendered=[3], requested=[3], changed=[3], scope="text")
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_text_change_rejects_unrelated_check_contract(self) -> None:
         deck = deck_for(5)
-        manifest = self.manifest(deck, 5, rendered=[2, 3, 4], requested=[3], changed=[3], scope="text")
+        manifest = self.manifest(deck, 5, rendered=[3], requested=[3], changed=[3], scope="text")
         manifest["slides"][2]["checks"]["crop"] = "pass"
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
@@ -507,8 +552,9 @@ class VisualReviewTests(unittest.TestCase):
 
     def test_manifest_cannot_downscope_a_detected_image_change_to_text(self) -> None:
         deck = deck_for(5)
-        manifest = self.manifest(deck, 5, rendered=[2, 3, 4], requested=[3], changed=[3], scope="text")
+        manifest = self.manifest(deck, 5, rendered=[3], requested=[3], changed=[3], scope="text")
         manifest["render_run"]["detected_change_type"] = "image"
+        manifest["render_run"]["content_changes"] = ["image"]
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
         self.assertIn("change_type improperly narrows the detected source change", result.stdout)
@@ -534,6 +580,28 @@ class VisualReviewTests(unittest.TestCase):
         self.assertEqual([batch["slides"] for batch in manifest["review_batches"]], [[1, 3, 5]])
         self.assertEqual(manifest["slides"][2]["required_ai_profiles"], ["normal"])
         self.assertIn("identity", manifest["slides"][2]["checks"])
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_pending_reused_identity_review_keeps_its_original_scope(self) -> None:
+        deck = deck_for(5, identity=3)
+        manifest = self.manifest(
+            deck,
+            count=5,
+            rendered=[2],
+            requested=[2],
+            changed=[2],
+            scope="text",
+            identity=3,
+        )
+        manifest["render_run"]["review_slides"] = [3]
+        manifest["review_batches"] = [{
+            "id": "batch-01",
+            "slides": [3],
+            "capture_profiles": {"3": ["normal"]},
+            "status": "pending",
+        }]
+        manifest["slides"][2]["review_batch_id"] = "batch-01"
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
@@ -568,16 +636,25 @@ class VisualReviewTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("requires at least 3 distinct primary reviewer_ref", result.stdout)
 
-    def test_incremental_render_requires_neighbors(self) -> None:
+    def test_direct_incremental_render_accepts_only_changed_slide(self) -> None:
         deck = deck_for(5)
         manifest = self.manifest(deck, 5, rendered=[3], requested=[3], changed=[3], scope="text")
         result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_neighbor_impact_requires_changed_slide_and_neighbors(self) -> None:
+        deck = deck_for(5)
+        manifest = self.manifest(
+            deck, 5, rendered=[3], requested=[3], changed=[3], scope="all", impact="neighbors"
+        )
+        manifest["render_run"]["content_changes"] = ["structure"]
+        result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("immediate neighbors", result.stdout)
+        self.assertIn("detected impact scope", result.stdout)
 
     def test_incremental_reuse_rejects_global_change(self) -> None:
         deck = deck_for(5)
-        manifest = self.manifest(deck, 5, rendered=[2, 3, 4], requested=[3], changed=[3], scope="image")
+        manifest = self.manifest(deck, 5, rendered=[3], requested=[3], changed=[3], scope="image")
         manifest["source_fingerprints"]["previous_global_sha256"] = hashlib.sha256(b"old-global").hexdigest()
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
@@ -585,7 +662,7 @@ class VisualReviewTests(unittest.TestCase):
 
     def test_reused_slide_may_keep_older_capture(self) -> None:
         deck = deck_for(5)
-        manifest = self.manifest(deck, 5, rendered=[2, 3, 4], requested=[3], changed=[3], scope="navigation")
+        manifest = self.manifest(deck, 5, rendered=[3], requested=[3], changed=[3], scope="text")
         result = self.validate(deck, manifest, stale_rendered=False)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
@@ -624,6 +701,33 @@ class VisualReviewTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("capture sha256 mismatch", result.stdout)
 
+    def test_refreshed_capture_scope_skips_reused_pixel_rechecks(self) -> None:
+        deck = deck_for(5)
+        manifest = self.manifest(deck, 5, rendered=[3], requested=[3], changed=[3], scope="text")
+        reused_blank = "normal/slide-01.png"
+        focused = self.validate(
+            deck,
+            manifest,
+            blank_capture=reused_blank,
+            capture_scope="refreshed",
+        )
+        self.assertEqual(focused.returncode, 0, focused.stdout + focused.stderr)
+        full = self.validate(deck, manifest, blank_capture=reused_blank, capture_scope="full")
+        self.assertEqual(full.returncode, 1)
+        self.assertIn("appears blank or near-solid", full.stdout)
+
+    def test_refreshed_capture_scope_still_checks_changed_slide_pixels(self) -> None:
+        deck = deck_for(5)
+        manifest = self.manifest(deck, 5, rendered=[3], requested=[3], changed=[3], scope="text")
+        result = self.validate(
+            deck,
+            manifest,
+            blank_capture="normal/slide-03.png",
+            capture_scope="refreshed",
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("appears blank or near-solid", result.stdout)
+
     def test_missing_capture_fails(self) -> None:
         deck = deck_for(2)
         result = self.validate(deck, self.manifest(deck), missing_capture="short/slide-02.png")
@@ -637,6 +741,14 @@ class VisualReviewTests(unittest.TestCase):
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
         self.assertIn("requires an independent final cross review", result.stdout)
+
+    def test_final_full_rejects_pending_cross_review_batch(self) -> None:
+        deck = deck_for(3)
+        manifest = self.manifest(deck, 3, mode="full", phase="final")
+        manifest["cross_review_batches"][0]["status"] = "pending"
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("must be marked complete", result.stdout)
 
     def test_final_full_requires_cross_review_for_ordinary_slide(self) -> None:
         deck = deck_for(3)
