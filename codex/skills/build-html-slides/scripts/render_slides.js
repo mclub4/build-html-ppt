@@ -6,29 +6,23 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { fileURLToPath, pathToFileURL } = require('url');
+const { loadPlaywright } = require('./playwright_loader');
 
-const BASE_PROFILES = ['normal', 'short', 'zoom150'];
-const RESPONSIVE_PROFILES = ['tablet', 'mobile'];
-const PROFILES = {
-  normal: { viewport: [1920, 1080], visualViewport: [1920, 1080], screenshot: [1920, 1080], zoom: 1, scaleMode: 'none' },
-  short: { viewport: [1366, 650], visualViewport: [1366, 650], screenshot: [1366, 650], zoom: 1, scaleMode: 'none' },
-  zoom150: { viewport: [1920, 1080], visualViewport: [1280, 720], screenshot: [1920, 1080], zoom: 1.5, scaleMode: 'browser-page' },
-  tablet: { viewport: [1024, 768], visualViewport: [1024, 768], screenshot: [1024, 768], zoom: 1, scaleMode: 'none' },
-  mobile: { viewport: [390, 844], visualViewport: [390, 844], screenshot: [390, 844], zoom: 1, scaleMode: 'none' },
-};
-const CHECKS_BY_CHANGE = {
-  all: ['crop', 'aspect_ratio', 'resolution', 'content_match', 'completion', 'overflow', 'occlusion', 'text', 'text_bounds', 'density', 'controls'],
-  text: ['text', 'text_bounds', 'density'],
-  image: ['crop', 'aspect_ratio', 'resolution', 'content_match', 'completion'],
-  navigation: ['controls'],
-};
-const AUTOMATION_CHECKS_BY_CHANGE = {
-  all: ['text_bounds', 'container_density', 'controls', 'image_geometry'],
-  text: ['text_bounds', 'container_density'],
-  image: ['image_geometry'],
-  navigation: ['controls'],
-};
-const REVIEW_BATCH_SIZE = 4;
+const CONTRACT_PATH = path.join(__dirname, 'validation_contract.json');
+const CONTRACT = JSON.parse(fs.readFileSync(CONTRACT_PATH, 'utf8'));
+const BASE_PROFILES = [...CONTRACT.base_profiles];
+const RESPONSIVE_PROFILES = [...CONTRACT.responsive_profiles];
+const PROFILES = Object.fromEntries(Object.entries(CONTRACT.profiles).map(([name, profile]) => [name, {
+  viewport: profile.viewport,
+  visualViewport: profile.visual_viewport,
+  screenshot: profile.screenshot,
+  zoom: profile.zoom,
+  scaleMode: profile.scale_mode,
+}]));
+const CHECKS_BY_CHANGE = CONTRACT.checks_by_change;
+const AUTOMATION_CHECKS_BY_CHANGE = CONTRACT.automation_checks_by_change;
+const REVIEW_BATCH_SIZE = CONTRACT.review_batch_size;
+const MEDIA_WAIT_TIMEOUT_MS = 15000;
 const QUALITY_DIMENSIONS = [
   'story', 'art_direction', 'layout_rhythm', 'typography',
   'imagery', 'composition', 'evidence', 'presentation_utility',
@@ -47,10 +41,12 @@ function usage(message) {
   process.stderr.write(
     'usage: node render_slides.js DECK.html [REVIEW_DIR] --mode quick|full '
     + '[--review-risk standard|high] [--slides 3,5-7] '
-    + '[--change-type all|text|image|navigation] [--responsive] [--final]\n'
-    + '       node render_slides.js DECK.html [REVIEW_DIR] --finalize\n'
+    + '[--change-type all|text|image|navigation] [--responsive]\n'
+    + '       node render_slides.js DECK.html [REVIEW_DIR] --finalize-prepare\n'
     + '       node render_slides.js --check\n'
     + '       node render_slides.js --fingerprints DECK.html\n'
+    + '       node render_slides.js --classify-change DECK.html REVIEW_DIR '
+    + 'all|text|image|navigation quick|full standard|high true|false\n'
     + '       node render_slides.js --workspace-dir DECK.html\n'
     + '       node render_slides.js --review-dir DECK.html\n'
     + '       node render_slides.js --clean-workspace DECK.html\n'
@@ -100,23 +96,6 @@ function defaultReviewDirectory(deck) {
   return path.join(defaultWorkspaceDirectory(deck), 'review');
 }
 
-function loadPlaywright() {
-  const candidates = [
-    'playwright',
-    path.join(os.homedir(), '.local/lib/node_modules/playwright'),
-    '/usr/local/lib/node_modules/playwright',
-    '/usr/lib/node_modules/playwright',
-  ];
-  for (const candidate of candidates) {
-    try {
-      return require(candidate);
-    } catch (error) {
-      if (error.code !== 'MODULE_NOT_FOUND') throw error;
-    }
-  }
-  throw new Error('Playwright is not installed. Install the Node playwright package and Chromium before rendering.');
-}
-
 function parseSlideSelection(value) {
   const selected = new Set();
   for (const token of value.split(',')) {
@@ -155,9 +134,7 @@ function parseArguments(argv) {
       changeType = argv[++index];
     } else if (argument === '--responsive') {
       responsive = true;
-    } else if (argument === '--final') {
-      phase = 'final';
-    } else if (argument === '--finalize') {
+    } else if (argument === '--finalize-prepare' || argument === '--finalize') {
       phase = 'final';
       finalizeOnly = true;
     } else {
@@ -173,7 +150,7 @@ function parseArguments(argv) {
   if (protectedPaths.has(output) || deck.startsWith(`${output}${path.sep}`)) {
     usage(`review directory must be a dedicated disposable child path: ${output}`);
   }
-  if (finalizeOnly && slides) usage('--finalize cannot be combined with --slides');
+  if (finalizeOnly && slides) usage('--finalize-prepare cannot be combined with --slides');
   return {
     deck,
     output,
@@ -204,13 +181,22 @@ function expandWithNeighbors(selected, slideCount) {
 }
 
 async function waitForMedia(page) {
-  await page.evaluate(async () => {
-    if (document.fonts?.ready) await document.fonts.ready;
-    await Promise.all([...document.images].map(image => image.complete ? null : new Promise(resolve => {
-      image.addEventListener('load', resolve, { once: true });
-      image.addEventListener('error', resolve, { once: true });
-    })));
-  });
+  await page.evaluate(async timeoutMs => {
+    const mediaReady = (async () => {
+      if (document.fonts?.ready) await document.fonts.ready;
+      await Promise.all([...document.images].map(image => image.complete ? null : new Promise(resolve => {
+        image.addEventListener('load', resolve, { once: true });
+        image.addEventListener('error', resolve, { once: true });
+      })));
+    })();
+    await Promise.race([
+      mediaReady,
+      new Promise((_resolve, reject) => setTimeout(
+        () => reject(new Error(`fonts or images did not settle within ${timeoutMs}ms`)),
+        timeoutMs
+      )),
+    ]);
+  }, MEDIA_WAIT_TIMEOUT_MS);
   await waitForFrames(page);
 }
 
@@ -322,6 +308,19 @@ async function collectFingerprints(page) {
     body.querySelectorAll('section.slide').forEach(node => node.remove());
     const globalStyles = [];
     const slideStyles = slides.map(() => []);
+    const dependencies = new Set();
+
+    const collectCssDependencies = (cssText, baseUrl) => {
+      for (const match of cssText.matchAll(/url\(\s*(?:"([^"]+)"|'([^']+)'|([^)'"\s]+))\s*\)/gi)) {
+        const value = match[1] || match[2] || match[3] || '';
+        if (!value || value.startsWith('#') || value.startsWith('data:')) continue;
+        try {
+          dependencies.add(new URL(value, baseUrl || document.baseURI).href);
+        } catch (_error) {
+          dependencies.add(value);
+        }
+      }
+    };
 
     const selectorTargets = selectorText => {
       if (/\.active\b|:target\b|\[aria-hidden(?:[\]=])/i.test(selectorText)) return null;
@@ -338,57 +337,151 @@ async function collectFingerprints(page) {
         return null;
       }
     };
-    const classifyRules = (rules, context = '') => {
+    const classifyRules = (rules, context = '', baseUrl = document.baseURI) => {
       for (const rule of [...rules]) {
         if (rule.type === CSSRule.STYLE_RULE) {
           const material = `${context}${rule.cssText}`;
+          collectCssDependencies(material, baseUrl);
           const targets = selectorTargets(rule.selectorText || '');
           if (targets?.length === 1) slideStyles[targets[0]].push(material);
           else if (targets === null || targets.length > 1) globalStyles.push(material);
           continue;
         }
         if (rule.cssRules && typeof rule.conditionText === 'string') {
-          classifyRules(rule.cssRules, `${context}@${rule.constructor.name} ${rule.conditionText}{`);
+          classifyRules(rule.cssRules, `${context}@${rule.constructor.name} ${rule.conditionText}{`, baseUrl);
           continue;
         }
-        globalStyles.push(`${context}${rule.cssText}`);
+        const material = `${context}${rule.cssText}`;
+        collectCssDependencies(material, baseUrl);
+        globalStyles.push(material);
       }
     };
-    for (const style of [...document.querySelectorAll('head style')]) {
-      if (style.hasAttribute('data-slide-validation-motion')) continue;
-      const explicit = (style.dataset.slideScope || '').split(',')
+    for (const sheet of [...document.styleSheets]) {
+      const owner = sheet.ownerNode;
+      if (owner?.hasAttribute?.('data-slide-validation-motion')) continue;
+      if (sheet.href) dependencies.add(sheet.href);
+      const explicit = (owner?.dataset?.slideScope || '').split(',')
         .map(value => Number.parseInt(value.trim(), 10))
         .filter(number => number >= 1 && number <= slides.length);
       if (explicit.length) {
-        explicit.forEach(number => slideStyles[number - 1].push(style.textContent || ''));
-      } else if (style.sheet) {
-        classifyRules(style.sheet.cssRules);
-      } else {
-        globalStyles.push(style.textContent || '');
+        explicit.forEach(number => slideStyles[number - 1].push(owner?.textContent || ''));
+        collectCssDependencies(owner?.textContent || '', sheet.href || document.baseURI);
+        continue;
+      }
+      try {
+        classifyRules(sheet.cssRules, '', sheet.href || document.baseURI);
+      } catch (_error) {
+        globalStyles.push(`unreadable-stylesheet:${sheet.href || owner?.outerHTML || ''}`);
       }
     }
+    document.querySelectorAll('script[src], link[href]').forEach(element => {
+      const value = element.src || element.href;
+      if (value) dependencies.add(value);
+    });
+
+    const srcsetUrls = value => {
+      const urls = [];
+      let position = 0;
+      while (position < value.length) {
+        while (position < value.length && /[\s,]/.test(value[position])) position += 1;
+        const start = position;
+        while (position < value.length && !/\s/.test(value[position])) position += 1;
+        let candidate = value.slice(start, position);
+        const trailingCommas = candidate.match(/,+$/)?.[0]?.length || 0;
+        if (trailingCommas) candidate = candidate.slice(0, -trailingCommas);
+        if (candidate) urls.push(candidate);
+        if (trailingCommas) continue;
+        let parentheses = 0;
+        while (position < value.length) {
+          const character = value[position++];
+          if (character === '(') parentheses += 1;
+          else if (character === ')' && parentheses) parentheses -= 1;
+          else if (character === ',' && !parentheses) break;
+        }
+      }
+      return urls;
+    };
+    const mediaAssets = element => {
+      const candidates = [
+        element.currentSrc,
+        element.src,
+        element.poster,
+        element.href?.baseVal || element.href,
+        element.getAttribute('href'),
+        element.getAttribute('xlink:href'),
+      ];
+      for (const attribute of ['srcset', 'imagesrcset']) {
+        const value = element.getAttribute(attribute);
+        if (value) candidates.push(...srcsetUrls(value));
+      }
+      return [...new Set(candidates.filter(Boolean).map(value => {
+        try {
+          return new URL(String(value), document.baseURI).href;
+        } catch (_error) {
+          return String(value);
+        }
+      }))];
+    };
+    document.querySelectorAll('link[imagesrcset], img, source, video, image').forEach(element => {
+      if (!element.closest('section.slide')) {
+        mediaAssets(element).forEach(value => dependencies.add(value));
+      }
+    });
+
+    const slideMaterial = (slide, index) => {
+      const mediaElements = [...slide.querySelectorAll('img, source, video, image')];
+      const structure = slide.cloneNode(true);
+      if (structure.hasAttribute('data-title')) structure.setAttribute('data-title', '#text');
+      const walker = document.createTreeWalker(structure, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) walker.currentNode.nodeValue = '#text';
+      structure.querySelectorAll('img, source, video, image').forEach(element => {
+        element.replaceWith(document.createComment(`media:${element.tagName.toLowerCase()}`));
+      });
+      const text = [slide.dataset.title || ''];
+      const textWalker = document.createTreeWalker(slide, NodeFilter.SHOW_TEXT);
+      while (textWalker.nextNode()) text.push(textWalker.currentNode.nodeValue);
+      return {
+        html: slide.outerHTML,
+        text,
+        structure: structure.outerHTML,
+        styles: slideStyles[index],
+        media: mediaElements.map(element => element.outerHTML),
+        assets: mediaElements.flatMap(mediaAssets),
+      };
+    };
     return {
       titles: slides.map(slide => slide.dataset.title || ''),
       criticalSlides: slides.map((slide, index) => (
         slide.dataset.visualCritical === 'true' ? index + 1 : null
       )).filter(Boolean),
       global: `${head.innerHTML}\n${body.innerHTML}\n${globalStyles.join('\n')}`,
-      slides: slides.map((slide, index) => ({
-        html: slide.outerHTML,
-        styles: slideStyles[index],
-        assets: [...slide.querySelectorAll('img, source, video, image')].map(element => (
-          element.currentSrc || element.src || element.poster || element.getAttribute('href') || element.getAttribute('xlink:href') || ''
-        )),
-      })),
+      dependencies: [...dependencies],
+      slides: slides.map(slideMaterial),
     };
+  });
+  const dependencyHashes = materials.dependencies.map(hashLocalAsset).sort();
+  const components = {};
+  const slides = {};
+  materials.slides.forEach((slide, index) => {
+    const assetHashes = slide.assets.map(hashLocalAsset).sort();
+    const number = String(index + 1);
+    components[number] = {
+      text_sha256: sha256(slide.text.join('\n')),
+      media_sha256: sha256(`${slide.media.join('\n')}\n${assetHashes.join('\n')}`),
+      structure_sha256: sha256(slide.structure),
+      styles_sha256: sha256(slide.styles.join('\n')),
+    };
+    slides[number] = sha256(
+      `${slide.html}\n${slide.styles.join('\n')}\n${assetHashes.join('\n')}`
+    );
   });
   return {
     titles: materials.titles,
     critical_slides: materials.criticalSlides,
-    global_sha256: sha256(materials.global),
-    slides: Object.fromEntries(materials.slides.map((slide, index) => [String(index + 1), sha256(
-      `${slide.html}\n${slide.styles.join('\n')}\n${slide.assets.map(hashLocalAsset).sort().join('\n')}`
-    )])),
+    global_sha256: sha256(`${materials.global}\n${dependencyHashes.join('\n')}`),
+    dependencies: dependencyHashes,
+    components,
+    slides,
   };
 }
 
@@ -439,6 +532,124 @@ function loadExistingManifest(output) {
   }
 }
 
+function changedSlideNumbers(existingFingerprints, currentFingerprints) {
+  const changed = new Set();
+  for (let number = 1; number <= currentFingerprints.titles.length; number += 1) {
+    if (existingFingerprints?.slides?.[String(number)] !== currentFingerprints.slides[String(number)]) {
+      changed.add(number);
+    }
+  }
+  return changed;
+}
+
+function detectedChangeType(existingFingerprints, currentFingerprints, changed, globalChanged) {
+  if (globalChanged) return 'all';
+  if (!changed.size) return 'none';
+  const previous = existingFingerprints?.components;
+  const current = currentFingerprints.components;
+  if (!previous || !current) return 'all';
+  const categories = new Set();
+  for (const number of changed) {
+    const before = previous[String(number)];
+    const after = current[String(number)];
+    if (!before || !after) return 'all';
+    if (
+      before.structure_sha256 !== after.structure_sha256
+      || before.styles_sha256 !== after.styles_sha256
+    ) return 'all';
+    const textChanged = before.text_sha256 !== after.text_sha256;
+    const imageChanged = before.media_sha256 !== after.media_sha256;
+    if (textChanged) categories.add('text');
+    if (imageChanged) categories.add('image');
+    if (!textChanged && !imageChanged && existingFingerprints.slides?.[String(number)] !== currentFingerprints.slides[String(number)]) {
+      return 'all';
+    }
+  }
+  if (categories.size !== 1) return categories.size ? 'all' : 'none';
+  return [...categories][0];
+}
+
+function effectiveChangeType(requested, detected) {
+  if (requested === 'all' || detected === 'none' || requested === detected) return requested;
+  return 'all';
+}
+
+function standardCrossReviewSlides(records, automationWarnings) {
+  const required = new Set(records.filter(record => record.visual_critical).map(record => record.slide));
+  for (const warning of automationWarnings || []) {
+    if (Number.isInteger(warning.slide)) required.add(warning.slide);
+  }
+  const ordinary = records.map(record => record.slide).filter(number => !required.has(number));
+  if (!ordinary.length) return required;
+  const policy = CONTRACT.standard_cross_review;
+  const count = Math.min(
+    policy.maximum_sample,
+    Math.max(policy.minimum_sample, Math.ceil(ordinary.length * policy.sample_ratio))
+  );
+  for (let index = 1; index <= count; index += 1) {
+    const position = Math.min(
+      ordinary.length - 1,
+      Math.max(0, Math.round((index * (ordinary.length + 1)) / (count + 1)) - 1)
+    );
+    required.add(ordinary[position]);
+  }
+  return required;
+}
+
+function requiredCrossReviewSlides(records, automationWarnings, reviewRisk) {
+  return reviewRisk === 'high'
+    ? new Set(records.map(record => record.slide))
+    : standardCrossReviewSlides(records, automationWarnings);
+}
+
+function emptyCrossReview(record, batchId) {
+  return {
+    slide: record.slide,
+    reviewer: '',
+    reviewer_ref: '',
+    review_batch_id: batchId,
+    review_method: 'vision-batched-full-size',
+    inspected_profiles: [],
+    observation: '',
+    capture_sha256: Object.fromEntries(record.required_ai_profiles.map(profile => [
+      profile,
+      record.captures[profile]?.sha256 || '',
+    ])),
+    checks: Object.fromEntries(checksFor(record.review_scope, record.identity_required).map(name => [name, 'pending'])),
+    identity_review: record.identity_required && ['all', 'image'].includes(record.review_scope)
+      ? record.identity_targets.map(target => ({
+        target_id: target.target_id,
+        subject_name: target.subject_name,
+        verdict: 'pending',
+        observation: '',
+      }))
+      : [],
+    status: 'pending',
+  };
+}
+
+function prepareCrossReviews(records, automationWarnings, reviewRisk) {
+  const required = [...requiredCrossReviewSlides(records, automationWarnings, reviewRisk)]
+    .sort((left, right) => left - right);
+  const reviews = [];
+  const batches = [];
+  for (let offset = 0; offset < required.length; offset += REVIEW_BATCH_SIZE) {
+    const slides = required.slice(offset, offset + REVIEW_BATCH_SIZE);
+    const id = `cross-batch-${String(batches.length + 1).padStart(2, '0')}`;
+    batches.push({
+      id,
+      slides,
+      capture_profiles: Object.fromEntries(slides.map(number => [
+        String(number),
+        records[number - 1].required_ai_profiles,
+      ])),
+      status: 'pending',
+    });
+    slides.forEach(number => reviews.push(emptyCrossReview(records[number - 1], id)));
+  }
+  return { reviews, batches };
+}
+
 async function main() {
   const args = parseArguments(process.argv.slice(2));
   if (args.workspaceStorage === 'agent-home') {
@@ -454,9 +665,10 @@ async function main() {
   const deckBytes = fs.readFileSync(args.deck);
   const deckHash = sha256(deckBytes);
   const runId = crypto.randomUUID();
+  const requestedChangeType = args.changeType;
   const existing = args.slides || args.finalizeOnly ? loadExistingManifest(args.output) : null;
   if ((args.slides || args.finalizeOnly) && !existing) {
-    usage('--slides/--finalize requires an existing review.json from an earlier full render');
+    usage('--slides/--finalize-prepare requires an existing review.json from an earlier full render');
   }
   if (args.finalizeOnly) {
     args.mode = existing.mode;
@@ -471,6 +683,7 @@ async function main() {
   let fingerprints;
   let renderTargets;
   let directlyChanged;
+  let detectedChange = 'all';
   let strategy = 'full';
   let records;
   let previousDeckHash = existing?.deck_sha256 || null;
@@ -492,25 +705,41 @@ async function main() {
     const existingProfiles = existing ? Object.keys(existing.viewports || {}) : [];
     const existingTitles = existing?.slides?.map(record => record.title) || [];
     const compatible = existing
-      && existing.schema_version === 7
+      && existing.schema_version === CONTRACT.schema_version
       && existing.mode === args.mode
       && existing.review_risk === args.reviewRisk
       && JSON.stringify(existingProfiles) === JSON.stringify(profiles)
       && JSON.stringify(existingTitles) === JSON.stringify(fingerprints.titles);
     const globalChanged = compatible
       && existing.source_fingerprints?.global_sha256 !== fingerprints.global_sha256;
-    directlyChanged = new Set();
-    if (compatible) {
-      for (let number = 1; number <= slideCount; number += 1) {
-        if (existing.source_fingerprints?.slides?.[String(number)] !== fingerprints.slides[String(number)]) {
-          directlyChanged.add(number);
-        }
-      }
+    directlyChanged = compatible
+      ? changedSlideNumbers(existing.source_fingerprints, fingerprints)
+      : new Set(allSlides);
+    detectedChange = compatible
+      ? detectedChangeType(existing.source_fingerprints, fingerprints, directlyChanged, globalChanged)
+      : 'all';
+    args.changeType = args.slides && compatible && !globalChanged
+      ? effectiveChangeType(args.changeType, detectedChange)
+      : 'all';
+    if (args.changeType !== requestedChangeType) {
+      process.stderr.write(
+        `WARNING: requested change type ${requestedChangeType} widened to ${args.changeType} `
+        + `because the rendered source diff was ${detectedChange}\n`
+      );
     }
 
     if (args.finalizeOnly) {
       if (!compatible || globalChanged || directlyChanged.size || existing.deck_sha256 !== deckHash) {
-        throw new Error('deck changed after review; render the changed slides before --finalize');
+        throw new Error('deck changed after review; render the changed slides before --finalize-prepare');
+      }
+      if (existing.mode !== 'full') {
+        throw new Error('Quick Draft finishes after verify; final scoring and cross-review are Full Validation only');
+      }
+      if (existing.phase === 'final') {
+        throw new Error(
+          'final review is already prepared; refusing to reset quality or cross-review evidence. '
+          + 'Complete it and run finalize-verify, or rerun prepare after editing the deck.'
+        );
       }
       existing.phase = 'final';
       existing.quality_score = {
@@ -522,11 +751,19 @@ async function main() {
         weakest_slides: [],
         notes: '',
       };
+      const finalReview = prepareCrossReviews(
+        existing.slides,
+        existing.automation_gate?.warnings || [],
+        existing.review_risk || 'standard'
+      );
+      existing.cross_reviews = finalReview.reviews;
+      existing.cross_review_batches = finalReview.batches;
       fs.writeFileSync(path.join(args.output, 'review.json'), `${JSON.stringify(existing, null, 2)}\n`);
-      const nextStep = existing.mode === 'full'
-        ? 'complete quality_score once'
-        : 'quick mode requires no quality score';
-      process.stdout.write(`OK: finalized review phase without re-rendering; ${nextStep}\n${path.join(args.output, 'review.json')}\n`);
+      process.stdout.write(
+        `OK: prepared final review without re-rendering; complete quality_score and `
+        + `${finalReview.batches.length} cross-review batch(es), then run finalize-verify\n`
+        + `${path.join(args.output, 'review.json')}\n`
+      );
       return;
     }
 
@@ -705,7 +942,7 @@ async function main() {
     }
   }
   const manifest = {
-    schema_version: 7,
+    schema_version: CONTRACT.schema_version,
     review_workspace: {
       storage: args.workspaceStorage,
       workspace: args.workspace,
@@ -723,6 +960,7 @@ async function main() {
       id: runId,
       generator: 'render_slides.js',
       generator_sha256: sha256(fs.readFileSync(scriptPath)),
+      contract_sha256: sha256(fs.readFileSync(CONTRACT_PATH)),
       browser: `chromium ${browserVersion}`,
       captured_at: new Date().toISOString(),
       strategy,
@@ -731,10 +969,14 @@ async function main() {
       directly_changed_slides: [...directlyChanged].sort((left, right) => left - right),
       reused_slides: records.map(record => record.slide).filter(number => !renderedSet.has(number)),
       animations_disabled: true,
+      requested_change_type: requestedChangeType,
+      detected_change_type: strategy === 'full' ? 'all' : detectedChange,
     },
     source_fingerprints: {
       global_sha256: fingerprints.global_sha256,
       previous_global_sha256: existing?.source_fingerprints?.global_sha256 || null,
+      dependencies: fingerprints.dependencies,
+      components: fingerprints.components,
       slides: fingerprints.slides,
     },
     viewports: Object.fromEntries(profiles.map(name => [name, {
@@ -761,7 +1003,8 @@ async function main() {
       weakest_slides: [],
       notes: '',
     },
-    cross_reviews: (existing?.cross_reviews || []).filter(review => !renderedSet.has(review.slide)),
+    cross_reviews: [],
+    cross_review_batches: [],
     slides: records,
   };
   const manifestPath = path.join(args.output, 'review.json');
@@ -801,6 +1044,50 @@ async function fingerprintCommand(deckArgument) {
   process.stdout.write(`${JSON.stringify(await fingerprintsForDeck(deck))}\n`);
 }
 
+async function classifyChangeCommand(
+  deckArgument,
+  reviewArgument,
+  requested = 'all',
+  mode,
+  reviewRisk,
+  responsiveValue
+) {
+  const deck = requireDeck('--classify-change', deckArgument);
+  if (!reviewArgument) usage('--classify-change requires a review directory');
+  if (!CHECKS_BY_CHANGE[requested]) usage(`invalid change type: ${requested}`);
+  if (!['quick', 'full'].includes(mode)) usage('--classify-change requires mode quick|full');
+  if (!['standard', 'high'].includes(reviewRisk)) usage('--classify-change requires review risk standard|high');
+  if (!['true', 'false'].includes(responsiveValue)) usage('--classify-change requires responsive true|false');
+  const responsive = responsiveValue === 'true';
+  const output = path.resolve(reviewArgument);
+  const existing = loadExistingManifest(output);
+  const compatible = existing
+    && existing.schema_version === CONTRACT.schema_version
+    && existing.mode === mode
+    && existing.review_risk === reviewRisk
+    && existing.responsive === responsive
+    && JSON.stringify(Object.keys(existing.viewports || {})) === JSON.stringify(profileNames(responsive));
+  if (!compatible) {
+    process.stdout.write(`${JSON.stringify({ requested, detected: 'all', effective: 'all', changed_slides: [] })}\n`);
+    return;
+  }
+  const current = await fingerprintsForDeck(deck);
+  const titles = existing.slides?.map(record => record.title) || [];
+  if (JSON.stringify(titles) !== JSON.stringify(current.titles)) {
+    process.stdout.write(`${JSON.stringify({ requested, detected: 'all', effective: 'all', changed_slides: [] })}\n`);
+    return;
+  }
+  const globalChanged = existing.source_fingerprints?.global_sha256 !== current.global_sha256;
+  const changed = changedSlideNumbers(existing.source_fingerprints, current);
+  const detected = detectedChangeType(existing.source_fingerprints, current, changed, globalChanged);
+  process.stdout.write(`${JSON.stringify({
+    requested,
+    detected,
+    effective: effectiveChangeType(requested, detected),
+    changed_slides: [...changed].sort((left, right) => left - right),
+  })}\n`);
+}
+
 function requireDeck(commandName, deckArgument) {
   if (!deckArgument) usage(`${commandName} requires a deck path`);
   const deck = path.resolve(deckArgument);
@@ -821,6 +1108,8 @@ if (command.length === 1 && command[0] === '--check') {
   operation = checkTools();
 } else if (command[0] === '--fingerprints') {
   operation = fingerprintCommand(command[1]);
+} else if (command[0] === '--classify-change') {
+  operation = classifyChangeCommand(command[1], command[2], command[3], command[4], command[5], command[6]);
 } else if (command[0] === '--workspace-dir') {
   process.stdout.write(`${defaultWorkspaceDirectory(requireDeck('--workspace-dir', command[1]))}\n`);
   operation = Promise.resolve();

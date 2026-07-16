@@ -110,6 +110,15 @@ def compact(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
+def generated_css_content(source: str) -> list[str]:
+    values: list[str] = []
+    for stylesheet in re.findall(r"<style\b[^>]*>([\s\S]*?)</style>", source, re.I):
+        stylesheet = re.sub(r"/\*[\s\S]*?\*/", "", stylesheet)
+        for match in re.finditer(r"\bcontent\s*:\s*([\"'])(.*?)\1", stylesheet, re.I | re.S):
+            values.append(match.group(2))
+    return values
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("deck", type=Path)
@@ -135,6 +144,11 @@ def main() -> int:
                 findings.append(f"slide {slide} contains blocked {label} text: {excerpt!r}")
     for slide, attribute, value in document.attribute_findings:
         findings.append(f"slide {slide} contains a placeholder marker in {attribute}: {value!r}")
+    for value in generated_css_content(source):
+        visible_text = compact(value)
+        for label, pattern in VISIBLE_PATTERNS:
+            if pattern.search(visible_text):
+                findings.append(f"stylesheet generates blocked {label} text: {visible_text[:140]!r}")
 
     findings = list(dict.fromkeys(findings))
     if findings:

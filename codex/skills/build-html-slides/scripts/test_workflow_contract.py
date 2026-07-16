@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 
@@ -29,6 +30,8 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("explicit consent", contract)
         self.assertIn("Never run `npm install`", skill)
         self.assertIn("Do not run `npm install`", contract)
+        self.assertIn("install_browser_dependencies.py --consent", skill)
+        self.assertIn("install_browser_dependencies.py --consent", contract)
 
     def test_fan_art_targets_are_checkpoints_and_do_not_expand_review_implicitly(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -42,7 +45,12 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("24-30 works", budget)
         self.assertIn("ask whether to continue discovery", budget)
         self.assertIn("do not abruptly stop", budget)
-        self.assertIn('Only `data-visual-critical="true"`', budget)
+        self.assertIn("Image count alone does not make a slide critical", budget)
+        machine_contract = json.loads(
+            (ROOT / "scripts" / "validation_contract.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(machine_contract["review_batch_size"], 4)
+        self.assertLess(machine_contract["standard_cross_review"]["sample_ratio"], 1)
 
     def test_full_validation_uses_one_entrypoint_and_bounded_time_target(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -51,7 +59,20 @@ class WorkflowContractTests(unittest.TestCase):
             self.assertIn("validate_all.py", document)
             self.assertIn("40-90 minutes", document)
         self.assertIn("20-25 slide deck", contract)
+        self.assertIn("--phase finalize-prepare", contract)
+        self.assertIn("--phase finalize-verify", contract)
+        self.assertIn("generated quality score", contract)
+        self.assertIn("`cross_review_batches`", contract)
         self.assertIn("browser-page-scale zoom150", (ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8"))
+
+    def test_machine_contract_owns_exact_validation_values(self) -> None:
+        contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
+        machine = json.loads((ROOT / "scripts" / "validation_contract.json").read_text(encoding="utf-8"))
+        self.assertIn("machine-readable authority", contract)
+        self.assertEqual(machine["schema_version"], 8)
+        self.assertEqual(machine["review_batch_size"], 4)
+        self.assertEqual(machine["base_profiles"], ["normal", "short", "zoom150"])
+        self.assertRegex(machine["playwright_version"], r"^\d+\.\d+\.\d+$")
 
     def test_identity_review_is_automatic_and_webp_grounded(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -102,6 +123,19 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("Cancer treatment research and development", media)
         self.assertIn("four to eight distinct sourced visual anchors", media)
         self.assertIn("must not remove useful subject imagery", quality)
+
+    def test_cover_is_a_first_class_design_and_review_contract(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        cover = (ROOT / "references" / "cover-design.md").read_text(encoding="utf-8")
+        contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
+        quality = (ROOT / "references" / "quality-bar.md").read_text(encoding="utf-8")
+        reviewer = (ROOT.parents[2] / "agents" / "build-html-slides-visual-reviewer.md").read_text(encoding="utf-8")
+        self.assertIn("references/cover-design.md", skill)
+        self.assertIn("highest-priority art-direction decision", cover)
+        self.assertIn("at least two materially different cover directions", cover)
+        self.assertIn("cover and closing are always visual-critical", contract)
+        self.assertIn("merely acceptable cover", quality)
+        self.assertIn("For slide 1, apply `cover-design.md`", reviewer)
 
 
 if __name__ == "__main__":

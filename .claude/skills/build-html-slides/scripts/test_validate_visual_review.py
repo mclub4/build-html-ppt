@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Regression tests for adaptive visual-review manifest schema version 7."""
+"""Regression tests for adaptive visual-review manifest schema version 8."""
 
 from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import struct
 import subprocess
@@ -18,26 +19,48 @@ from pathlib import Path
 
 VALIDATOR = Path(__file__).with_name("validate_visual_review.py")
 RENDERER = Path(__file__).with_name("render_slides.js")
+CONTRACT_PATH = Path(__file__).with_name("validation_contract.json")
+CONTRACT_BYTES = CONTRACT_PATH.read_bytes()
+CONTRACT = json.loads(CONTRACT_BYTES)
 PROFILE_SPECS = {
-    "normal": {"viewport": "1920x1080", "visual_viewport": "1920x1080", "screenshot": "1920x1080", "zoom": 1, "scale_mode": "none", "device_pixel_ratio": 1},
-    "short": {"viewport": "1366x650", "visual_viewport": "1366x650", "screenshot": "1366x650", "zoom": 1, "scale_mode": "none", "device_pixel_ratio": 1},
-    "zoom150": {"viewport": "1920x1080", "visual_viewport": "1280x720", "screenshot": "1920x1080", "zoom": 1.5, "scale_mode": "browser-page", "device_pixel_ratio": 1},
-    "tablet": {"viewport": "1024x768", "visual_viewport": "1024x768", "screenshot": "1024x768", "zoom": 1, "scale_mode": "none", "device_pixel_ratio": 1},
-    "mobile": {"viewport": "390x844", "visual_viewport": "390x844", "screenshot": "390x844", "zoom": 1, "scale_mode": "none", "device_pixel_ratio": 1},
+    name: {
+        "viewport": "x".join(str(value) for value in profile["viewport"]),
+        "visual_viewport": "x".join(str(value) for value in profile["visual_viewport"]),
+        "screenshot": "x".join(str(value) for value in profile["screenshot"]),
+        "zoom": profile["zoom"],
+        "scale_mode": profile["scale_mode"],
+        "device_pixel_ratio": profile["device_pixel_ratio"],
+    }
+    for name, profile in CONTRACT["profiles"].items()
 }
-BASE_PROFILES = ("normal", "short", "zoom150")
-RESPONSIVE_PROFILES = BASE_PROFILES + ("tablet", "mobile")
-CHECKS_BY_CHANGE = {
-    "all": ("crop", "aspect_ratio", "resolution", "content_match", "completion", "overflow", "occlusion", "text", "text_bounds", "density", "controls"),
-    "text": ("text", "text_bounds", "density"),
-    "image": ("crop", "aspect_ratio", "resolution", "content_match", "completion"),
-    "navigation": ("controls",),
-}
+BASE_PROFILES = tuple(CONTRACT["base_profiles"])
+RESPONSIVE_PROFILES = BASE_PROFILES + tuple(CONTRACT["responsive_profiles"])
+CHECKS_BY_CHANGE = {name: tuple(checks) for name, checks in CONTRACT["checks_by_change"].items()}
 
 
 def checks_for(scope: str, identity: bool = False) -> tuple[str, ...]:
     checks = CHECKS_BY_CHANGE[scope]
     return checks + (("identity",) if identity and scope in {"all", "image"} else ())
+
+
+def cross_review_numbers(records: list[dict], review_risk: str) -> list[int]:
+    if review_risk == "high":
+        return [record["slide"] for record in records]
+    required = {record["slide"] for record in records if record["visual_critical"]}
+    ordinary = [record["slide"] for record in records if record["slide"] not in required]
+    if ordinary:
+        policy = CONTRACT["standard_cross_review"]
+        count = min(
+            policy["maximum_sample"],
+            max(policy["minimum_sample"], math.ceil(len(ordinary) * policy["sample_ratio"])),
+        )
+        for index in range(1, count + 1):
+            position = min(
+                len(ordinary) - 1,
+                max(0, math.floor((index * (len(ordinary) + 1)) / (count + 1) + 0.5) - 1),
+            )
+            required.add(ordinary[position])
+    return sorted(required)
 
 
 def deck_for(count: int, critical: int | None = None, identity: int | None = None) -> str:
@@ -168,12 +191,13 @@ class VisualReviewTests(unittest.TestCase):
             "notes": [],
         }
 
-    def cross_review(self, record: dict, responsive: bool) -> dict:
+    def cross_review(self, record: dict, responsive: bool, batch_id: str = "") -> dict:
         reviewer_ref = "cross-ref-b" if record["reviewer_ref"] != "cross-ref-b" else "cross-ref-c"
         return {
             "slide": record["slide"],
             "reviewer": "cross-reviewer",
             "reviewer_ref": reviewer_ref,
+            "review_batch_id": batch_id,
             "review_method": "vision-batched-full-size",
             "inspected_profiles": record["required_ai_profiles"],
             "observation": f"Independently inspected slide {record['slide']} once across all current capture profiles and found no defect.",
@@ -243,9 +267,23 @@ class VisualReviewTests(unittest.TestCase):
             "notes": "Final rendered deck has coherent pacing, readable evidence, and stable presentation utility." if phase == "final" and mode == "full" else "",
         }
         cross_reviews = []
+        cross_review_batches = []
         if phase == "final" and mode == "full":
-            required = set(range(1, count + 1))
-            cross_reviews = [self.cross_review(records[number - 1], responsive) for number in sorted(required)]
+            required = cross_review_numbers(records, review_risk)
+            for offset in range(0, len(required), CONTRACT["review_batch_size"]):
+                batch_slides = required[offset : offset + CONTRACT["review_batch_size"]]
+                batch_id = f"cross-batch-{len(cross_review_batches) + 1:02}"
+                cross_review_batches.append({
+                    "id": batch_id,
+                    "slides": batch_slides,
+                    "capture_profiles": {
+                        str(number): records[number - 1]["required_ai_profiles"] for number in batch_slides
+                    },
+                    "status": "pending",
+                })
+                cross_reviews.extend(
+                    self.cross_review(records[number - 1], responsive, batch_id) for number in batch_slides
+                )
         review_batches = []
         ai_reviewed = [number for number in rendered if records[number - 1]["required_ai_profiles"]]
         for offset in range(0, len(ai_reviewed), 4):
@@ -262,7 +300,7 @@ class VisualReviewTests(unittest.TestCase):
                 "status": "pending",
             })
         return {
-            "schema_version": 7,
+            "schema_version": CONTRACT["schema_version"],
             "mode": mode,
             "review_risk": review_risk,
             "phase": phase,
@@ -274,18 +312,33 @@ class VisualReviewTests(unittest.TestCase):
                 "id": self.run_id,
                 "generator": "render_slides.js",
                 "generator_sha256": hashlib.sha256(RENDERER.read_bytes()).hexdigest(),
+                "contract_sha256": hashlib.sha256(CONTRACT_BYTES).hexdigest(),
                 "browser": "chromium 149.0.0.0",
                 "captured_at": "2026-07-14T00:00:00+00:00",
-                "strategy": "full" if rendered_set == set(range(1, count + 1)) else "incremental",
+                "strategy": (
+                    "full"
+                    if scope == "all" and rendered_set == set(range(1, count + 1))
+                    else "incremental"
+                ),
                 "requested_slides": requested,
                 "rendered_slides": rendered,
                 "directly_changed_slides": changed,
                 "reused_slides": [number for number in range(1, count + 1) if number not in rendered_set],
                 "animations_disabled": True,
+                "requested_change_type": scope,
+                "detected_change_type": "all" if scope == "all" else scope,
             },
             "source_fingerprints": {
                 "global_sha256": global_hash,
                 "previous_global_sha256": global_hash,
+                "dependencies": [],
+                "components": {
+                    str(number): {
+                        name: hashlib.sha256(f"{name}-{number}".encode()).hexdigest()
+                        for name in ("text_sha256", "media_sha256", "structure_sha256", "styles_sha256")
+                    }
+                    for number in range(1, count + 1)
+                },
                 "slides": slide_hashes,
             },
             "viewports": {profile: dict(PROFILE_SPECS[profile]) for profile in profiles},
@@ -303,6 +356,7 @@ class VisualReviewTests(unittest.TestCase):
             "review_batches": review_batches,
             "quality_score": quality,
             "cross_reviews": cross_reviews,
+            "cross_review_batches": cross_review_batches,
             "slides": records,
         }
 
@@ -435,7 +489,7 @@ class VisualReviewTests(unittest.TestCase):
             record["review_batch_id"] = "batch-01"
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("one to four slide numbers", result.stdout)
+        self.assertIn(f"one to {CONTRACT['review_batch_size']} slide numbers", result.stdout)
 
     def test_text_change_requires_only_text_checks(self) -> None:
         deck = deck_for(5)
@@ -450,6 +504,14 @@ class VisualReviewTests(unittest.TestCase):
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
         self.assertIn("automation-only record must carry automation-pass status", result.stdout)
+
+    def test_manifest_cannot_downscope_a_detected_image_change_to_text(self) -> None:
+        deck = deck_for(5)
+        manifest = self.manifest(deck, 5, rendered=[2, 3, 4], requested=[3], changed=[3], scope="text")
+        manifest["render_run"]["detected_change_type"] = "image"
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("change_type improperly narrows the detected source change", result.stdout)
 
     def test_quick_routes_only_critical_slides_to_ai(self) -> None:
         deck = deck_for(5)
@@ -585,6 +647,41 @@ class VisualReviewTests(unittest.TestCase):
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
         self.assertIn("slide 2 requires an independent final cross review", result.stdout)
+
+    def test_standard_final_cross_review_is_risk_sampled(self) -> None:
+        deck = deck_for(20)
+        manifest = self.manifest(deck, 20, mode="full", phase="final", review_risk="standard")
+        reviewed = [review["slide"] for review in manifest["cross_reviews"]]
+        self.assertEqual(reviewed, [1, 6, 11, 15, 20])
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_standard_final_rejects_cross_review_outside_generated_sample(self) -> None:
+        deck = deck_for(20)
+        manifest = self.manifest(deck, 20, mode="full", phase="final", review_risk="standard")
+        extra_slide = 2
+        batch_id = "cross-extra"
+        manifest["cross_reviews"].append(
+            self.cross_review(manifest["slides"][extra_slide - 1], False, batch_id)
+        )
+        manifest["cross_review_batches"].append({
+            "id": batch_id,
+            "slides": [extra_slide],
+            "capture_profiles": {
+                str(extra_slide): manifest["slides"][extra_slide - 1]["required_ai_profiles"]
+            },
+            "status": "pending",
+        })
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("slide 2 is outside the generated final cross-review set", result.stdout)
+
+    def test_high_risk_final_cross_reviews_every_slide(self) -> None:
+        deck = deck_for(12)
+        manifest = self.manifest(deck, 12, mode="full", phase="final", review_risk="high")
+        self.assertEqual([review["slide"] for review in manifest["cross_reviews"]], list(range(1, 13)))
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_cross_reviewer_must_be_outside_all_primary_reviewers(self) -> None:
         deck = deck_for(4)

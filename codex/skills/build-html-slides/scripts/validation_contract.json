@@ -1,0 +1,66 @@
+{
+  "schema_version": 8,
+  "playwright_version": "1.61.1",
+  "review_batch_size": 4,
+  "profiles": {
+    "normal": {
+      "viewport": [1920, 1080],
+      "visual_viewport": [1920, 1080],
+      "screenshot": [1920, 1080],
+      "zoom": 1,
+      "scale_mode": "none",
+      "device_pixel_ratio": 1
+    },
+    "short": {
+      "viewport": [1366, 650],
+      "visual_viewport": [1366, 650],
+      "screenshot": [1366, 650],
+      "zoom": 1,
+      "scale_mode": "none",
+      "device_pixel_ratio": 1
+    },
+    "zoom150": {
+      "viewport": [1920, 1080],
+      "visual_viewport": [1280, 720],
+      "screenshot": [1920, 1080],
+      "zoom": 1.5,
+      "scale_mode": "browser-page",
+      "device_pixel_ratio": 1
+    },
+    "tablet": {
+      "viewport": [1024, 768],
+      "visual_viewport": [1024, 768],
+      "screenshot": [1024, 768],
+      "zoom": 1,
+      "scale_mode": "none",
+      "device_pixel_ratio": 1
+    },
+    "mobile": {
+      "viewport": [390, 844],
+      "visual_viewport": [390, 844],
+      "screenshot": [390, 844],
+      "zoom": 1,
+      "scale_mode": "none",
+      "device_pixel_ratio": 1
+    }
+  },
+  "base_profiles": ["normal", "short", "zoom150"],
+  "responsive_profiles": ["tablet", "mobile"],
+  "checks_by_change": {
+    "all": ["crop", "aspect_ratio", "resolution", "content_match", "completion", "overflow", "occlusion", "text", "text_bounds", "density", "controls"],
+    "text": ["text", "text_bounds", "density"],
+    "image": ["crop", "aspect_ratio", "resolution", "content_match", "completion"],
+    "navigation": ["controls"]
+  },
+  "automation_checks_by_change": {
+    "all": ["text_bounds", "container_density", "controls", "image_geometry"],
+    "text": ["text_bounds", "container_density"],
+    "image": ["image_geometry"],
+    "navigation": ["controls"]
+  },
+  "standard_cross_review": {
+    "sample_ratio": 0.15,
+    "minimum_sample": 1,
+    "maximum_sample": 3
+  }
+}

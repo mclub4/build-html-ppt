@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import subprocess
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.validate_all import deterministic_commands
+from scripts.validate_all import classify_change_scope, deterministic_commands
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -123,6 +124,81 @@ class ValidateAllTests(unittest.TestCase):
             self.assertNotIn("presenter notes", navigation_labels)
             self.assertIn("source locality", image_labels)
             self.assertNotIn("source locality", text_labels)
+
+    def test_incremental_prepare_widens_a_misdeclared_text_change(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            deck.write_text(
+                TEMPLATE.read_text(encoding="utf-8")
+                .replace('<html lang="ko">', '<html lang="en">', 1)
+                .replace("<!-- SLIDE_2_CONTENT -->", "<h2>Initial structure</h2>", 1),
+                encoding="utf-8",
+            )
+            notes_path = root / "deck-notes.md"
+            notes_path.write_text(notes(), encoding="utf-8")
+            review = root / "review"
+            initial = subprocess.run(
+                [
+                    "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "quick",
+                    "--notes", str(notes_path), "--review-dir", str(review),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(initial.returncode, 0, initial.stdout + initial.stderr)
+
+            deck.write_text(
+                deck.read_text(encoding="utf-8").replace(
+                    "<h2>Initial structure</h2>",
+                    "<h2><span>Changed structure</span></h2>",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            revised = subprocess.run(
+                [
+                    "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "quick",
+                    "--notes", str(notes_path), "--review-dir", str(review),
+                    "--slides", "2", "--change-type", "text",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(revised.returncode, 0, revised.stdout + revised.stderr)
+            self.assertIn("requested change type text widened to all", revised.stdout)
+            manifest = json.loads((review / "review.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["change_type"], "all")
+            self.assertEqual(manifest["render_run"]["requested_change_type"], "text")
+            self.assertEqual(manifest["render_run"]["detected_change_type"], "all")
+
+    def test_change_classifier_widens_when_review_configuration_changed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            deck.write_text(TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+            review = root / "review"
+            initial = subprocess.run(
+                [
+                    "node", str(ROOT / "scripts" / "render_slides.js"), str(deck), str(review),
+                    "--mode", "quick", "--review-risk", "standard",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(initial.returncode, 0, initial.stdout + initial.stderr)
+            effective = classify_change_scope(
+                deck,
+                review,
+                "text",
+                "quick",
+                "high",
+                False,
+            )
+            self.assertEqual(effective, "all")
 
 
 if __name__ == "__main__":

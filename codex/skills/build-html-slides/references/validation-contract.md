@@ -1,6 +1,6 @@
 # Validation Contract
 
-This file is the single source of truth for validation modes, render profiles, AI review routing, reviewer count, incremental checks, and finalization.
+This file defines validation semantics. `scripts/validation_contract.json` is the machine-readable authority for the schema version, exact profile geometry, check sets, batch size, managed Playwright version, and standard cross-review sampling values. Scripts and tests must read that JSON rather than duplicate those values.
 
 ## Choose By Intent
 
@@ -22,7 +22,13 @@ After the user chooses Quick Draft or Full Validation, run this shared preflight
 python3 scripts/check_environment.py
 ```
 
-The script checks Python, Node.js, Playwright, Chromium, and screenshot capture without installing anything. If it fails, report the exact missing or incompatible components and ask whether the user wants them installed. Stop until the user gives explicit consent unless that consent was already part of the request. Do not run `npm install`, `npx playwright install`, an OS package manager, or elevated installation commands first. After approved installation, rerun the preflight. Do not begin either rendered mode until it passes.
+The script checks Python, Node.js, Playwright, Chromium, and screenshot capture without installing anything. If it fails, report the exact missing or incompatible components and ask whether the user wants them installed. Stop until the user gives explicit consent unless that consent was already part of the request. Do not run `npm install`, `npx playwright install`, an OS package manager, or elevated installation commands first. After approval, prefer the bundled user-scoped installer:
+
+```bash
+python3 scripts/install_browser_dependencies.py --consent
+```
+
+It installs the contract-pinned Playwright package and Chromium under `~/.build-html-slides/runtime`. Use `--with-deps` only when the user also approved Linux system-library installation, which may require elevated privileges. After installation, rerun the preflight. Do not begin either rendered mode until it passes.
 
 ## Turnaround Envelope
 
@@ -56,7 +62,7 @@ Add `tablet` 1024×768 and `mobile` 390×844 only when responsive device support
 
 ## Quick Draft
 
-Run the deterministic deck, visible-placeholder/incomplete-asset gate, notes, source-cache, interaction semantics, real-browser navigation/print E2E, and Chromium geometry checks. The placeholder gate runs in both rendered modes and every `validate_all` phase, including navigation-only revisions, and blocks `PLACE NOTE`, image-here instructions, dummy asset markers, and other explicit unfinished media before AI review. Render all slides at all canonical profiles. Automated text bounds, rendered-line composition, container-density measurement, control geometry, and image geometry must complete before any AI inspection. The rendered-line pass blocks Korean display orphans, punctuation-only final lines, colliding glyph rows, sibling text intersections, and navigation-covered copy. Geometry issues block review; low-density container warnings route the affected slide and profile to AI inspection instead of failing automatically.
+Run the deterministic deck, visible-placeholder/incomplete-asset gate, notes, source-cache, interaction semantics, real-browser navigation/print E2E, and Chromium geometry checks. The placeholder gate runs in both rendered modes and every `validate_all` phase, including navigation-only revisions, and blocks `PLACE NOTE`, image-here instructions, dummy asset markers, CSS-generated placeholder copy, and other explicit unfinished media before AI review. Render all slides at all canonical profiles. Automated text bounds, rendered-line composition, cross-layer occlusion, container-density measurement, control geometry, and image geometry must complete before any AI inspection. The rendered-line pass blocks Korean display orphans, punctuation-only final lines, colliding glyph rows, sibling text intersections, navigation-covered copy, and opaque unrelated layers covering text. Geometry failures block review. Low-density surfaces and meaningful `object-fit: cover` crops are warnings that route the affected slide and profile to AI inspection, because automation can detect risk but cannot decide semantic crop quality.
 
 `data-placeholder-literal="true"` may exempt visible wording only when the slide is genuinely teaching or comparing placeholder behavior. It does not exempt suspicious class names, asset filenames, or media-state markers, and it must never be used to bypass an unfinished visual.
 
@@ -67,7 +73,7 @@ AI inspects only:
 - slides and profiles named by automation warnings.
 - slides explicitly or automatically routed to identity review for `all` or `image` scope.
 
-Critical slides inspect every generated profile. A warning-triggered ordinary slide inspects `normal` plus the warned profiles. Identity-required slides inspect at least `normal`, including Quick Draft, and require local canonical WebP references plus per-target cue-based verdicts. Identity review activates automatically from subject metadata, named-subject slide kinds, or character/person/profile markup; the slide flag is an explicit signal, not the only trigger. Missing identity metadata or reference files blocks AI review before batching. Other slides retain hash-bound captures and geometry results with `review_method: automated-geometry-only`; they must not claim an AI reviewer or observation.
+The cover and closing are always visual-critical and cannot be downgraded to automation-only. Critical slides inspect every generated profile. A warning-triggered ordinary slide inspects `normal` plus the warned profiles. Identity-required slides inspect at least `normal`, including Quick Draft, and require local canonical WebP references plus per-target cue-based verdicts. Identity review activates automatically from subject metadata, named-subject slide kinds, or character/person/profile markup; the slide flag is an explicit signal, not the only trigger. Missing identity metadata or reference files blocks AI review before batching. Other slides retain hash-bound captures and geometry results with `review_method: automated-geometry-only`; they must not claim an AI reviewer or observation.
 
 Quick Draft does not calculate the 24-point quality score, run independent cross-reviews, or require multiple reviewer agents. Report the AI-inspected subset separately from all-slide automated coverage.
 
@@ -82,7 +88,7 @@ Choose review risk by reasoning about consequences, uncertainty, distribution, t
 
 Pass the decision to the renderer with `--review-risk standard|high`. Assign contiguous slide ranges. Vision batches contain at most four slides, independent of reviewer range size.
 
-After fixes settle, run `--finalize`, assign an independent presentation editor, calculate the quality score once, and independently cross-review every slide. The cross-reviewer must be outside the complete primary-reviewer set, not merely different from the primary reviewer assigned to that slide. This second pass intentionally catches repeated-layout defects, image-specific whitespace and scale failures, and primary-review misses. Unresolved high/medium findings or a failing score block delivery.
+After fixes settle, run `--phase finalize-prepare`. This verifies the iteration evidence first, then generates the one quality-score record and bounded `cross_review_batches` without rerendering. Assign an independent presentation editor and calculate the quality score once. For standard risk, cross-review cover, closing, explicit visual-critical slides, automation-warning slides, and a deterministic distributed sample of ordinary slides. For high risk, cross-review every slide. Exact sampling values come from `validation_contract.json`. Every cross-reviewer must be outside the complete primary-reviewer set, not merely different from the primary reviewer assigned to that slide. This second pass targets repeated-layout defects, image-specific whitespace and scale failures, and primary-review misses without repeating all work on ordinary decks. Unresolved high/medium findings or a failing score block delivery.
 
 ## Commands
 
@@ -98,7 +104,7 @@ Full Validation preparation:
 python3 scripts/validate_all.py OUTPUT.html --mode full --review-risk standard --phase prepare
 ```
 
-After filling the listed AI batches, run `python3 scripts/validate_all.py OUTPUT.html --phase verify`. For Full Validation, then run `--phase finalize`, fill the one quality score and required cross-reviews, and run `--phase verify` once more. The entrypoint executes structure, placeholder completion, notes, source cache, reuse, locality, static interaction, browser E2E, render/geometry, and evidence checks in the required order. Use `--responsive` only for requested tablet/mobile support.
+After filling the listed AI batches, run `python3 scripts/validate_all.py OUTPUT.html --phase verify`. Quick Draft ends there. For Full Validation, then run `--phase finalize-prepare`, fill the generated quality score and `cross_review_batches`, and run `--phase finalize-verify`. The entrypoint executes structure, placeholder completion, notes, source cache, reuse, locality, static interaction, browser E2E, render/geometry, and evidence checks in the required order. Use `--responsive` only for requested tablet/mobile support.
 
 ## Incremental Revision
 
@@ -110,7 +116,7 @@ python3 scripts/validate_all.py OUTPUT.html --phase prepare \
   --slides N --change-type text|image|navigation|all
 ```
 
-The renderer refreshes changed slides and immediate neighbors. It fingerprints a CSS rule with exactly one matching slide, so a local style edit remains incremental. Shared styles, dynamic active-state selectors, runtime code, profile set, mode, review risk, or slide-title changes still force a full render when reuse is unsafe. Authors may also declare isolated rules with `<style data-slide-scope="N">`.
+The renderer refreshes changed slides and immediate neighbors. `--change-type` is a performance hint, not trusted proof. Before choosing validators, `validate_all.py` compares typed per-slide text, media, structure, and slide-local style hashes. A mismatched hint widens to `all`; it never narrows the detected change. A CSS rule with exactly one matching slide remains incremental. Shared styles, dynamic active-state selectors, runtime code, profile set, mode, review risk, slide-title changes, linked CSS/JavaScript bytes, and local assets referenced by HTML or CSS force broader invalidation when reuse is unsafe. Authors may also declare isolated rules with `<style data-slide-scope="N">`.
 
 Run checks by change type:
 

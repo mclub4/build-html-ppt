@@ -7,6 +7,7 @@ When a user gives this repository URL to an AI agent and asks it to install or u
 1. Follow the platform-specific installation path in `README.md`. Install either the plugin or the standalone skill for a platform, never both.
 2. Do not install optional companion skills, image-generation tools, MCP servers, plugins, credentials, or paid services without explicit user consent.
 3. After a successful installation, the final response MUST include all applicable post-install guidance below. Do not omit it just because the user asked for a short response.
+4. Do not treat Playwright/Chromium as silently installable. Run the installed skill's `scripts/check_environment.py`; if it reports them missing, ask first. After explicit consent, prefer `scripts/install_browser_dependencies.py --consent`, and add `--with-deps` only when system-library installation was also approved.
 
 ### Required for every installation
 

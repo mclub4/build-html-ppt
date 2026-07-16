@@ -50,18 +50,18 @@ After the user chooses Quick Draft or Full Validation, run this preflight before
 python3 scripts/check_environment.py
 ```
 
-The preflight never installs software. If it fails, report the exact missing or incompatible components and ask whether the user wants them installed. Stop until the user answers unless the original request already gave explicit installation consent. Never run `npm install`, `npx playwright install`, an OS package manager, or elevated installation commands without that consent. Install only the approved missing components, rerun the preflight, and start deck work only after it passes.
+The preflight never installs software. If it fails, report the exact missing or incompatible components and ask whether the user wants them installed. Stop until the user answers unless the original request already gave explicit installation consent. Never run `npm install`, `npx playwright install`, an OS package manager, or elevated installation commands without that consent. After approval, prefer `python3 scripts/install_browser_dependencies.py --consent` for a user-scoped Playwright/Chromium runtime; use `--with-deps` only when the user also approved system-library installation. Rerun the preflight and start deck work only after it passes.
 
 ## Build Workflow
 
 1. Inspect supplied files and successful prior decks. Extract useful rhythm, density, composition range, and interaction behavior without copying identity or defects.
 2. Read `references/audience-story-routing.md`. Identify audience groups, decision owner, desired room outcome, baseline knowledge, likely objections, locale, and distribution scope. Order information for the actual room. Put shared stakes and decisions before specialist depth when that improves attention; do not apply a generic outline.
-3. Read `references/quality-bar.md`, `references/theme-playbook.md`, and `references/theme-gallery.md`. Write a one-line theme contract covering mood, named display/body font stacks, palette roles, shape language, imagery, density, and motion. Choose several composition families rather than repeating one card grid. Unless the user supplied a brand type system, infer an attractive language- and topic-appropriate pairing without asking a separate font question.
+3. Read `references/quality-bar.md`, `references/theme-playbook.md`, `references/theme-gallery.md`, and `references/cover-design.md`. Write a one-line theme contract covering mood, named display/body font stacks, palette roles, shape language, imagery, density, and motion. Write a separate cover brief, compare at least two materially different slide-1 directions in planning, and implement the stronger one. Choose several body composition families rather than repeating one card grid. Unless the user supplied a brand type system, infer an attractive language- and topic-appropriate pairing without asking a separate font question.
 4. Read `references/style-presets.md`. Copy `assets/runtime-shell.html` to the output path. Replace all placeholder sections while preserving the stage fitter and navigation runtime. The shell has no art direction; replace its neutral font variables and styling with the chosen theme system.
 5. Read `references/media-strategy.md`, then plan official/supplied/sourced/generated assets and diagrams. Decide semantically whether the audience needs to see real products, facilities, equipment, people, organisms, tissue, experiments, interfaces, or places. Read `references/architecture-diagrams.md` when systems, flows, deployment, integrations, or trust boundaries matter.
 6. Implement semantic `<section class="slide" data-title="…">` elements. Give every slide exactly one direct `.slide-media` and `.slide-content` child. Keep meaningful copy and non-croppable visuals in the content-safe layer.
 7. Create `OUTPUT-notes.md` from `assets/speaker-notes-template.md`. Use the exact slide number and title. Include purpose/audience, natural 30–90 second talk track, emphasis, transition, and source/caveat guidance without repeating slide text.
-8. Run the selected mode through `python3 scripts/validate_all.py OUTPUT.html --mode quick|full --phase prepare`. The placeholder gate runs in both rendered modes and every `validate_all` phase. Fix deterministic failures before opening captures, then use the same entrypoint for `verify` and `finalize`. After scoped edits, pass `--slides` and rerender only the changed slides and immediate neighbors unless shared runtime or styles changed. Treat rendered pixels as the source of truth: never bulk-fill review records, synthesize PASS observations, or override a reviewer FAIL. A FAIL closes only after the affected current captures are independently reinspected.
+8. Run the selected mode through `python3 scripts/validate_all.py OUTPUT.html --mode quick|full --phase prepare`. The placeholder gate runs in both rendered modes and every `validate_all` phase. Fix deterministic failures before opening captures, fill only the generated review batches, and run `--phase verify`. Full Validation then uses `--phase finalize-prepare`, fills the generated score and cross-review batches, and ends with `--phase finalize-verify`; Quick Draft ends after `verify`. After scoped edits, pass `--slides` plus the best change-type hint. The renderer classifies the actual typed diff, widens an unsafe hint, and rerenders changed slides with immediate neighbors unless shared dependencies, runtime, structure, or styles require a full render. Treat rendered pixels as the source of truth: never bulk-fill review records, synthesize PASS observations, or override a reviewer FAIL. A FAIL closes only after the affected current captures are independently reinspected.
 9. Deliver the HTML, notes, sources cache, asset provenance, selected mode, and only the checks actually performed. Report the validation workspace separately; never present it as a deliverable.
 
 Full Validation controls assurance depth, not research breadth, art direction, or visual-media variety. It must not turn an image-worthy presentation into a chart-and-SVG report. For 20-25 slides, target 40-90 minutes. When a request asks for many, as many as possible, or a large collection of fan artworks, read `references/fan-art-budget.md` before searching. Use its planning targets to protect implementation and validation time, but treat them as checkpoints rather than hard caps. If the task is likely to exceed 90 minutes, explain why and ask whether to continue discovery or freeze the current set; do not abruptly stop the work.
@@ -85,6 +85,7 @@ Full Validation controls assurance depth, not research breadth, art direction, o
 ## Art Direction
 
 - Translate the theme into type, surfaces, shapes, imagery, information density, and motion, not color alone.
+- Treat slide 1 as the deck's highest-priority art-direction decision. It must establish the literal subject, opening promise, and visual tone within roughly three seconds; do not spend the visual ambition only on body slides.
 - Choose typography proactively from the language, subject, audience, and room. Declare `--font-display`, `--font-body`, and `--font-mono`; use a deliberate display/body contrast when the theme benefits from it. Do not ship the shell's neutral font stack unchanged or fall back to bare `system-ui` as the final art direction.
 - Use the theme gallery as a vocabulary, not a template library. Combine composition families coherently within one visual system.
 - Classify the communication job before mapping a subject to a theme. For travel, distinguish consumer magazine, premium hospitality, documentary reportage, and expedition records; ordinary leisure guides default to Destination Magazine rather than Field Notes.
@@ -144,9 +145,10 @@ For Edit Only, explicitly state that no new render or validation was run. Never 
 
 ## References And Tools
 
-- `references/validation-contract.md`: single source of truth for mode, render, AI review, reviewer count, incremental validation, and finalization.
+- `references/validation-contract.md`: semantic contract for mode, render, AI review, reviewer count, incremental validation, and finalization. Exact profiles, checks, batch size, and sampling values live in `scripts/validation_contract.json`.
 - `references/audience-story-routing.md`: audience-aware story order.
 - `references/theme-playbook.md` and `references/theme-gallery.md`: theme and composition selection.
+- `references/cover-design.md`: first-slide planning, art direction, media, typography, and blocking review criteria.
 - `references/style-presets.md`: canonical stage, media safety, navigation, and responsive fit.
 - `references/quality-bar.md`: full-validation scoring rubric.
 - `references/slide-by-slide-review.md`: how to inspect rendered evidence and fill review records.
@@ -157,9 +159,10 @@ For Edit Only, explicitly state that no new render or validation was run. Never 
 - `references/source-locality.md`: region-specific factual sourcing.
 - `references/asset-discovery.md`: broad, topic-aware image discovery and original-source tracing.
 - `references/fan-art-budget.md`: bounded fan-art search, provenance, processing, and validation limits.
-- `scripts/validate_all.py`: canonical prepare, verify, and finalize entrypoint.
+- `scripts/validate_all.py`: canonical prepare, verify, finalize-prepare, and finalize-verify entrypoint.
 - `scripts/validate_deck.py`, `validate_placeholders.py`, `validate_speaker_notes.py`, `validate_image_reuse.py`, `validate_interactions.py`, and `validate_browser_e2e.js`: deterministic deliverable, completion, and real-browser behavior checks.
 - `scripts/render_slides.js` and `validate_visual_review.py`: Chromium evidence, true page-scale zoom, and adaptive review validation.
 - `scripts/check_environment.py`: non-mutating Python, Node.js, Playwright, and Chromium preflight.
+- `scripts/install_browser_dependencies.py`: explicit-consent, user-scoped Playwright/Chromium installer.
 - `scripts/measure_container_density.js`: rendered warning detector for oversized low-information surfaces.
 - `scripts/source_cache.py`: hash-bound raster provenance cache.

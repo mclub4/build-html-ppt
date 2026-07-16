@@ -1,6 +1,6 @@
 {
   "name": "build-html-slides",
-  "version": "0.3.1",
+  "version": "0.4.1",
   "private": true,
   "description": "Codex and Claude Code skills for art-directed, validated HTML presentations.",
   "license": "MIT",

@@ -255,6 +255,40 @@
   const readableCount = record => Array.from(
     record.lines.map(line => line.text).join('').replace(/[\s\p{P}\p{S}]/gu, '')
   ).length;
+  const paintsOpaqueVisual = element => {
+    const style = getComputedStyle(element);
+    const color = style.backgroundColor || '';
+    const alphaMatch = color.match(/rgba?\([^)]*[,/]\s*([\d.]+)\s*\)$/i);
+    const backgroundAlpha = color === 'transparent' ? 0 : (alphaMatch ? Number(alphaMatch[1]) : 1);
+    return Number(style.opacity) > 0.05 && (
+      backgroundAlpha > 0.08 || style.backgroundImage !== 'none'
+      || ['IMG', 'SVG', 'CANVAS', 'VIDEO', 'IFRAME'].includes(element.tagName)
+    );
+  };
+  for (const record of lineRecords) {
+    const exempt = record.element.closest('[data-occlusion-ok]');
+    let occluded = false;
+    for (const line of record.lines) {
+      const y = line.top + line.height / 2;
+      for (const ratio of [0.15, 0.35, 0.5, 0.65, 0.85]) {
+        const x = line.left + line.width * ratio;
+        if (x < 0 || y < 0 || x >= viewportWidth || y >= viewportHeight) continue;
+        const stack = document.elementsFromPoint(x, y);
+        const ownerIndex = stack.findIndex(candidate => (
+          candidate === record.element || candidate.contains(record.element) || record.element.contains(candidate)
+        ));
+        if (ownerIndex <= 0) continue;
+        occluded = stack.slice(0, ownerIndex).some(candidate => (
+          !candidate.closest('[data-text-bounds-ignore]') && paintsOpaqueVisual(candidate)
+        ));
+        if (occluded) break;
+      }
+      if (occluded) break;
+    }
+    if (!occluded) continue;
+    if (exempt) warnings.push(`${label(record.element)}: intentional occlusion exemption requires visual inspection`);
+    else issues.push(`${label(record.element)}: rendered text is covered by an opaque visual layer`);
+  }
   for (const record of lineRecords) {
     if (record.element.closest('[data-text-overlap-ok]')) {
       warnings.push(`${label(record.element)}: intentional text-overlap exemption requires visual inspection`);

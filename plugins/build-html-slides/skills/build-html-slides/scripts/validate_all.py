@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -17,6 +18,7 @@ except ModuleNotFoundError:  # Allows unittest imports from the skill root.
 
 
 SCRIPTS = Path(__file__).resolve().parent
+COMMAND_TIMEOUT_SECONDS = int(os.environ.get("BUILD_HTML_SLIDES_COMMAND_TIMEOUT", "900"))
 
 
 def default_notes(deck: Path) -> Path:
@@ -31,7 +33,17 @@ def default_notes(deck: Path) -> Path:
 def run(label: str, command: list[str]) -> None:
     started = time.monotonic()
     print(f"RUN: {label}")
-    result = subprocess.run(command, text=True, check=False)
+    try:
+        result = subprocess.run(
+            command,
+            text=True,
+            check=False,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"{label} exceeded the {COMMAND_TIMEOUT_SECONDS}s per-command safety timeout"
+        ) from exc
     elapsed = time.monotonic() - started
     if result.returncode:
         raise RuntimeError(f"{label} failed after {elapsed:.1f}s")
@@ -85,10 +97,56 @@ def review_directory(deck: Path, explicit: Path | None) -> Path | None:
     return Path(result.stdout.strip()).resolve()
 
 
+def classify_change_scope(
+    deck: Path,
+    review: Path,
+    requested: str,
+    mode: str,
+    review_risk: str,
+    responsive: bool,
+) -> str:
+    result = subprocess.run(
+        [
+            "node",
+            str(SCRIPTS / "render_slides.js"),
+            "--classify-change",
+            str(deck),
+            str(review),
+            requested,
+            mode,
+            review_risk,
+            str(responsive).lower(),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    if result.returncode:
+        raise RuntimeError((result.stderr or result.stdout).strip() or "could not classify the source change")
+    try:
+        classification = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("change classifier returned invalid JSON") from exc
+    effective = classification.get("effective")
+    if effective not in {"all", "text", "image", "navigation"}:
+        raise RuntimeError("change classifier returned an invalid effective scope")
+    if effective != requested:
+        print(
+            f"NOTICE: requested change type {requested} widened to {effective} "
+            f"after detecting {classification.get('detected', 'unknown')} changes"
+        )
+    return effective
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("deck", type=Path)
-    parser.add_argument("--phase", choices=("prepare", "verify", "finalize"), default="prepare")
+    parser.add_argument(
+        "--phase",
+        choices=("prepare", "verify", "finalize-prepare", "finalize-verify", "finalize"),
+        default="prepare",
+    )
     parser.add_argument("--mode", choices=("quick", "full"))
     parser.add_argument("--review-risk", choices=("standard", "high"), default="standard")
     parser.add_argument("--notes", type=Path)
@@ -98,6 +156,9 @@ def main() -> int:
     parser.add_argument("--change-type", choices=("all", "text", "image", "navigation"), default="all")
     parser.add_argument("--responsive", action="store_true")
     args = parser.parse_args()
+    if args.phase == "finalize":
+        print("NOTICE: --phase finalize is deprecated; using finalize-prepare")
+        args.phase = "finalize-prepare"
 
     deck = args.deck.resolve()
     if not deck.is_file():
@@ -122,6 +183,15 @@ def main() -> int:
                 validation_scope = "all"
         if args.phase == "prepare":
             run("tool preflight", [sys.executable, str(SCRIPTS / "check_environment.py")])
+            if args.slides:
+                validation_scope = classify_change_scope(
+                    deck,
+                    review,
+                    args.change_type,
+                    args.mode,
+                    args.review_risk,
+                    args.responsive,
+                )
         for label, command in deterministic_commands(deck, notes, sources, validation_scope):
             run(label, command)
 
@@ -142,16 +212,24 @@ def main() -> int:
                 "visual evidence contract",
                 [sys.executable, str(SCRIPTS / "validate_visual_review.py"), str(deck), str(manifest)],
             )
-        else:
+        elif args.phase == "finalize-prepare":
             run(
                 "iteration evidence before finalization",
                 [sys.executable, str(SCRIPTS / "validate_visual_review.py"), str(deck), str(manifest)],
             )
             run(
-                "finalization without rerender",
-                ["node", str(SCRIPTS / "render_slides.js"), str(deck), str(review), "--finalize"],
+                "prepare final review without rerender",
+                ["node", str(SCRIPTS / "render_slides.js"), str(deck), str(review), "--finalize-prepare"],
             )
-            print(f"NEXT: fill the one final quality score and required cross-reviews in {manifest}, then run --phase verify")
+            print(
+                f"NEXT: fill the final quality score and generated cross-review batches in {manifest}, "
+                "then run --phase finalize-verify"
+            )
+        else:
+            run(
+                "final quality score and cross-review evidence",
+                [sys.executable, str(SCRIPTS / "validate_visual_review.py"), str(deck), str(manifest)],
+            )
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

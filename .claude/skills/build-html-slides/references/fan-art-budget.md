@@ -48,7 +48,7 @@ Interpret "maximum," "as many as possible," and similar superlatives as a reques
 
 - Validate fan art as part of the rendered slide, not with a separate AI call per artwork.
 - Batch up to four slide captures per vision call as defined by `slide-by-slide-review.md`.
-- Image count alone does not make a slide critical. `data-visual-critical="true"` requests additional stress profiles; Full Validation independently cross-reviews every slide after the primary pass.
+- Image count alone does not make a slide critical. `data-visual-critical="true"` requests additional stress profiles and inclusion in the standard final cross-review set. Standard Full Validation also samples ordinary slides; high-risk Full Validation cross-reviews every slide.
 - Do not create auxiliary fan-art, source, or rights-review agents for an ordinary internal/private entertainment deck. Standard Full Validation uses its two primary reviewers and one final editor only.
 - Low-resolution, failed-load, crop, or attribution problems may replace the affected work once; they do not reopen broad discovery.
 

@@ -73,7 +73,11 @@ def inspect_environment(
             "detail": detail or "Playwright/Chromium check returned no detail",
         })
         if not browser_ok:
-            suggestions.append("Install project packages, then install Chromium with Playwright.")
+            installer = Path(__file__).with_name("install_browser_dependencies.py")
+            suggestions.append(
+                "After the user explicitly approves installation, run: "
+                f"{sys.executable} {installer} --consent"
+            )
     else:
         checks.append({
             "name": "playwright_chromium",

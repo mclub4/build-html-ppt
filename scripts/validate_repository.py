@@ -38,6 +38,9 @@ def require(condition: bool, message: str) -> None:
 
 def main() -> None:
     require((STANDALONE / "SKILL.md").is_file(), "standalone SKILL.md is missing")
+    require((STANDALONE / "scripts/install_browser_dependencies.py").is_file(), "managed browser installer is missing")
+    require((STANDALONE / "scripts/playwright_loader.js").is_file(), "shared Playwright loader is missing")
+    require((STANDALONE / "scripts/validation_contract.json").is_file(), "machine validation contract is missing")
     require((PLUGIN_SKILL / "SKILL.md").is_file(), "plugin SKILL.md is missing")
     require((CLAUDE_SKILL / "SKILL.md").is_file(), "Claude SKILL.md is missing")
     require(tree_hashes(STANDALONE) == tree_hashes(PLUGIN_SKILL), "skill distributions differ")
@@ -57,12 +60,18 @@ def main() -> None:
         )
 
     package = json.loads((ROOT / "package.json").read_text())
+    machine_contract = json.loads((STANDALONE / "scripts/validation_contract.json").read_text())
     plugin = json.loads((PLUGIN_ROOT / ".codex-plugin/plugin.json").read_text())
     marketplace = json.loads((ROOT / ".agents/plugins/marketplace.json").read_text())
     claude_plugin = json.loads(CLAUDE_PLUGIN.read_text())
     claude_marketplace = json.loads(CLAUDE_MARKETPLACE.read_text())
 
     require(plugin["name"] == "build-html-slides", "plugin name mismatch")
+    require(machine_contract.get("schema_version") == 8, "validation contract schema mismatch")
+    require(
+        package.get("devDependencies", {}).get("playwright") == machine_contract.get("playwright_version"),
+        "package and managed Playwright versions differ",
+    )
     require(plugin["version"] == package["version"], "package and plugin versions differ")
     require(bool(re.fullmatch(r"\d+\.\d+\.\d+", plugin["version"])), "version is not strict semver")
     require(plugin.get("license") == "MIT", "plugin license must be MIT")

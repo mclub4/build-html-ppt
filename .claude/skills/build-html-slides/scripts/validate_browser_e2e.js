@@ -2,25 +2,9 @@
 'use strict';
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
-
-function loadPlaywright() {
-  for (const candidate of [
-    'playwright',
-    path.join(os.homedir(), '.local/lib/node_modules/playwright'),
-    '/usr/local/lib/node_modules/playwright',
-    '/usr/lib/node_modules/playwright',
-  ]) {
-    try {
-      return require(candidate);
-    } catch (error) {
-      if (error.code !== 'MODULE_NOT_FOUND') throw error;
-    }
-  }
-  throw new Error('Playwright is not installed');
-}
+const { loadPlaywright } = require('./playwright_loader');
 
 function fail(message) {
   process.stderr.write(`ERROR: ${message}\n`);

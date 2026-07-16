@@ -9,6 +9,7 @@ Use this reference before storyboarding and again during visual review. It captu
 - Make imagery carry meaning. Product shots prove the object, screenshots prove the experience, people create stakes, and generated scenes establish atmosphere or a chapter change.
 - Use one art direction across many compositions. Typography, color roles, line weight, radii, image treatment, and source treatment stay coherent while layouts change.
 - Design the ending. The last slide resolves the opening promise and leaves one useful action or memorable statement.
+- Design the opening with equal intent. Slide 1 makes the named subject, promise, and visual world recognizable before the audience starts reading body copy.
 - Integrate evidence. Sources, dates, caveats, and provenance belong to the composition rather than appearing as an afterthought.
 - Route the story for the room. Common stakes and decision context arrive before specialist depth unless technical detail is itself the decision; every named audience sees why the next section matters.
 
@@ -68,7 +69,7 @@ Score each dimension from 0 to 3 on rendered slides.
 | Evidence | unsupported or detached | present but weak | integrated sources | evidence strengthens the visual argument |
 | Presentation utility | broken or awkward | functional | smooth controls and notes | rehearsal-ready and audience-aware |
 
-This rubric is used only in Full Validation. After the render/fix loop is settled, run `--finalize` and score exactly once. Require at least 20/24 with every dimension at least 2. Record all eight dimensions, the calculated total, a stable independent editor `reviewer_ref`, concrete notes, and the three weakest slides (or every slide when fewer than three) in `review.json`. Quick Draft does not calculate this score. A passing structural validator does not compensate for a failing visual score.
+This rubric is used only in Full Validation. After the render/fix loop is settled, run `--phase finalize-prepare` and score exactly once. Require at least 20/24 with every dimension at least 2. Record all eight dimensions, the calculated total, a stable independent editor `reviewer_ref`, concrete notes, and the three weakest slides (or every slide when fewer than three) in `review.json`. Complete only the generated risk-based cross-review batches, then run `--phase finalize-verify`. Quick Draft does not calculate this score. A passing structural validator does not compensate for a failing visual score.
 
 ## Blocking quality failures
 
@@ -77,13 +78,13 @@ This rubric is used only in Full Validation. After the render/fix loop is settle
 - A product, game, place, person, or event deck relies mainly on text and generic cards.
 - A materially observable industry, product chain, facility, device, experiment, biological phenomenon, or research modality is shown almost entirely through text, tables, charts, and generic SVGs even though suitable subject imagery is reasonably available.
 - A rendered slide contains oversized low-information surfaces or decorative empty boxes that are not justified by a hero, chapter, comparison, interaction, or fixed-format visual.
-- The cover lacks a clear first-viewport identity signal for the named subject.
+- The cover lacks a clear first-glance identity signal for the named subject, looks like a generic title template, uses a weak or irrelevant visual, traps the title in an oversized empty panel, or crops an identifying feature. A technically valid but merely acceptable cover does not pass when the body is more art-directed.
 - The deck has no designed closing payoff.
 - A named mixed audience receives a generic topic order, or must endure specialist detail before understanding the shared stakes, decision, or relevance.
 - Raster assets are not WebP, except that SVG remains preferred for true vector content.
 - Reviewers approve from HTML source without inspecting settled rendered slides.
 - Full Validation lacks all-slide AI coverage, or a Quick Draft AI-routed slide lacks its adaptive profiles, review-batch membership, concrete observation, stable reviewer reference, and passing change-type verdict.
-- Full Validation lacks an independent hash-bound cross-review for any slide, or uses a cross-reviewer from the primary-reviewer set.
+- Full Validation omits any slide generated in the risk-based `cross_review_batches`, adds unbound substitute records, or uses a cross-reviewer from the primary-reviewer set.
 - A named character/person slide lacks grounded identity targets, cue-based identity verdicts, or uses the wrong subject or variant.
 - Any slide contains a visible placeholder, temporary/dummy asset, empty media promise, or generic substitute graphic where the composition claims a real subject image. One occurrence blocks delivery regardless of the numeric score.
 - Typography remains the neutral runtime-shell stack, bare `system-ui`, or an unrelated generic face instead of a deliberate language- and topic-appropriate display/body system.

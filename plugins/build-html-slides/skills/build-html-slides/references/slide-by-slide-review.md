@@ -59,11 +59,13 @@ Never change a FAIL record to PASS in place. A FAIL requires a deck change, a ne
 
 After all findings are settled:
 
-1. run `validate_all.py --phase finalize`;
+1. run `validate_all.py --phase finalize-prepare`;
 2. have an independent presentation editor score the deck once with `quality-bar.md`;
-3. add an independent cross-review for every slide, using a reviewer outside the full primary-reviewer set;
+3. complete exactly the generated `cross_review_batches`, using reviewers outside the full primary-reviewer set;
 4. bind cross-reviews to current capture hashes;
-5. run the visual-review validator again.
+5. run `validate_all.py --phase finalize-verify`.
+
+Standard risk uses a bounded set containing visual-critical, warning-triggered, and distributed sample slides. High risk includes every slide. Do not expand a standard final pass to all slides unless the generated batches or a new finding requires it.
 
 Quick Draft skips quality scoring and cross-review.
 

@@ -112,6 +112,9 @@
       if (objectFit === 'fill' && Math.abs(intrinsicRatio / boxRatio - 1) > 0.03) {
         issues.push(`${name}: image is stretched because object-fit is fill`);
       }
+      if (objectFit === 'cover' && !decorative) {
+        warnings.push(`${name}: meaningful cover-cropped image requires full-size visual crop inspection`);
+      }
 
       let cssScale;
       if (objectFit === 'contain' || objectFit === 'scale-down') {

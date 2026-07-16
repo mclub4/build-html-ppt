@@ -52,6 +52,13 @@ class ValidatePlaceholdersTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("unfinished Korean media instruction", result.stdout)
 
+    def test_css_generated_placeholder_is_blocking(self) -> None:
+        result = self.validate(
+            '<style>.unfinished::before { content: "IMAGE HERE"; }</style><div class="unfinished"></div>'
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("stylesheet generates blocked unfinished media instruction", result.stdout)
+
     def test_literal_placeholder_discussion_can_be_explicitly_exempted(self) -> None:
         result = self.validate(
             '<p data-placeholder-literal="true">HTML placeholder 속성의 접근성 동작을 비교합니다.</p>'
