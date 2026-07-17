@@ -39,7 +39,7 @@ class SourceCacheTests(unittest.TestCase):
             data = json.loads(cache.read_text(encoding="utf-8"))
             self.assertEqual(data["schema_version"], 2)
             entry = data["assets"][0]
-            self.assertEqual(entry["roles"], ["slide-image"])
+            self.assertEqual(entry["roles"], ["media-purpose:unspecified", "slide-image"])
             entry.update({
                 "source_kind": "official",
                 "source_url": "https://example.com/hero",
@@ -107,6 +107,10 @@ class SourceCacheTests(unittest.TestCase):
             data = json.loads(cache.read_text(encoding="utf-8"))
             by_path = {entry["path"]: entry for entry in data["assets"]}
             self.assertEqual(by_path["assets/official.webp"]["roles"], ["identity-reference"])
+            self.assertEqual(
+                by_path["assets/candidate.webp"]["roles"],
+                ["identity-candidate", "media-purpose:unspecified", "slide-image"],
+            )
             for entry in data["assets"]:
                 entry.update({
                     "source_kind": "official",
@@ -138,6 +142,60 @@ class SourceCacheTests(unittest.TestCase):
             result = self.run_cache(deck, cache, "--check")
             self.assertEqual(result.returncode, 1)
             self.assertIn("identity reference must be a local WebP", result.stdout)
+
+    def test_generated_asset_accepts_only_non_factual_declared_purpose(self) -> None:
+        cases = (
+            (
+                "atmosphere",
+                '<img src="assets/generated.webp" data-media-purpose="atmosphere" alt="Atmosphere">',
+                0,
+                "",
+            ),
+            (
+                "missing-purpose",
+                '<img src="assets/generated.webp" alt="Generated">',
+                1,
+                "generated asset requires data-media-purpose",
+            ),
+            (
+                "factual-subject",
+                '<img src="assets/generated.webp" data-media-purpose="subject" alt="Named subject">',
+                1,
+                "generated asset cannot fill factual media purpose (subject)",
+            ),
+            (
+                "identity-candidate",
+                '<img src="assets/generated.webp" data-media-purpose="atmosphere" '
+                'data-subject-id="group:member" alt="Member">',
+                1,
+                "generated asset cannot be an identity candidate",
+            ),
+        )
+        for name, image_markup, expected_code, expected_message in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                assets = root / "assets"
+                assets.mkdir()
+                (assets / "generated.webp").write_bytes(b"generated-webp")
+                deck = root / "deck.html"
+                deck.write_text(
+                    f'<section class="slide">{image_markup}</section>',
+                    encoding="utf-8",
+                )
+                cache = root / "sources.json"
+                self.assertEqual(self.run_cache(deck, cache, "--update").returncode, 0)
+                data = json.loads(cache.read_text(encoding="utf-8"))
+                data["assets"][0].update({
+                    "source_kind": "generated",
+                    "verified_at": datetime.now(timezone.utc).isoformat(),
+                    "credit": "Image generator",
+                    "status": "verified",
+                })
+                cache.write_text(f"{json.dumps(data, indent=2)}\n", encoding="utf-8")
+                result = self.run_cache(deck, cache, "--check")
+                self.assertEqual(result.returncode, expected_code, result.stdout + result.stderr)
+                if expected_message:
+                    self.assertIn(expected_message, result.stdout)
 
 
 if __name__ == "__main__":

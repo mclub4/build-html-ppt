@@ -153,6 +153,31 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("merely acceptable cover", quality)
         self.assertIn("For slide 1, apply `cover-design.md`", reviewer)
 
+    def test_existing_subjects_use_authentic_media_and_generated_support_is_bounded(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        generation = (ROOT / "references" / "image-generation.md").read_text(encoding="utf-8")
+        media = (ROOT / "references" / "media-strategy.md").read_text(encoding="utf-8")
+        cover = (ROOT / "references" / "cover-design.md").read_text(encoding="utf-8")
+        reviewer = (ROOT.parents[2] / "agents" / "build-html-slides-visual-reviewer.md").read_text(encoding="utf-8")
+        self.assertIn("generated art must never stand in for the real subject", skill)
+        self.assertIn("data-media-purpose", skill)
+        self.assertIn("fourth-generation girl-group introduction", generation)
+        self.assertIn("1990s-2000s game retrospective", generation)
+        self.assertIn("Existing entertainment catalog or nostalgia retrospective", media)
+        self.assertIn("authentic sourced identity anchor", generation)
+        self.assertIn("dedicated refinement pass", cover)
+        self.assertIn("generated-only depiction of an existing named subject", reviewer)
+
+    def test_idol_editorial_index_is_optional_job_based_vocabulary(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        gallery = (ROOT / "references" / "theme-gallery.md").read_text(encoding="utf-8")
+        playbook = (ROOT / "references" / "theme-playbook.md").read_text(encoding="utf-8")
+        self.assertIn("## 21. Idol Editorial Index", gallery)
+        self.assertIn("use Idol Editorial Index only when the job is multi-subject", gallery)
+        self.assertIn("Do not select Idol Editorial Index merely because an idol appears", playbook)
+        self.assertIn("bespoke theme contract", skill)
+        self.assertIn("not presets or a closed taxonomy", gallery)
+
 
 if __name__ == "__main__":
     unittest.main()

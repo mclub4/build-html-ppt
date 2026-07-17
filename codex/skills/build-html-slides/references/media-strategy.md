@@ -34,12 +34,17 @@ Charts should explain market movement, but sourced visuals should establish the 
 
 Use the modality that supports the claim: microscopy, histology or pathology, medical imaging, immune-cell or tumor-microenvironment imagery, therapy delivery, laboratory instrumentation, or a sourced clinical/research setting. Record specimen, stain, modality, scale, and study context when known. Do not present generated cells, tumors, scans, or treatment scenes as research evidence. Patient imagery must be ethically sourced, non-exploitative, and necessary to the story.
 
+### Existing entertainment catalog or nostalgia retrospective
+
+When introducing real idol generations, artists, films, animation, released games, consoles, magazines, toys, or past campaigns, the named items are factual subjects. Give each prominently introduced item an authentic visual such as an official or supplied photo, performance still, title screen, gameplay capture, box art, advertisement, hardware photo, logo, poster, or properly attributed fan work when appropriate to the story and distribution context. A generated idol, game screenshot, package, poster, or period imitation is not an acceptable substitute. Use generation only for clearly non-factual atmosphere, chapter transitions, hypothetical scenes, or decorative support.
+
 ## Source and truth rules
 
 - Prefer official corporate or institutional media, government or public archives, open-license scientific repositories, and source publications whose reuse terms fit the distribution context.
 - Citation alone does not grant reuse rights. For public or commercial decks, verify the applicable license or use a safer official, licensed, supplied, or original alternative.
 - Separate factual evidence from conceptual illustration in captions and presenter notes.
 - Generated imagery may establish atmosphere or explain an abstract concept, but it cannot impersonate a real facility, product, experiment, pathology image, scan, patient, or measured result.
+- For every generated raster, declare `data-media-purpose` as `atmosphere`, `concept`, `scenario`, or `decorative`. Existing named subjects and documentary evidence remain sourced even when a generated alternative would be faster or more stylistically uniform.
 - Cache selected assets in `sources.json`; reuse unchanged verified assets on later revisions.
 
 ## Review failure

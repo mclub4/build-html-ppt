@@ -19,7 +19,8 @@ Consider at least two materially different cover directions in planning, such as
 
 - Make the named subject a first-glance signal. Use its literal name or offer as the primary title; put explanatory value in supporting copy.
 - Give the cover one dominant focal hierarchy: subject or key visual first, title immediately legible, secondary metadata quiet.
-- For physical, observable, branded, entertainment, travel, scientific, or person-led subjects, use the strongest accurate official, supplied, licensed, sourced, or generated visual available for the distribution context. Do not replace an available subject image with generic geometry, a chart, or an empty mood field.
+- For an existing physical, observable, branded, entertainment, travel, scientific, or person-led subject, use the strongest accurate official, supplied, licensed, or sourced visual as the identity anchor. Do not replace it with generated lookalike art, generic geometry, a chart, or an empty mood field.
+- Generated scenery, texture, or conceptual art may support the cover when it cannot be mistaken for the real subject. It may lead only for an abstract thesis, confidential system, or clearly hypothetical scenario with no honest documentary referent.
 - Use logos, posters, title art, products, screenshots, diagrams, and character compositions with `contain` or a deliberately protected foreground. A covered backdrop may support them, but must not crop the identifying edges.
 - For abstract or confidential topics, earn a typographic or diagrammatic cover with a distinctive thesis, composition, and visual system. A large empty rectangle with a title is not a concept.
 - Avoid dashboards, repeated card grids, agenda lists, multi-column reports, and oversized rounded title panels on slide 1 unless the format itself is the subject.
@@ -30,9 +31,12 @@ Consider at least two materially different cover directions in planning, such as
 
 The renderer treats slide 1 as visual-critical in every rendered mode. AI must open every generated profile for the cover, even in Quick Draft. Review it as a cover, not merely as a slide whose elements fit inside bounds.
 
+After the first settled render, open the cover at full size and perform a dedicated refinement pass. Check authentic subject recognition, focal crop, image resolution, title line composition, display/body contrast, color integration, depth and edge treatment, logo and metadata placement, source treatment, and navigation clearance. Resolve weak details before reviewing ordinary slides; the cover should feel at least as intentional as the strongest body slide.
+
 Fail the cover when any of these is true:
 
 - the named subject is ambiguous or visually subordinate;
+- an existing named subject is represented only by generated or generic imagery without an authentic identity anchor;
 - the title could belong to an unrelated generic deck;
 - the key visual is weak, irrelevant, blurry, visibly upscaled, or incorrectly cropped;
 - a logo, face, product edge, title art, map, or identifying feature is cut off;

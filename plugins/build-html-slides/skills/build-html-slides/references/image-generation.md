@@ -13,9 +13,31 @@ Inspect the tools available in the current agent session before planning generat
 
 Claude Code can inspect rendered PNG captures with its image-reading capability, but a base Claude Code installation does not provide raster image generation. Use a connected plugin, MCP server, or other configured generator when present. Codex may expose ImageGen directly; treat it as one qualifying implementation of this contract rather than a mandatory dependency.
 
+## Truth Boundary
+
+Classify the visual role before invoking a generator:
+
+- `subject`: an existing named person, idol group, character, released game, product, place, event, artwork, organization, or other thing the audience is expected to recognize;
+- `evidence`: documentary photography, gameplay or interface screenshots, packaging, archival material, measured results, scientific imagery, or a visual used to prove a factual claim;
+- `atmosphere`, `concept`, `scenario`, or `decorative`: non-factual support that establishes mood, explains an abstract idea, depicts a clearly hypothetical situation, or adds texture without claiming authenticity.
+
+Use sourced real material for `subject` and `evidence`. This applies to entertainment and nostalgia decks as strongly as it does to business and science: a fourth-generation girl-group introduction needs actual group/member photography, and a 1990s-2000s game retrospective needs authentic gameplay, title screens, box art, advertisements, hardware, or official key art. Do not generate lookalikes, replacement screenshots, invented game art, or approximate period imagery because it is faster or visually consistent.
+
+Generated imagery may support a cover as atmosphere or concept, but a cover about an existing named subject must also contain an authentic sourced identity anchor. For a fictional scenario, abstract thesis, confidential system, or event that has no documentary image, generation may carry the main visual when the slide makes that status clear. If an essential factual asset cannot be secured, redesign the slide, reduce the claim, or disclose the limitation; never conceal the gap with synthetic media.
+
+Mark every generated raster use with one allowed purpose:
+
+```html
+<img src="assets/generated-stage-atmosphere.webp"
+     data-media-purpose="atmosphere"
+     alt="추상적인 무대 조명 배경">
+```
+
+Record it as `source_kind: generated` in `sources.json`. `source_cache.py --check` rejects a generated asset with no declared purpose, a factual `subject` or `evidence` purpose, or an identity-candidate role.
+
 ## Generation Rules
 
-- Generate atmosphere, editorial concepts, scene-setting backgrounds, textures, and original illustrative metaphors.
+- Generate atmosphere, editorial concepts, clearly hypothetical scenes, scene-setting backgrounds, textures, and original illustrative metaphors.
 - Do not fabricate documentary evidence, product screenshots, logos, interfaces, people, events, charts, or technical states that the audience could mistake for factual material.
 - Give every generated image a narrative job and record `source_kind: generated`, the tool/provider, prompt summary, generation time, and local hash in `sources.json`.
 - Convert final raster output to WebP while preserving useful source dimensions and aspect ratio.

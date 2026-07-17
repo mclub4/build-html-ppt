@@ -19,8 +19,22 @@ Read `theme-gallery.md`, then define six decisions before styling: three mood ad
 | Documentary essay | field reporting, social impact, case studies | full-frame photography, location/date slugs, testimony, map interludes, quiet evidence captions |
 | Spatial product | AI products, mobility, digital twins, XR | layered depth, isolated objects, anchored labels, restrained translucency, state transitions |
 | Financial trust | banking, fintech, stablecoins, payments | tabular numerals, reserve composition, money movement, fiat/chain boundaries, audit trails, semantic risk color |
+| Idol editorial index | multi-act or multi-member orientation, chronology, comparison, and curation | authentic photo index, bold grotesk hierarchy, serif contrast, mono metadata, act-specific accents, timeline and listening map |
 
-These are routing hints, not fixed presets. Use the larger gallery for distinctive directions including Neo Brutalist, Riso Zine, Scientific Atlas, Blueprint Workshop, Documentary Photo Essay, Spatial Interface, and Ledger Trust alongside the original gallery. Mix only compatible attributes.
+These are routing hints, not fixed presets. A topic may support several valid directions depending on audience and communication job, and the best answer may be a bespoke contract not named here. Use the larger gallery for additional vocabulary including Neo Brutalist, Riso Zine, Scientific Atlas, Blueprint Workshop, Documentary Photo Essay, Spatial Interface, Ledger Trust, and Idol Editorial Index. Mix only compatible attributes, and do not turn signature-slide lists into mandatory checklists.
+
+### Idol routing
+
+Treat idol presentations as different editorial jobs rather than one visual genre:
+
+| Communication job | Possible direction | Typical treatment |
+|---|---|---|
+| Multi-group generation guide, lineup overview, or listening map | Idol Editorial Index | authentic photo index, chronology, profile spreads, source labels, act-specific accent shifts |
+| Single-act personality, fandom, relationship, or meme guide | Bespoke fan-zine, Editorial Culture, Riso Zine, or Playful Modular traits | closer photography, quotes, artifacts, fan-language rhythm, scrapbook cues only when they serve the story |
+| Premium comeback, concept launch, or sales promotion | Editorial Culture, Product Keynote, Cinematic Noir, or a bespoke brand direction | official key art, campaign hierarchy, dramatic reveal, concise benefit or concept claims |
+| History, legacy, archive, or industry analysis | Museum Catalog, Documentary Photo Essay, Data Newsroom, or a bespoke research direction | chronology, archival evidence, dated captions, comparisons, restrained interpretation |
+
+Do not select Idol Editorial Index merely because an idol appears. Preserve the act's own visual identity and let the audience, purpose, evidence, and available photography determine the final system.
 
 ### Travel routing
 

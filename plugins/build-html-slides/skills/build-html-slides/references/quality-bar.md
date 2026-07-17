@@ -42,6 +42,7 @@ Do not use the same dominant composition on three consecutive slides. Do not use
 - Convert every raster deliverable asset to WebP before referencing it in HTML. Keep SVG for logos, icons, and editable vector diagrams.
 - Avoid low-resolution thumbnails, screenshots with unreadable embedded text, generic stock filler, and decorative images that do not support the slide claim.
 - Reject images that do not visibly match the named subject. Character/person decks require canonical-reference comparison as defined in `identity-review.md`; metadata and source tags alone are insufficient.
+- Reject generated media used as an authentic depiction of an existing person, group, released game, product, place, event, artwork, interface, or documentary result. Generated atmosphere may support a factual slide but cannot occupy its subject, evidence, or identity role.
 - Reject unfinished media slots. A label such as `PLACE NOTE`, an empty image frame, a repeated geometric fallback, or generic art standing in for an expected real place/product/person/event image is a blocking placeholder, not intentional visual variety.
 
 ## Composition checks

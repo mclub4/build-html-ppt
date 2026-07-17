@@ -17,6 +17,9 @@ SOURCE_KINDS = {"official", "licensed", "fan-art", "generated", "supplied", "oth
 URL_REQUIRED_KINDS = {"official", "licensed", "fan-art", "other"}
 FAN_ART_ORIGIN_STATUSES = {"origin-verified", "discovery-only"}
 IDENTITY_REFERENCE_KINDS = {"official", "licensed", "supplied"}
+MEDIA_PURPOSES = {"subject", "evidence", "atmosphere", "concept", "scenario", "decorative"}
+GENERATED_MEDIA_PURPOSES = {"atmosphere", "concept", "scenario", "decorative"}
+UNSPECIFIED_MEDIA_PURPOSE = "unspecified"
 
 
 class ImageParser(HTMLParser):
@@ -28,17 +31,24 @@ class ImageParser(HTMLParser):
         if url:
             self.uses.setdefault(url, set()).add(role)
 
+    def record_slide_image(self, url: str, values: dict[str, str | None]) -> None:
+        self.record(url, "slide-image")
+        purpose = (values.get("data-media-purpose") or "").strip().lower()
+        self.record(url, f"media-purpose:{purpose or UNSPECIFIED_MEDIA_PURPOSE}")
+        if values.get("data-subject-id") or values.get("data-subject-name"):
+            self.record(url, "identity-candidate")
+
     def handle_starttag(self, tag: str, attrs) -> None:
         values = dict(attrs)
         if tag == "img" and values.get("src"):
-            self.record(values["src"], "slide-image")
+            self.record_slide_image(values["src"], values)
         elif tag == "source" and values.get("srcset"):
             for candidate in values["srcset"].split(","):
                 url = candidate.strip().split()[0] if candidate.strip() else ""
-                self.record(url, "slide-image")
+                self.record_slide_image(url, values)
         elif tag == "image":
             url = values.get("href") or values.get("xlink:href")
-            self.record(url or "", "slide-image")
+            self.record_slide_image(url or "", values)
         self.record(values.get("data-identity-reference", ""), "identity-reference")
 
 
@@ -164,6 +174,29 @@ def check(deck: Path, cache_path: Path) -> int:
         kind = entry.get("source_kind")
         if kind not in SOURCE_KINDS:
             errors.append(f"asset source_kind is invalid: {relative}")
+        purpose_roles = {
+            role.removeprefix("media-purpose:")
+            for role in expected_roles
+            if role.startswith("media-purpose:")
+        }
+        invalid_purposes = purpose_roles - MEDIA_PURPOSES - {UNSPECIFIED_MEDIA_PURPOSE}
+        if invalid_purposes:
+            errors.append(
+                f"asset data-media-purpose is invalid ({', '.join(sorted(invalid_purposes))}): {relative}"
+            )
+        if kind == "generated":
+            declared_purposes = purpose_roles - {UNSPECIFIED_MEDIA_PURPOSE}
+            if UNSPECIFIED_MEDIA_PURPOSE in purpose_roles or not declared_purposes:
+                errors.append(
+                    f"generated asset requires data-media-purpose on every rendered use: {relative}"
+                )
+            disallowed = declared_purposes - GENERATED_MEDIA_PURPOSES
+            if disallowed:
+                errors.append(
+                    f"generated asset cannot fill factual media purpose ({', '.join(sorted(disallowed))}): {relative}"
+                )
+            if "identity-candidate" in expected_roles:
+                errors.append(f"generated asset cannot be an identity candidate: {relative}")
         source_url = entry.get("source_url")
         if kind in URL_REQUIRED_KINDS and (
             not isinstance(source_url, str) or urlparse(source_url).scheme not in {"http", "https"}

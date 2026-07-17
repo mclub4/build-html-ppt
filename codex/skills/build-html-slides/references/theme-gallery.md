@@ -1,6 +1,6 @@
 # Theme Gallery
 
-Choose one primary visual system after identifying the audience, subject, and emotional job. Borrow high-level grammar only; never copy a commercial template or recognizable deck.
+Choose a primary visual system after identifying the audience, communication job, subject, authentic media, and emotional tone. The named directions below are optional lenses, not presets or a closed taxonomy. Borrow high-level grammar only, combine compatible traits when useful, and write a bespoke theme contract when none fits. Never choose from the topic noun alone or copy a commercial template or recognizable deck.
 
 ## 1. Swiss Signal
 
@@ -182,12 +182,22 @@ Choose one primary visual system after identifying the audience, subject, and em
 - Signature slides: trust thesis, money movement map, reserve backing, mint/burn flow, settlement comparison, risk controls, attestation timeline
 - Avoid: coin-and-circuit wallpaper, speculative candlesticks, fake live tickers, unverified token logos, guaranteed-return language, and presenting issuer claims as independent assurance
 
+## 21. Idol Editorial Index
+
+- Best for: multi-group or multi-member introductions, generation overviews, scene maps, curated listening guides, lineup comparisons, and editorial newcomer briefings
+- Type: bold grotesk display with a restrained editorial serif contrast and compact mono issue, date, index, and source labels
+- Palette: black or paper base with one sharp index accent; let authentic photography and each act's own identity supply secondary color instead of recoloring everyone into one artificial brand
+- Grammar: issue-style cover, contact-sheet collage, chronological index, asymmetric photo/profile split, act-specific accent shifts, taste map, listening guide, and visible photo credits
+- Signature slides: multi-subject cover index, generation timeline, full-size act profile, lineup comparison, mood or sound map, curated playlist, editorial closing
+- Avoid: generated idols or fake performance stills, identical profile cards for every act, tiny contact sheets, treating popularity as a visual ranking without evidence, and forcing this direction onto every idol topic. A single-act fandom or meme story may need a scrapbook/fan-zine grammar; a premium comeback may need Editorial Culture, Product Keynote, or Cinematic Noir; a historical archive may need Museum Catalog or Documentary Photo Essay.
+
 ## Selection rules
 
-1. Choose based on communication job, not favorite color.
+1. Choose based on communication job, audience, media, and emotional tone, not the topic noun or favorite color. A named gallery direction is never mandatory.
 2. Write a one-line theme contract covering mood, type roles, palette roles, shape language, media treatment, and motion.
 3. Pick three to five signature composition families from the selected theme and add two contrasting families for rhythm.
 4. Keep the system recognizable across dark, light, image-led, and data-led slides.
 5. Use another theme only as a small accent if its grammar is compatible; do not mix unrelated aesthetics slide by slide.
 6. For finance and stablecoin decks, choose Ledger Trust when the communication job is trust, reserves, payment flow, settlement, or risk. Use Data Newsroom instead when the primary job is market evidence, and Mission Control when the primary job is infrastructure operations.
 7. For travel decks, classify the communication job before selecting a theme. Use Destination Magazine for ordinary leisure guides and trip planning, Soft Kinetic or Museum Catalog for premium hospitality, Documentary Photo Essay for reportage or heritage testimony, and Field Notes only for expeditions or observation-led field records. Do not select Field Notes merely because the subject is travel.
+8. For idol decks, use Idol Editorial Index only when the job is multi-subject orientation, comparison, chronology, or curation. Route single-act personality, fandom, meme, comeback, business, or historical stories according to their actual job, and create a bespoke contract when the gallery vocabulary would flatten the subject.
