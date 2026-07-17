@@ -164,6 +164,12 @@ Useful starting directions, not fixed templates:
 
 Test the exact Korean/Latin/numeral mix before committing. Use no more than two primary families plus one mono family. A novelty face belongs only in short display copy, never paragraphs or tables. When portability requires bundled fonts, use local WOFF2 files with redistribution-compatible licenses and retain their license/credit; otherwise use an intentional cross-platform fallback stack. Never load a remote font at runtime.
 
+Declare only weights that the bundled file actually contains. A static Regular face is `font-weight: 400`, not `100 900`; a variable face may declare its real range. Bundle a real bold/semibold face or use a supported variable weight instead of asking Chromium to manufacture a heavier Korean glyph. Keep `font-synthesis: none` on the deck so missing weights fail visibly during authoring rather than producing uneven synthetic strokes. Do not request weights beyond a variable face's declared range, such as `950` from a `100 900` file.
+
+Use a complete Korean font for editable copy. A small language subset is safe only after every character is final; regenerate it after any copy edit. The renderer's `font_integrity` gate asks Chromium which platform font actually painted each Hangul syllable from a locally declared face and fails mixed-family fallback before screenshots reach AI review.
+
+`<strong>` and `<b>` must create visible emphasis. Do not neutralize them with the parent's weight and color. Use a supported heavier weight, a deliberate color or underline treatment, or replace the semantic tag when no visual emphasis is intended. `measure_text_bounds.js` rejects no-op emphasis and computed weights outside matching local `@font-face` declarations before AI review.
+
 Use values appropriate to the 1280×720 logical canvas:
 
 - display title: typically 44–68px;
@@ -183,7 +189,7 @@ Validate settled browser lines after local fonts finish loading. Element width a
 - Do not leave only one or two Korean characters, a sentence ending such as `다.`, or closing punctuation on the last line of a display title or quote. Rephrase, rebalance the text box, reduce the display size, or add a phrase-boundary break.
 - Set Korean display line-height from the actual face and weight. Start with enough separation for the font's glyph metrics; never tighten multiline copy below `0.9` without rendered proof, and reject any visible row collision regardless of the declared CSS value.
 - Keep footer copy, credits, and captions outside the persistent navigation rectangle at every retained profile.
-- `measure_text_bounds.js` reconstructs Chromium lines, checks Korean final-line fragments, line advance, sibling text intersections, and navigation occlusion under the existing `text_bounds` automation gate.
+- `measure_text_bounds.js` reconstructs Chromium lines, checks Korean final-line fragments, line advance, sibling text intersections, navigation occlusion, unsupported local font weights, and no-op emphasis under the existing `text_bounds` automation gate.
 - `data-line-break-ok` is limited to an intentional one- or two-character poster/chapter treatment that remains visibly balanced. It bypasses only the orphan-line heuristic, never collision or bounds checks. `data-text-overlap-ok` is limited to deliberate legible overprint and still requires AI inspection; do not use either attribute to silence an accidental layout defect.
 
 ## Density

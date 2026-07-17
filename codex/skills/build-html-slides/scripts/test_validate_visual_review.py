@@ -379,8 +379,8 @@ class VisualReviewTests(unittest.TestCase):
             "automation_gate": {
                 "status": "pass",
                 "checks": list({
-                    "all": ("text_bounds", "container_density", "controls", "image_geometry"),
-                    "text": ("text_bounds", "container_density"),
+                    "all": ("text_bounds", "font_integrity", "container_density", "controls", "image_geometry"),
+                    "text": ("text_bounds", "font_integrity", "container_density"),
                     "image": ("image_geometry",),
                     "navigation": ("controls",),
                 }[scope]),

@@ -154,7 +154,7 @@ const { chromium } = loadPlaywright();
 
             manifest_path = review_dir / "review.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self.assertEqual(manifest["schema_version"], 9)
+            self.assertEqual(manifest["schema_version"], 10)
             self.assertEqual(list(manifest["viewports"]), ["normal", "short", "zoom150"])
             self.assertEqual(manifest["viewports"]["zoom150"]["viewport"], "1920x1080")
             self.assertEqual(manifest["viewports"]["zoom150"]["visual_viewport"], "1280x720")
@@ -620,6 +620,88 @@ const { chromium } = loadPlaywright();
                 if failure["check"] == "text_bounds"
             ]
             self.assertTrue(any("opaque visual layer" in issue for issue in issues), issues)
+
+    def test_noop_strong_emphasis_blocks_before_ai(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            content = (
+                '<h2 style="margin:120px;font-size:48px;font-weight:400;color:#111">'
+                '보통 문장 <strong style="font-weight:inherit;color:inherit">강조 실패</strong></h2>'
+            )
+            deck.write_text(
+                TEMPLATE.read_text(encoding="utf-8").replace("<!-- SLIDE_2_CONTENT -->", content, 1),
+                encoding="utf-8",
+            )
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 1)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            issues = [failure["issue"] for failure in manifest["automation_gate"]["failures"]]
+            self.assertTrue(any("has no visible emphasis" in issue for issue in issues), issues)
+
+    def test_unsupported_declared_font_weight_blocks_before_ai(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "</style>",
+                "@font-face{font-family:'Single Weight';src:local('Arial');font-weight:400}"
+                ".unsupported-weight{font-family:'Single Weight';font-weight:800}</style>",
+                1,
+            ).replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                '<h2 class="unsupported-weight" style="margin:120px;font-size:48px">합성 굵기 차단</h2>',
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 1)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            issues = [failure["issue"] for failure in manifest["automation_gate"]["failures"]]
+            self.assertTrue(any("outside its declared local faces" in issue for issue in issues), issues)
+
+    def test_partial_korean_font_fallback_blocks_before_ai(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "</style>",
+                "@font-face{font-family:'Partial Korean Fixture';src:local('Arial');font-weight:400}"
+                ".partial-korean{font-family:'Partial Korean Fixture',sans-serif;font-weight:400}</style>",
+                1,
+            ).replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                '<h2 class="partial-korean" style="margin:100px;font-size:48px">'
+                '응원팀은 성적표가 아니라 자꾸 다음 경기를 찾게 되는 이유로 고른다.</h2>',
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 1, render.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            failures = manifest["automation_gate"]["failures"]
+            font_failures = [failure for failure in failures if failure["check"] == "font_integrity"]
+            self.assertTrue(font_failures, failures)
+            self.assertTrue(any("응(U+C751)" in failure["issue"] for failure in font_failures), font_failures)
+            self.assertTrue(any("complete Korean font" in failure["issue"] for failure in font_failures), font_failures)
 
     def test_meaningful_cover_crop_routes_quick_slide_to_ai(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1375,6 +1457,28 @@ const { chromium } = loadPlaywright();
             )
             self.assertEqual(lookup.returncode, 0, lookup.stderr)
             self.assertTrue(Path(lookup.stdout.strip()).is_relative_to(claude_home))
+
+    def test_gemini_home_selects_gemini_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "gemini-deck.html"
+            deck.write_text(TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+            gemini_home = root / "gemini-home"
+            env = {
+                key: value for key, value in os.environ.items()
+                if key not in {"CODEX_HOME", "CLAUDE_CONFIG_DIR", "CLAUDE_HOME"}
+            }
+            env["GEMINI_HOME"] = str(gemini_home)
+
+            lookup = subprocess.run(
+                ["node", str(RENDERER), "--workspace-dir", str(deck)],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=env,
+            )
+            self.assertEqual(lookup.returncode, 0, lookup.stderr)
+            self.assertTrue(Path(lookup.stdout.strip()).is_relative_to(gemini_home))
 
 
 if __name__ == "__main__":

@@ -27,6 +27,49 @@
   const directText = element => [...element.childNodes].some(node => (
     node.nodeType === Node.TEXT_NODE && node.nodeValue.trim()
   ));
+  const normalizeFontFamily = value => value.trim().replace(/^['"]|['"]$/g, '').toLowerCase();
+  const parseFontWeight = value => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'normal') return 400;
+    if (normalized === 'bold') return 700;
+    const parsed = Number.parseInt(normalized, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const declaredFontWeights = new Map();
+  const collectFontFaces = rules => {
+    for (const rule of rules) {
+      if (rule.type === CSSRule.FONT_FACE_RULE) {
+        const family = normalizeFontFamily(rule.style.getPropertyValue('font-family'));
+        const parts = rule.style.getPropertyValue('font-weight').trim().split(/\s+/).filter(Boolean);
+        const start = parseFontWeight(parts[0] || 'normal');
+        const end = parseFontWeight(parts[1] || parts[0] || 'normal');
+        if (family && start !== null && end !== null) {
+          const ranges = declaredFontWeights.get(family) || [];
+          ranges.push([Math.min(start, end), Math.max(start, end)]);
+          declaredFontWeights.set(family, ranges);
+        }
+      } else if (rule.cssRules) {
+        collectFontFaces(rule.cssRules);
+      }
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    try {
+      collectFontFaces(sheet.cssRules);
+    } catch (_error) {
+      warnings.push('A stylesheet could not be inspected for declared font weights');
+    }
+  }
+  const declaredFamily = style => {
+    const families = style.fontFamily.match(/(?:"[^"]*"|'[^']*'|[^,])+/g) || [];
+    return families.map(normalizeFontFamily).find(family => declaredFontWeights.has(family));
+  };
+  const emphasisSignature = style => [
+    style.fontFamily, style.fontSize, style.fontWeight, style.fontStyle,
+    style.color, style.backgroundColor, style.textDecorationLine,
+    style.textDecorationStyle, style.textDecorationColor, style.textShadow,
+    style.letterSpacing,
+  ].join('|');
   const inlineTextTags = new Set(['SPAN', 'BR', 'EM', 'STRONG', 'B', 'I', 'SMALL', 'MARK', 'S', 'U']);
   const inlineTextWrapper = element => {
     const display = getComputedStyle(element).display;
@@ -77,6 +120,20 @@
     && !element.closest('[data-text-bounds-ignore]')
   ));
 
+  for (const emphasis of active.querySelectorAll('strong, b')) {
+    if (!visible(emphasis) || !(emphasis.textContent || '').trim() || emphasis.closest('[data-text-bounds-ignore]')) continue;
+    const parent = emphasis.parentElement;
+    if (!parent) continue;
+    const targets = directText(emphasis)
+      ? [emphasis]
+      : [...emphasis.querySelectorAll('*')].filter(element => directText(element) && visible(element));
+    if (targets.length && targets.every(target => (
+      emphasisSignature(getComputedStyle(target)) === emphasisSignature(getComputedStyle(parent))
+    ))) {
+      issues.push(`${label(emphasis)}: <${emphasis.tagName.toLowerCase()}> has no visible emphasis; use a supported weight or another deliberate cue`);
+    }
+  }
+
   for (const element of elements) {
     const elementRect = element.getBoundingClientRect();
     const selfBoxTags = new Set(['BUTTON', 'TD', 'TH', 'PRE', 'CODE']);
@@ -85,6 +142,19 @@
     const containerRect = container.getBoundingClientRect();
     const name = label(element);
     const style = getComputedStyle(element);
+    const localFamily = declaredFamily(style);
+    const requestedWeight = parseFontWeight(style.fontWeight);
+    if (localFamily && requestedWeight !== null) {
+      const supported = declaredFontWeights.get(localFamily).some(([start, end]) => (
+        requestedWeight >= start && requestedWeight <= end
+      ));
+      if (!supported) {
+        issues.push(
+          `${name}: font-family "${localFamily}" requests weight ${requestedWeight} outside its declared local faces; `
+          + 'bundle that weight or choose a supported weight instead of browser-synthesized bold'
+        );
+      }
+    }
     const clipsX = ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowX);
     const clipsY = ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowY);
 

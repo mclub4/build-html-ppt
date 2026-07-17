@@ -69,9 +69,10 @@ class WorkflowContractTests(unittest.TestCase):
         contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
         machine = json.loads((ROOT / "scripts" / "validation_contract.json").read_text(encoding="utf-8"))
         self.assertIn("machine-readable authority", contract)
-        self.assertEqual(machine["schema_version"], 9)
+        self.assertEqual(machine["schema_version"], 10)
         self.assertEqual(machine["review_batch_size"], 4)
         self.assertEqual(machine["base_profiles"], ["normal", "short", "zoom150"])
+        self.assertIn("font_integrity", machine["automation_checks_by_change"]["text"])
         self.assertEqual(machine["impact_scopes"], ["direct", "neighbors", "full"])
         self.assertEqual(
             machine["content_change_categories"],
@@ -96,6 +97,17 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("One occurrence blocks delivery", quality)
         self.assertIn("Choose the type system without asking a separate font question", typography)
         self.assertTrue((ROOT / "scripts" / "validate_placeholders.py").is_file())
+
+    def test_typography_blocks_synthetic_bold_and_noop_emphasis(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        typography = (ROOT / "references" / "style-presets.md").read_text(encoding="utf-8")
+        shell = (ROOT / "assets" / "runtime-shell.html").read_text(encoding="utf-8")
+        measure = (ROOT / "scripts" / "measure_text_bounds.js").read_text(encoding="utf-8")
+        self.assertIn("font-synthesis: none", shell)
+        self.assertIn("Use only weights present", skill)
+        self.assertIn("Bundle a real bold/semibold face", typography)
+        self.assertIn("has no visible emphasis", measure)
+        self.assertIn("outside its declared local faces", measure)
 
     def test_incremental_contract_scopes_work_without_dropping_independent_review(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -123,11 +135,12 @@ class WorkflowContractTests(unittest.TestCase):
         architecture = (ROOT / "references" / "architecture-diagrams.md").read_text(encoding="utf-8")
         self.assertIn("## Optional Companion Routing", skill)
         self.assertIn("If `humanize-korean` is available", skill)
-        self.assertIn("If `drawio-skill` is available", skill)
+        self.assertIn("If `archify` is available", skill)
         self.assertIn("without waiting for a separate request", skill)
         self.assertIn("ask before installing", skill)
-        self.assertIn("When `drawio-skill` is already available", architecture)
-        self.assertIn("self-contained SVG", architecture)
+        self.assertIn("When `archify` is already available", architecture)
+        self.assertIn("self-contained HTML output", architecture)
+        self.assertIn("inline SVG", architecture)
 
     def test_physical_subjects_keep_real_world_or_scientific_imagery(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")

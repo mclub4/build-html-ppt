@@ -12,6 +12,7 @@ STANDALONE = ROOT / "codex/skills/build-html-slides"
 PLUGIN_ROOT = ROOT / "plugins/build-html-slides"
 PLUGIN_SKILL = PLUGIN_ROOT / "skills/build-html-slides"
 CLAUDE_SKILL = ROOT / ".claude/skills/build-html-slides"
+GEMINI_SKILL = ROOT / ".gemini/skills/build-html-slides"
 CLAUDE_PLUGIN = ROOT / ".claude-plugin/plugin.json"
 CLAUDE_MARKETPLACE = ROOT / ".claude-plugin/marketplace.json"
 
@@ -43,14 +44,16 @@ def main() -> None:
     require((STANDALONE / "scripts/validation_contract.json").is_file(), "machine validation contract is missing")
     require((PLUGIN_SKILL / "SKILL.md").is_file(), "plugin SKILL.md is missing")
     require((CLAUDE_SKILL / "SKILL.md").is_file(), "Claude SKILL.md is missing")
+    require((GEMINI_SKILL / "SKILL.md").is_file(), "Gemini SKILL.md is missing")
     require(tree_hashes(STANDALONE) == tree_hashes(PLUGIN_SKILL), "skill distributions differ")
     require(tree_hashes(STANDALONE) == tree_hashes(CLAUDE_SKILL), "Claude skill distribution differs")
+    require(tree_hashes(STANDALONE) == tree_hashes(GEMINI_SKILL), "Gemini skill distribution differs")
 
     license_file = ROOT / "LICENSE"
     notices_file = ROOT / "THIRD_PARTY_NOTICES.md"
     require(license_file.is_file(), "root LICENSE is missing")
     require(notices_file.is_file(), "root THIRD_PARTY_NOTICES.md is missing")
-    for distribution in (STANDALONE, CLAUDE_SKILL, PLUGIN_ROOT):
+    for distribution in (STANDALONE, CLAUDE_SKILL, GEMINI_SKILL, PLUGIN_ROOT):
         require((distribution / "LICENSE").is_file(), f"{distribution} LICENSE is missing")
         require(digest(distribution / "LICENSE") == digest(license_file), f"{distribution} LICENSE differs")
         require((distribution / "THIRD_PARTY_NOTICES.md").is_file(), f"{distribution} third-party notices are missing")
@@ -67,7 +70,7 @@ def main() -> None:
     claude_marketplace = json.loads(CLAUDE_MARKETPLACE.read_text())
 
     require(plugin["name"] == "build-html-slides", "plugin name mismatch")
-    require(machine_contract.get("schema_version") == 9, "validation contract schema mismatch")
+    require(machine_contract.get("schema_version") == 10, "validation contract schema mismatch")
     require(
         package.get("devDependencies", {}).get("playwright") == machine_contract.get("playwright_version"),
         "package and managed Playwright versions differ",
@@ -110,17 +113,20 @@ def main() -> None:
     require("final response MUST include" in agent_guidance, "agent post-install reporting contract is missing")
     require("im-not-ai" in agent_guidance and "humanize-korean" in agent_guidance, "agent im-not-ai guidance is missing")
     require("/humanize-korean" in agent_guidance and "$humanize-korean" in agent_guidance, "agent im-not-ai invocation guidance is missing")
-    require("drawio-skill" in agent_guidance and "draw.io desktop CLI" in agent_guidance, "agent drawio companion guidance is missing")
+    require("tt-a1i/archify" in agent_guidance and "self-contained HTML" in agent_guidance, "agent Archify companion guidance is missing")
     require("also install" not in agent_guidance or "explicitly agrees" in agent_guidance, "optional companion consent contract is missing")
     require("does not include a raster image generator" in agent_guidance, "agent Claude image-generation guidance is missing")
+    require("Required when Gemini CLI was installed" in agent_guidance, "agent Gemini post-install guidance is missing")
     require("Read and follow `AGENTS.md`" in claude_guidance, "Claude repository guidance does not inherit AGENTS.md")
     require("AI 에이전트에게 설치를 맡긴 경우" in readme, "README AI-agent installation guidance is missing")
     require("Claude Code 기본 설치에는 래스터 이미지 생성기가 포함되지 않습니다" in readme, "README Claude image-generation notice is missing")
+    require("Gemini CLI Agent Skill" in readme, "README Gemini installation guidance is missing")
     require("Post-install guidance:" in installer, "installer post-install guidance is missing")
     require("epoko77-ai/im-not-ai" in installer, "installer im-not-ai notice is missing")
-    require("Agents365-ai/drawio-skill" in installer, "installer drawio notice is missing")
+    require("tt-a1i/archify" in installer, "installer Archify notice is missing")
     require("Do not install either companion" in installer, "installer optional companion consent notice is missing")
     require("does not include a raster image generator by default" in installer, "installer Claude image-generation notice is missing")
+    require("Gemini CLI Agent Skills" in installer, "installer Gemini post-install notice is missing")
 
     print(f"Repository validation passed ({len(tree_hashes(STANDALONE))} shared skill files).")
 

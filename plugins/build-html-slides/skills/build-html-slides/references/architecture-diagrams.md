@@ -16,19 +16,20 @@ Use the smallest diagram that answers the presentation’s claim. Split overview
 
 ## Route to an installed diagram companion
 
-When `drawio-skill` is already available, use it proactively for architecture, cloud or network topology, deployment, ERD, UML, sequence, BPMN, swimlane, codebase structure, and complex multi-component flows that benefit from editable rich shapes, official vendor symbols, or deterministic connector routing. The user does not need to request draw.io explicitly.
+When `archify` is already available, use it proactively for architecture, cloud or network topology, deployment, ERD, UML, sequence, workflow, lifecycle, codebase structure, and complex multi-component flows that benefit from a dedicated diagram layout. The user does not need to request Archify explicitly.
 
-Keep the native HTML/CSS or inline-SVG path for simple two- or three-node flows, small comparisons, and diagrams whose primary value is slide-by-slide animation. Do not add draw.io merely because a slide contains arrows.
+Keep the native HTML/CSS or inline-SVG path for simple two- or three-node flows, small comparisons, and diagrams whose primary value is slide-by-slide animation. Do not add Archify merely because a slide contains arrows.
 
-For a draw.io handoff:
+For an Archify handoff:
 
 - establish factual nodes, boundaries, labels, protocols, and relationships before invoking the companion;
 - match the deck's semantic colors and typography rather than accepting an unrelated default preset;
-- preserve the editable `.drawio` source in the deck assets;
-- export a self-contained SVG for the slide whenever possible, embedding diagram data, icons, and fonts and avoiding runtime CDN references;
-- if only raster export is practical, convert the final PNG to WebP before insertion while retaining the `.drawio` source;
+- preserve Archify's self-contained HTML output in the deck assets as the reproducible source;
+- extract or export its inline SVG for the slide whenever practical, keeping icons and fonts self-contained and avoiding runtime CDN references;
+- if raster export is more reliable, use Archify's WebP export at sufficient resolution while retaining the source HTML;
+- embed only the diagram artwork, not Archify's theme toggle or export controls, in the presentation;
 - render and inspect the exported result at slide size under the same geometry and AI review contract as every other meaningful visual;
-- ask for consent before installing a missing draw.io desktop CLI, Graphviz, system package, or other dependency. If unavailable or declined, use the native diagram workflow below.
+- ask for consent before installing a missing Archify skill or any dependency. If unavailable or declined, use the native diagram workflow below.
 
 ## Establish truth before drawing
 

@@ -4,6 +4,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_HOME="${CLAUDE_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+GEMINI_HOME="${GEMINI_HOME:-$HOME/.gemini}"
 CHECK_ONLY=0
 
 case "${1:-}" in
@@ -41,6 +42,7 @@ fi
 
 CLAUDE_COPY=0
 CODEX_COPY=0
+GEMINI_COPY=0
 if [ -f "$CLAUDE_HOME/skills/build-html-slides/.build-html-slides-copy-origin" ] &&
    [ "$(cat "$CLAUDE_HOME/skills/build-html-slides/.build-html-slides-copy-origin")" = "$REPO" ]; then
   CLAUDE_COPY=1
@@ -48,6 +50,10 @@ fi
 if [ -f "$CODEX_HOME/skills/build-html-slides/.build-html-slides-copy-origin" ] &&
    [ "$(cat "$CODEX_HOME/skills/build-html-slides/.build-html-slides-copy-origin")" = "$REPO" ]; then
   CODEX_COPY=1
+fi
+if [ -f "$GEMINI_HOME/skills/build-html-slides/.build-html-slides-copy-origin" ] &&
+   [ "$(cat "$GEMINI_HOME/skills/build-html-slides/.build-html-slides-copy-origin")" = "$REPO" ]; then
+  GEMINI_COPY=1
 fi
 
 git -C "$REPO" pull --ff-only
@@ -57,5 +63,8 @@ fi
 if [ "$CODEX_COPY" -eq 1 ]; then
   "$REPO/install.sh" --copy --codex-only
 fi
+if [ "$GEMINI_COPY" -eq 1 ]; then
+  "$REPO/install.sh" --copy --gemini-only
+fi
 
-echo "Updated to $(git -C "$REPO" rev-parse --short HEAD). Reload plugins or start a new Claude/Codex session."
+echo "Updated to $(git -C "$REPO" rev-parse --short HEAD). Reload plugins or start a new Claude/Codex/Gemini session."

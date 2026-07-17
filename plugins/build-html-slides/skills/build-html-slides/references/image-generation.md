@@ -11,7 +11,7 @@ Inspect the tools available in the current agent session before planning generat
 - If the user explicitly requests generated imagery, or the agreed concept cannot be delivered without it, explain that no image generator is configured and ask whether to continue with sourced visuals or configure a generator.
 - Never install a package, add an MCP server, configure credentials, or switch to a paid image service without explicit consent.
 
-Claude Code can inspect rendered PNG captures with its image-reading capability, but a base Claude Code installation does not provide raster image generation. Use a connected plugin, MCP server, or other configured generator when present. Codex may expose ImageGen directly; treat it as one qualifying implementation of this contract rather than a mandatory dependency.
+Claude Code can inspect rendered PNG captures with its image-reading capability, but a base Claude Code installation does not provide raster image generation. Use a connected plugin, MCP server, or other configured generator when present. Codex may expose ImageGen directly. Gemini CLI capabilities also depend on the tools or extensions configured in the current session. Treat any available generator as one qualifying implementation of this contract rather than a mandatory dependency; never assume one from the platform name alone.
 
 ## Truth Boundary
 

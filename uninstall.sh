@@ -4,18 +4,21 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_HOME="${CLAUDE_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+GEMINI_HOME="${GEMINI_HOME:-$HOME/.gemini}"
 DO_CLAUDE=1
 DO_CODEX=1
+DO_GEMINI=1
 DRY_RUN=0
 
 usage() {
-  echo "Usage: ./uninstall.sh [--claude-only|--codex-only] [--dry-run]"
+  echo "Usage: ./uninstall.sh [--claude-only|--codex-only|--gemini-only] [--dry-run]"
 }
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --claude-only) DO_CLAUDE=1; DO_CODEX=0 ;;
-    --codex-only) DO_CLAUDE=0; DO_CODEX=1 ;;
+    --claude-only) DO_CLAUDE=1; DO_CODEX=0; DO_GEMINI=0 ;;
+    --codex-only) DO_CLAUDE=0; DO_CODEX=1; DO_GEMINI=0 ;;
+    --gemini-only) DO_CLAUDE=0; DO_CODEX=0; DO_GEMINI=1 ;;
     --dry-run) DRY_RUN=1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -55,4 +58,8 @@ fi
 
 if [ "$DO_CODEX" -eq 1 ]; then
   remove_owned "$REPO/codex/skills/build-html-slides" "$CODEX_HOME/skills/build-html-slides" dir
+fi
+
+if [ "$DO_GEMINI" -eq 1 ]; then
+  remove_owned "$REPO/.gemini/skills/build-html-slides" "$GEMINI_HOME/skills/build-html-slides" dir
 fi

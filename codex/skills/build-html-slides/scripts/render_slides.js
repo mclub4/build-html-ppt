@@ -74,14 +74,143 @@ function workspaceRoot() {
     agentHome = process.env.BUILD_HTML_SLIDES_AGENT_HOME;
   } else if (process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_HOME) {
     agentHome = process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_HOME;
+  } else if (process.env.GEMINI_HOME) {
+    agentHome = process.env.GEMINI_HOME;
   } else {
     const scriptParts = fs.realpathSync.native(__filename).split(path.sep);
     const runsFromClaude = scriptParts.includes('.claude');
+    const runsFromGemini = scriptParts.includes('.gemini');
     agentHome = runsFromClaude
       ? path.join(os.homedir(), '.claude')
-      : (process.env.CODEX_HOME || path.join(os.homedir(), '.codex'));
+      : (runsFromGemini
+        ? path.join(os.homedir(), '.gemini')
+        : (process.env.CODEX_HOME || path.join(os.homedir(), '.codex')));
   }
   return path.join(path.resolve(agentHome), 'build-html-slides', 'workspaces');
+}
+
+async function measureFontIntegrity(page, cdp) {
+  const candidates = await page.evaluate(() => {
+    const normalizeFamily = value => value.trim().replace(/^['"]|['"]$/g, '').toLowerCase();
+    const declaredFamilies = new Set();
+    const collectRules = rules => {
+      for (const rule of rules) {
+        if (rule.type === CSSRule.FONT_FACE_RULE) {
+          declaredFamilies.add(normalizeFamily(rule.style.getPropertyValue('font-family')));
+        } else if (rule.cssRules) {
+          collectRules(rule.cssRules);
+        }
+      }
+    };
+    for (const sheet of document.styleSheets) {
+      try { collectRules(sheet.cssRules); } catch (_error) { /* local offline decks remain inspectable */ }
+    }
+
+    const active = document.querySelector('.slide.active');
+    if (!active || !declaredFamilies.size) return [];
+    document.getElementById('__font-integrity-audit')?.remove();
+    const root = document.createElement('div');
+    root.id = '__font-integrity-audit';
+    root.setAttribute('aria-hidden', 'true');
+    root.style.cssText = 'position:fixed;left:-12000px;top:0;opacity:0;pointer-events:none;z-index:-1';
+    document.body.appendChild(root);
+
+    const records = [];
+    const seen = new Set();
+    const elements = [...active.querySelectorAll('*')].filter(element => (
+      element.namespaceURI === 'http://www.w3.org/1999/xhtml'
+      && !element.closest('[data-text-bounds-ignore]')
+    ));
+    for (const element of elements) {
+      const direct = [...element.childNodes]
+        .filter(node => node.nodeType === Node.TEXT_NODE)
+        .map(node => node.nodeValue)
+        .join('');
+      const hangul = [...new Set(Array.from(direct).filter(character => /[\uAC00-\uD7A3]/.test(character)))];
+      if (!hangul.length) continue;
+      const style = getComputedStyle(element);
+      const families = style.fontFamily.match(/(?:"[^"]*"|'[^']*'|[^,])+/g) || [];
+      const family = families.map(normalizeFamily).find(value => declaredFamilies.has(value));
+      if (!family) continue;
+      const source = element.getAttribute('data-title') || element.getAttribute('aria-label') || element.id
+        || direct.trim().replace(/\s+/g, ' ').slice(0, 48) || element.tagName.toLowerCase();
+      const styleKey = [family, style.fontWeight, style.fontStyle, style.fontStretch, style.fontVariationSettings].join('|');
+      for (const character of hangul) {
+        const key = `${styleKey}|${character}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const id = `font-audit-${records.length + 1}`;
+        const probe = document.createElement('span');
+        probe.dataset.fontIntegrityId = id;
+        probe.textContent = character;
+        Object.assign(probe.style, {
+          fontFamily: style.fontFamily,
+          fontWeight: style.fontWeight,
+          fontStyle: style.fontStyle,
+          fontStretch: style.fontStretch,
+          fontSize: style.fontSize,
+          fontVariationSettings: style.fontVariationSettings,
+          fontFeatureSettings: style.fontFeatureSettings,
+          fontSynthesis: 'none',
+          whiteSpace: 'pre',
+        });
+        root.appendChild(probe);
+        records.push({ id, character, family, styleKey, weight: style.fontWeight, source });
+      }
+    }
+    return records;
+  });
+
+  if (!candidates.length) return { ok: true, checked: 0, issues: [], warnings: [] };
+  await cdp.send('DOM.enable');
+  await cdp.send('CSS.enable');
+  const { root } = await cdp.send('DOM.getDocument', { depth: 1, pierce: true });
+  const audited = [];
+  for (const candidate of candidates) {
+    const { nodeId } = await cdp.send('DOM.querySelector', {
+      nodeId: root.nodeId,
+      selector: `[data-font-integrity-id="${candidate.id}"]`,
+    });
+    let font = null;
+    if (nodeId) {
+      const result = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+      font = [...(result.fonts || [])].sort((left, right) => right.glyphCount - left.glyphCount)[0] || null;
+    }
+    audited.push({
+      ...candidate,
+      signature: font ? `${font.isCustomFont ? 'custom' : 'system'}:${font.postScriptName || font.familyName}` : 'missing',
+      custom: font?.isCustomFont === true,
+    });
+  }
+  await page.evaluate(() => document.getElementById('__font-integrity-audit')?.remove());
+
+  const issues = [];
+  const groups = new Map();
+  for (const item of audited) {
+    const records = groups.get(item.styleKey) || [];
+    records.push(item);
+    groups.set(item.styleKey, records);
+  }
+  for (const records of groups.values()) {
+    const customCounts = new Map();
+    for (const record of records.filter(item => item.custom)) {
+      customCounts.set(record.signature, (customCounts.get(record.signature) || 0) + 1);
+    }
+    const expected = [...customCounts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] || null;
+    const fallback = records.filter(record => !record.custom || (expected && record.signature !== expected));
+    if (!fallback.length) continue;
+    const characters = [...new Set(fallback.map(record => record.character))]
+      .sort((left, right) => left.codePointAt(0) - right.codePointAt(0));
+    const rendered = characters.map(character => (
+      `${character}(U+${character.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')})`
+    )).join(', ');
+    const sample = fallback[0];
+    issues.push(
+      `${sample.source}: locally declared font-family "${sample.family}" weight ${sample.weight} `
+      + `falls back to another platform font for Hangul ${rendered}; use a complete Korean font or rebuild the subset after copy changes`
+    );
+  }
+  return { ok: issues.length === 0, checked: candidates.length, issues, warnings: [] };
 }
 
 function deckWorkspaceId(deck) {
@@ -1196,6 +1325,9 @@ async function main() {
         if (measuredChecks.has('text_bounds')) {
           measurements.text_geometry = await page.evaluate(source => (0, eval)(source), textBoundsScript);
         }
+        if (measuredChecks.has('font_integrity') && profileName === profiles[0]) {
+          measurements.font_integrity = await measureFontIntegrity(page, cdp);
+        }
         if (measuredChecks.has('container_density')) {
           measurements.container_density = await page.evaluate(source => (0, eval)(source), containerDensityScript);
         }
@@ -1255,6 +1387,7 @@ async function main() {
     : [];
   const geometryField = {
     text_bounds: 'text_geometry',
+    font_integrity: 'font_integrity',
     container_density: 'container_density',
     controls: 'control_geometry',
     image_geometry: 'image_geometry',

@@ -138,9 +138,13 @@ def default_review_directory(deck: Path) -> Path:
         if not agent_home:
             agent_home = os.environ.get("CLAUDE_CONFIG_DIR") or os.environ.get("CLAUDE_HOME")
         if not agent_home:
-            runs_from_claude = ".claude" in Path(__file__).resolve().parts
-            agent_home = Path.home() / (".claude" if runs_from_claude else ".codex")
-            if not runs_from_claude:
+            agent_home = os.environ.get("GEMINI_HOME")
+        if not agent_home:
+            script_parts = Path(__file__).resolve().parts
+            runs_from_claude = ".claude" in script_parts
+            runs_from_gemini = ".gemini" in script_parts
+            agent_home = Path.home() / (".claude" if runs_from_claude else ".gemini" if runs_from_gemini else ".codex")
+            if not runs_from_claude and not runs_from_gemini:
                 agent_home = os.environ.get("CODEX_HOME", agent_home)
         root = Path(agent_home).expanduser().resolve() / "build-html-slides" / "workspaces"
     stem = unicodedata.normalize("NFKC", deck.stem)
