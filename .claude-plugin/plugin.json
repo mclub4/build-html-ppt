@@ -1,6 +1,6 @@
 {
   "name": "build-html-slides",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Create audience-aware HTML presentations with presenter notes, WebP assets, viewport-safe playback, and Chromium visual QA.",
   "author": {
     "name": "HYUNJIN CHO",

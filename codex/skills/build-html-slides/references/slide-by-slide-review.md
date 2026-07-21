@@ -4,9 +4,9 @@ Read `validation-contract.md` first. That file decides which slides and profiles
 
 ## Before Vision
 
-Run the renderer for the selected mode. Do not open captures while `automation_gate.status` is failing. Fix text bounds, control geometry, image load/aspect/resolution, or other deterministic failures first.
+This procedure applies to Full Validation. Run the renderer and do not open captures while `automation_gate.status` is failing. Fix text bounds, control geometry, image load/aspect/resolution, or other deterministic failures first. Quick Draft does not create captures or enter this procedure.
 
-Every slide still retains all canonical captures. Only slides listed in `review_batches` require AI review. In Quick Draft, ordinary slides without warnings remain `automated-geometry-only`; do not add reviewer labels or observations to them.
+Every slide retains all canonical captures. Only slides listed in `review_batches` require AI review.
 
 ## Batch Procedure
 
@@ -66,8 +66,6 @@ After all findings are settled:
 5. run `validate_all.py --phase finalize-verify`.
 
 Standard risk uses a bounded set containing visual-critical, warning-triggered, and distributed sample slides. High risk includes every slide. This independent pass is not removed as duplicate checking. Do not expand a standard final pass to all slides unless the generated batches or a new finding requires it. After a focused repair, reuse a passing independent review only when the slide capture hash and review contract are unchanged; regenerate the failed or changed slide's review.
-
-Quick Draft skips quality scoring and cross-review.
 
 Image count does not create additional AI calls by itself. Inspect the rendered composition once per required slide/profile set. Do not open every fan-art source as a separate validation step, and do not infer critical status from styling classes such as `logo`, `key-visual`, `title-art`, or `diagram`.
 

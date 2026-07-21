@@ -85,7 +85,7 @@ This rubric is used only in Full Validation. After the render/fix loop is settle
 - A named mixed audience receives a generic topic order, or must endure specialist detail before understanding the shared stakes, decision, or relevance.
 - Raster assets are not WebP, except that SVG remains preferred for true vector content.
 - Reviewers approve from HTML source without inspecting settled rendered slides.
-- Full Validation lacks all-slide AI coverage, or a Quick Draft AI-routed slide lacks its adaptive profiles, review-batch membership, concrete observation, stable reviewer reference, and passing change-type verdict.
+- Full Validation lacks all-slide AI coverage, required adaptive profiles, review-batch membership, concrete observations, stable reviewer references, or passing change-type verdicts.
 - Full Validation omits any slide generated in the risk-based `cross_review_batches`, adds unbound substitute records, or uses a cross-reviewer from the primary-reviewer set.
 - A named character/person slide lacks grounded identity targets, cue-based identity verdicts, or uses the wrong subject or variant.
 - Any slide contains a visible placeholder, temporary/dummy asset, empty media promise, or generic substitute graphic where the composition claims a real subject image. One occurrence blocks delivery regardless of the numeric score.

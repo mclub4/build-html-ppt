@@ -9,14 +9,14 @@ New-deck creation requires an explicit user choice between Quick Draft and Full 
 | Mode | Use when | New evidence |
 | --- | --- | --- |
 | Edit Only | The user primarily wants an ordinary revision and does not seek new assurance | None |
-| Quick Draft | The user prioritizes iteration or a first usable version | Automated geometry for every slide; adaptive AI subset |
+| Quick Draft | The user prioritizes iteration or a first usable version | None; creation only |
 | Full Validation | The deck is intended for delivery, publication, or a consequential decision, or strong assurance is requested | Automated geometry and AI review for every slide, independent review, final score |
 
 Edit Only applies to an existing deck revision when the user asks for a change without requesting new validation evidence. It is not a substitute for asking the required new-deck mode question.
 
 ## Tool Preflight And Installation Consent
 
-After the user chooses Quick Draft or Full Validation, run this shared preflight before substantive work:
+After the user chooses Full Validation, run this preflight before substantive work:
 
 ```bash
 python3 scripts/check_environment.py
@@ -28,7 +28,7 @@ The script checks Python, Node.js, Playwright, Chromium, and screenshot capture 
 python3 scripts/install_browser_dependencies.py --consent
 ```
 
-It installs the contract-pinned Playwright package and Chromium under `~/.build-html-slides/runtime`. Use `--with-deps` only when the user also approved Linux system-library installation, which may require elevated privileges. After installation, rerun the preflight. Do not begin either rendered mode until it passes.
+It installs the contract-pinned Playwright package and Chromium under `~/.build-html-slides/runtime`. Use `--with-deps` only when the user also approved Linux system-library installation, which may require elevated privileges. After installation, rerun the preflight. Do not begin Full Validation until it passes. Quick Draft skips this preflight because it performs no browser rendering or validation.
 
 ## Turnaround Envelope
 
@@ -52,7 +52,7 @@ After evidence is no longer needed, remove the default workspace with `node scri
 
 ## Canonical Profiles
 
-Both rendered modes capture every slide at:
+Full Validation captures every slide at:
 
 - `normal`: 1920×1080 viewport and screenshot, zoom 1;
 - `short`: 1366×650 viewport and screenshot, zoom 1;
@@ -62,24 +62,13 @@ Add `tablet` 1024×768 and `mobile` 390×844 only when responsive device support
 
 ## Quick Draft
 
-During `prepare`, run the deterministic deck and visible-placeholder/incomplete-asset gates, plus only the notes, source, image, or browser-interaction gates relevant to the detected source change. The placeholder gate therefore runs once for every new or edited source before AI review, not again in evidence-only phases. It blocks `PLACE NOTE`, image-here instructions, dummy asset markers, CSS-generated placeholder copy, and other explicit unfinished media. The source gate also blocks generated assets without an allowed `data-media-purpose` and generated assets assigned to factual subject, evidence, or identity roles. Initial renders capture all slides at all canonical profiles. Automated text bounds, rendered-line composition, cross-layer occlusion, container-density measurement, control geometry, and image geometry must complete before any AI inspection; incremental renders execute only the geometry families relevant to the detected edit. The rendered-line pass blocks Korean display orphans, punctuation-only final lines, colliding glyph rows, sibling text intersections, navigation-covered copy, and opaque unrelated layers covering text. Geometry failures block review. Low-density surfaces and meaningful `object-fit: cover` crops are warnings that route the affected slide and profile to AI inspection, because automation can detect risk but cannot decide semantic crop quality.
+Quick Draft is creation-only. Build the final HTML, sibling presenter notes, `sources.json`, and locally referenced assets, then deliver them without entering the validation pipeline.
 
-`data-placeholder-literal="true"` may exempt visible wording only when the slide is genuinely teaching or comparing placeholder behavior. It does not exempt suspicious class names, asset filenames, or media-state markers, and it must never be used to bypass an unfinished visual.
-
-AI inspects only:
-
-- cover and closing slides;
-- slides explicitly marked `data-visual-critical="true"`;
-- slides and profiles named by automation warnings.
-- slides explicitly or automatically routed to identity review for `all` or `image` scope.
-
-The cover and closing are always visual-critical and cannot be downgraded to automation-only. Critical slides inspect every generated profile. A warning-triggered ordinary slide inspects `normal` plus the warned profiles. Identity-required slides inspect at least `normal`, including Quick Draft, and require local canonical WebP references plus per-target cue-based verdicts. Identity review activates automatically from subject metadata, named-subject slide kinds, or character/person/profile markup; the slide flag is an explicit signal, not the only trigger. Missing identity metadata or reference files blocks AI review before batching. Other slides retain hash-bound captures and geometry results with `review_method: automated-geometry-only`; they must not claim an AI reviewer or observation.
-
-Quick Draft does not calculate the 24-point quality score, run independent cross-reviews, or require multiple reviewer agents. Report the AI-inspected subset separately from all-slide automated coverage.
+Do not run `check_environment.py`, install Playwright or Chromium, invoke `validate_all.py`, open a browser, render screenshots, create a review workspace, execute deterministic gates, request AI visual inspection, calculate the 24-point score, or run independent cross-review. Do not claim clipping, crop, interaction, identity, placeholder, font, or visual-quality assurance. Report explicitly that the deck was not rendered or validated. A later request may upgrade the same deck to Full Validation.
 
 ## Full Validation
 
-The initial Full preparation runs the complete deterministic suite and Chromium geometry checks. Later edits run only gates that the typed change can affect. AI inspects `normal` for every refreshed slide and records `completion` for all/image scope. Any visible placeholder, empty media promise, or generic substitute for an expected real subject image blocks delivery regardless of the final quality score. Cover, closing, explicit critical slides, and warning-triggered profiles receive their adaptive stress profiles. When responsive support was requested, tablet/mobile captures remain automated evidence for ordinary slides and become AI-required only for critical or warning-routed slides.
+The initial Full preparation runs the complete deterministic suite and Chromium geometry checks. The placeholder gate therefore runs once for every new or edited source before AI review and blocks `PLACE NOTE`, image-here instructions, dummy asset markers, CSS-generated placeholder copy, and other explicit unfinished media. Later edits run only gates that the typed change can affect. AI inspects `normal` for every refreshed slide and records `completion` for all/image scope. Any visible placeholder, empty media promise, or generic substitute for an expected real subject image blocks delivery regardless of the final quality score. The cover and closing are always visual-critical, and cover, closing, explicit critical slides, and warning-triggered profiles receive their adaptive stress profiles. When responsive support was requested, tablet/mobile captures remain automated evidence for ordinary slides and become AI-required only for critical or warning-routed slides.
 
 Choose review risk by reasoning about consequences, uncertainty, distribution, technical complexity, visual complexity, and audience sensitivity:
 
@@ -92,19 +81,13 @@ After fixes settle, run `--phase finalize-prepare`. This verifies iteration meta
 
 ## Commands
 
-Quick Draft preparation:
-
-```bash
-python3 scripts/validate_all.py OUTPUT.html --mode quick --phase prepare
-```
-
 Full Validation preparation:
 
 ```bash
 python3 scripts/validate_all.py OUTPUT.html --mode full --review-risk standard --phase prepare
 ```
 
-After filling the listed AI batches, run `python3 scripts/validate_all.py OUTPUT.html --phase verify`. Quick Draft ends there. For Full Validation, then run `--phase finalize-prepare`, fill the generated quality score and `cross_review_batches`, and run `--phase finalize-verify`. `prepare` executes change-relevant deterministic gates and rendering; `verify` checks refreshed captures and any previously blocked captures entering AI review, while other retained evidence receives metadata checks only; `finalize-prepare` performs the one settled Chromium source-fingerprint confirmation and prepares final records without rerendering; `finalize-verify` checks every capture hash plus HTML/local-file freshness without recomputing the same browser fingerprint. Use `--responsive` only for requested tablet/mobile support.
+After filling the listed AI batches, run `python3 scripts/validate_all.py OUTPUT.html --phase verify`, then run `--phase finalize-prepare`, fill the generated quality score and `cross_review_batches`, and run `--phase finalize-verify`. `prepare` executes change-relevant deterministic gates and rendering; `verify` checks refreshed captures and any previously blocked captures entering AI review, while other retained evidence receives metadata checks only; `finalize-prepare` performs the one settled Chromium source-fingerprint confirmation and prepares final records without rerendering; `finalize-verify` checks every capture hash plus HTML/local-file freshness without recomputing the same browser fingerprint. Use `--responsive` only for requested tablet/mobile support.
 
 ## Incremental Revision
 
@@ -112,7 +95,7 @@ After the initial render, use:
 
 ```bash
 python3 scripts/validate_all.py OUTPUT.html --phase prepare \
-  --mode quick|full --review-risk standard|high \
+  --mode full --review-risk standard|high \
   --slides N --change-type text|image|navigation|all
 ```
 
@@ -144,7 +127,7 @@ The manifest proves that captures came from the current HTML/local assets, match
 ## Delivery Language
 
 - Edit Only: state that no new render or validation was performed.
-- Quick Draft: report all-slide automated coverage and the exact AI-inspected slides.
+- Quick Draft: state that no browser render, automated validation, AI visual review, or quality score was performed.
 - Full Validation: report review risk, reviewer count, AI coverage, final score, and any limitation.
 
 Never report stale captures as current evidence or imply a broader validation scope than was performed.

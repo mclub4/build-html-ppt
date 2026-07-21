@@ -35,7 +35,7 @@ Annotate every character/person profile, gallery, comparison, or image-led slide
 - The candidate and reference must be different local files inside the deck bundle.
 - Decorative imagery belongs in `.slide-media`, remains excluded from identity review, and must not be used to make a factual identity claim.
 
-Missing or invalid metadata blocks AI review. Automatically detected identity slides always receive at least one full-size AI inspection in Quick Draft as well as Full Validation. Use `data-identity-review="not-applicable"` only when profile-like markup describes a product or other non-person subject and no subject identity metadata is present.
+In Full Validation, missing or invalid metadata blocks AI review and automatically detected identity slides receive at least one full-size AI inspection. Quick Draft performs no identity validation; still author the metadata and references so the deck can be upgraded to Full Validation later. Use `data-identity-review="not-applicable"` only when profile-like markup describes a product or other non-person subject and no subject identity metadata is present.
 
 ## Rendered Review
 

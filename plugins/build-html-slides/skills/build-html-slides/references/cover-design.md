@@ -29,7 +29,7 @@ Consider at least two materially different cover directions in planning, such as
 
 ## Cover Review Gate
 
-The renderer treats slide 1 as visual-critical in every rendered mode. AI must open every generated profile for the cover, even in Quick Draft. Review it as a cover, not merely as a slide whose elements fit inside bounds.
+In Full Validation, the renderer treats slide 1 as visual-critical. AI must open every generated profile for the cover and review it as a cover, not merely as a slide whose elements fit inside bounds. Quick Draft still gives the cover the strongest authoring attention, but performs no render or AI review.
 
 After the first settled render, open the cover at full size and perform a dedicated refinement pass. Check authentic subject recognition, focal crop, image resolution, title line composition, display/body contrast, color integration, depth and edge treatment, logo and metadata placement, source treatment, and navigation clearance. Resolve weak details before reviewing ordinary slides; the cover should feel at least as intentional as the strongest body slide.
 

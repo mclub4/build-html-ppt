@@ -20,12 +20,18 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("New-deck creation requires an explicit user choice", contract)
         self.assertIn("Do not silently infer the mode", contract)
 
-    def test_both_rendered_modes_require_preflight_and_install_consent(self) -> None:
+    def test_quick_draft_skips_validation_and_full_requires_preflight(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
-        for document in (skill, contract):
-            self.assertIn("Quick Draft or Full Validation", document)
-            self.assertIn("python3 scripts/check_environment.py", document)
+        self.assertIn("This is a creation-only mode", skill)
+        self.assertIn("deliver immediately after implementation without running any validation command", skill)
+        self.assertIn("Quick Draft is creation-only", contract)
+        self.assertIn("Do not run `check_environment.py`", contract)
+        self.assertIn("Do not run `check_environment.py`", skill)
+        self.assertIn("After the user chooses Full Validation", skill)
+        self.assertIn("After the user chooses Full Validation", contract)
+        self.assertIn("python3 scripts/check_environment.py", skill)
+        self.assertIn("python3 scripts/check_environment.py", contract)
         self.assertIn("explicit installation consent", skill)
         self.assertIn("explicit consent", contract)
         self.assertIn("Never run `npm install`", skill)
