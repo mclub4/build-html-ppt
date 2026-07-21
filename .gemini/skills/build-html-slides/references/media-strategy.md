@@ -2,13 +2,19 @@
 
 Use this before storyboarding so factual rigor does not accidentally turn a presentation into a text report.
 
+## Default media decision
+
+Unless the user explicitly asks for pure HTML, no photography, no external images, or a typography/diagram-only treatment, perform a bounded search for relevant sourced photographs or factual imagery before finalizing the storyboard. Do not ask separately whether to search; visual discovery is part of ordinary deck planning.
+
+This is a relevance rule, not an image quota. Select photographs when they improve subject recognition, factual grounding, scale, process context, human stakes, atmosphere, or visual rhythm. Omit them on slides where a chart, screenshot, diagram, typographic statement, or whitespace communicates the claim better. A decision to use no photography should follow a semantic fit judgment, not convenience, verification cost, or failure to search.
+
 ## Classify the visual job semantically
 
 Do not infer from keywords or a fixed topic list. Reason from what the audience needs to see:
 
 1. **Physical or observable subject**: facilities, machinery, products, infrastructure, places, people, organisms, tissue, experiments, clinical or laboratory phenomena. Default to sourced real-world or scientific imagery alongside charts and diagrams.
 2. **Interface or process subject**: software behavior, workflows, abstract systems, policies, and operating models. Screenshots, diagrams, charts, and selective contextual photography may be sufficient.
-3. **Abstract, confidential, or unavailable subject**: concepts with no honest visual referent, protected systems, or cases where appropriate media cannot be secured. Typography, data, and diagrams may lead, but record the rationale instead of silently omitting imagery.
+3. **Abstract, confidential, or unavailable subject**: concepts with no honest visual referent, protected systems, explicit pure-HTML requests, or cases where appropriate media cannot be secured. Typography, data, and diagrams may lead, but record the rationale instead of silently omitting imagery.
 
 Full Validation changes assurance depth, provenance, and inspection. It must not remove useful photography or scientific imagery merely because charts and SVGs are easier to verify.
 

@@ -19,7 +19,7 @@ When a user gives this repository URL to an AI agent and asks it to install or u
 - Explain that Archify produces self-contained HTML with inline SVG and image export controls; build-html-slides keeps its source HTML and inserts the diagram SVG or WebP into the deck.
 - Check whether `humanize-korean` and `archify` are already available on the installed platform. After the main installation succeeds, ask one concise follow-up for only the missing companions: `선택 도구인 im-not-ai(한국어 윤문)와 Archify(아키텍처·ERD·UML·흐름도)도 설치할까요?`
 - Do not install either companion, credentials, or system packages until the user explicitly agrees. If one companion is already present, ask only about the missing one.
-- When a companion is already installed, build-html-slides may invoke it automatically when its task-specific routing rules match; do not ask for permission on every deck.
+- When a companion is already installed, build-html-slides must invoke it automatically when its task-specific routing rules match; availability is sufficient consent for use. Do not ask for permission on every deck.
 
 ### Required when Claude Code was installed
 

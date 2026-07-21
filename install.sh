@@ -188,6 +188,7 @@ echo "- Optional Korean polish: epoko77-ai/im-not-ai provides humanize-korean fo
 echo "- After installing im-not-ai separately, invoke /humanize-korean in Claude Code or \$humanize-korean in Codex; Codex uses its Fast single-call mode."
 echo "- Optional technical diagrams: tt-a1i/archify creates self-contained HTML architecture, topology, ERD, UML, sequence, workflow, lifecycle, and complex-flow diagrams with inline SVG and export controls."
 echo "- AI installer: check which companions are missing, then ask whether to install im-not-ai and/or archify. Do not install either companion or any dependency without explicit consent."
+echo "- Already-installed humanize-korean and archify are used automatically when their routing rules match; do not ask again before each deck."
 if [ "$installed_claude" -eq 1 ]; then
   echo "- Claude Code can inspect rendered images but does not include a raster image generator by default. Connect a compatible image-generation plugin, MCP server, or external tool separately if generated imagery is needed."
   echo "- Do not install or configure an image generator, credentials, or a paid service without explicit user consent. The slide skill still works without one."

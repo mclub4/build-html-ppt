@@ -110,6 +110,18 @@ def main() -> None:
     claude_guidance = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     installer = (ROOT / "install.sh").read_text(encoding="utf-8")
+    skill = (STANDALONE / "SKILL.md").read_text(encoding="utf-8")
+    media_strategy = (STANDALONE / "references/media-strategy.md").read_text(encoding="utf-8")
+    legacy_diagram_name = "draw" + "io"
+    for path in (
+        ROOT / "AGENTS.md",
+        ROOT / "CLAUDE.md",
+        ROOT / "README.md",
+        ROOT / "install.sh",
+        STANDALONE / "SKILL.md",
+        STANDALONE / "references/architecture-diagrams.md",
+    ):
+        require(legacy_diagram_name not in path.read_text(encoding="utf-8").lower(), f"legacy diagram companion reference remains: {path}")
     require("final response MUST include" in agent_guidance, "agent post-install reporting contract is missing")
     require("im-not-ai" in agent_guidance and "humanize-korean" in agent_guidance, "agent im-not-ai guidance is missing")
     require("/humanize-korean" in agent_guidance and "$humanize-korean" in agent_guidance, "agent im-not-ai invocation guidance is missing")
@@ -117,16 +129,21 @@ def main() -> None:
     require("also install" not in agent_guidance or "explicitly agrees" in agent_guidance, "optional companion consent contract is missing")
     require("does not include a raster image generator" in agent_guidance, "agent Claude image-generation guidance is missing")
     require("Required when Gemini CLI was installed" in agent_guidance, "agent Gemini post-install guidance is missing")
+    require("availability is sufficient consent for use" in agent_guidance, "installed companion auto-use contract is missing")
     require("Read and follow `AGENTS.md`" in claude_guidance, "Claude repository guidance does not inherit AGENTS.md")
     require("AI 에이전트에게 설치를 맡긴 경우" in readme, "README AI-agent installation guidance is missing")
     require("Claude Code 기본 설치에는 래스터 이미지 생성기가 포함되지 않습니다" in readme, "README Claude image-generation notice is missing")
     require("Gemini CLI Agent Skill" in readme, "README Gemini installation guidance is missing")
+    require("다시 허락을 묻지 않고 자동 사용" in readme, "README installed companion auto-use guidance is missing")
     require("Post-install guidance:" in installer, "installer post-install guidance is missing")
     require("epoko77-ai/im-not-ai" in installer, "installer im-not-ai notice is missing")
     require("tt-a1i/archify" in installer, "installer Archify notice is missing")
     require("Do not install either companion" in installer, "installer optional companion consent notice is missing")
     require("does not include a raster image generator by default" in installer, "installer Claude image-generation notice is missing")
     require("Gemini CLI Agent Skills" in installer, "installer Gemini post-install notice is missing")
+    require("Already-installed humanize-korean and archify are used automatically" in installer, "installer companion auto-use notice is missing")
+    require("pure-HTML, image-free, or typography/diagram-only" in skill, "skill default photo-discovery contract is missing")
+    require("perform a bounded search for relevant sourced photographs" in media_strategy, "media strategy default discovery contract is missing")
 
     print(f"Repository validation passed ({len(tree_hashes(STANDALONE))} shared skill files).")
 

@@ -137,10 +137,21 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("If `humanize-korean` is available", skill)
         self.assertIn("If `archify` is available", skill)
         self.assertIn("without waiting for a separate request", skill)
+        self.assertIn("Availability is sufficient consent", skill)
+        self.assertIn("Do not ask whether to use an already-installed", skill)
         self.assertIn("ask before installing", skill)
         self.assertIn("When `archify` is already available", architecture)
         self.assertIn("self-contained HTML output", architecture)
         self.assertIn("inline SVG", architecture)
+
+    def test_relevant_photography_is_default_unless_pure_html_is_explicit(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        media = (ROOT / "references" / "media-strategy.md").read_text(encoding="utf-8")
+        quality = (ROOT / "references" / "quality-bar.md").read_text(encoding="utf-8")
+        self.assertIn("pure-HTML, image-free, or typography/diagram-only", skill)
+        self.assertIn("perform a bounded search for relevant sourced photographs", media)
+        self.assertIn("This is a relevance rule, not an image quota", media)
+        self.assertIn("omit them when they add no information", quality)
 
     def test_physical_subjects_keep_real_world_or_scientific_imagery(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")

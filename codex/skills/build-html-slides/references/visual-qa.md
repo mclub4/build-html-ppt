@@ -34,6 +34,7 @@ Use this checklist while inspecting the rendered slides selected by `validation-
 ## Imagery
 
 - The deck's medium matches the subject. Physical industries, products, facilities, equipment, people, experiments, organisms, tissue, and clinical or laboratory phenomena receive enough sourced real-world or scientific imagery to establish the subject; charts and SVGs do not replace seeing the thing itself.
+- Unless the brief explicitly required pure HTML or no photography, an image-free chapter reflects a documented semantic choice after relevant visual discovery rather than convenience or an unattempted search.
 - The cover or opening sequence visually establishes a materially observable subject unless confidentiality, availability, or a deliberate abstract communication job justifies another approach.
 - Data-heavy slides may remain chart-first, but the overall sequence still has image-led context and chapter rhythm when the subject benefits from it.
 - Official marks retain aspect ratio and clear space.
