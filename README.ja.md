@@ -119,6 +119,7 @@ codex plugin add build-html-slides@build-html-slides
 
 ```bash
 gemini skills install ./BUILD-HTML-SLIDES-GEMINI-vX.Y.Z.skill
+gemini skills install ./ARCHIFY-GEMINI-v2.12.0.skill
 gemini skills list
 ```
 
@@ -137,10 +138,10 @@ cd build-html-ppt
 インストール担当エージェントは、次の点を必ず説明します。
 
 - [`epoko77-ai/im-not-ai`](https://github.com/epoko77-ai/im-not-ai) は韓国語文章を整える任意の補助スキルであり、本リポジトリには同梱されません。
-- [`tt-a1i/archify`](https://github.com/tt-a1i/archify) はアーキテクチャ、トポロジー、ERD、UML、シーケンス、ライフサイクル、複雑なフロー図向けの任意スキルです。
-- すでに導入済みの`humanize-korean`と`archify`は、適用条件に合えば再確認なしで利用します。
+- 本リポジトリは[`tt-a1i/archify`](https://github.com/tt-a1i/archify)のArchify v2.12.0を同梱し、アーキテクチャ、トポロジー、シーケンス、ワークフロー、ライフサイクル、データフロー図向けの独立スキルとして提供します。
+- 利用可能な`humanize-korean`と同梱された`archify`は、適用条件に合えば再確認なしで利用します。別途導入済みのArchifyは`--force`を明示しない限り上書きしません。
 - Claude Codeには標準でラスター画像生成機能がないため、生成画像には互換プラグイン、MCP、または外部ツールが別途必要です。
-- 任意スキル、画像生成サービス、認証情報は同意なしに導入・設定しません。
+- 任意スキル、画像生成サービス、認証情報は同意なしに導入・設定しません。追加導入を確認する対象は、未導入の`humanize-korean`だけです。
 
 ## 使い方
 

@@ -1,7 +1,7 @@
 {
   "name": "build-html-slides",
   "version": "0.6.2",
-  "description": "Create art-directed HTML presentations with presenter notes and adaptive visual QA.",
+  "description": "Create art-directed HTML presentations with presenter notes, adaptive visual QA, and bundled Archify diagrams.",
   "author": {
     "name": "HYUNJIN CHO",
     "url": "https://github.com/mclub4"
@@ -14,13 +14,14 @@
     "html-slides",
     "presentation",
     "playwright",
-    "visual-qa"
+    "visual-qa",
+    "architecture-diagrams"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Build HTML Slides",
-    "shortDescription": "Create HTML decks with notes and adaptive visual QA.",
-  "longDescription": "Build offline-portable HTML presentations with audience-aware story routing, a neutral 1280x720 runtime shell, topic-aware themes, WebP imagery, presenter notes, source caching, viewport-safe scaling, crop protection, and proportional Chromium visual review.",
+    "shortDescription": "Create HTML decks with notes, visual QA, and diagrams.",
+  "longDescription": "Build offline-portable HTML presentations with audience-aware story routing, topic-aware themes, WebP imagery, presenter notes, source caching, viewport-safe scaling, proportional Chromium visual review, and the bundled Archify skill for complex technical diagrams.",
     "developerName": "HYUNJIN CHO",
     "category": "Productivity",
     "capabilities": [

@@ -9,12 +9,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 STANDALONE = ROOT / "codex/skills/build-html-slides"
+ARCHIFY_STANDALONE = ROOT / "codex/skills/archify"
 PLUGIN_ROOT = ROOT / "plugins/build-html-slides"
 PLUGIN_SKILL = PLUGIN_ROOT / "skills/build-html-slides"
+PLUGIN_ARCHIFY = PLUGIN_ROOT / "skills/archify"
 CLAUDE_SKILL = ROOT / ".claude/skills/build-html-slides"
+CLAUDE_ARCHIFY = ROOT / ".claude/skills/archify"
 GEMINI_SKILL = ROOT / ".gemini/skills/build-html-slides"
+GEMINI_ARCHIFY = ROOT / ".gemini/skills/archify"
 CLAUDE_PLUGIN = ROOT / ".claude-plugin/plugin.json"
 CLAUDE_MARKETPLACE = ROOT / ".claude-plugin/marketplace.json"
+ARCHIFY_VERSION = "2.12.0"
+ARCHIFY_UPSTREAM_COMMIT = "324c0c063bd5f89a36a582fcb9a3efb53caa4285"
+ARCHIFY_PACKAGE_SHA256 = "3a52613634287fe90f39f076c98cb1271cce58737458e632e7766e1a6b443849"
 
 
 def digest(path: Path) -> str:
@@ -52,6 +59,13 @@ def main() -> None:
     require(tree_hashes(STANDALONE) == tree_hashes(PLUGIN_SKILL), "skill distributions differ")
     require(tree_hashes(STANDALONE) == tree_hashes(CLAUDE_SKILL), "Claude skill distribution differs")
     require(tree_hashes(STANDALONE) == tree_hashes(GEMINI_SKILL), "Gemini skill distribution differs")
+    require((ARCHIFY_STANDALONE / "SKILL.md").is_file(), "bundled Archify SKILL.md is missing")
+    require((PLUGIN_ARCHIFY / "SKILL.md").is_file(), "plugin Archify SKILL.md is missing")
+    require((CLAUDE_ARCHIFY / "SKILL.md").is_file(), "Claude Archify SKILL.md is missing")
+    require((GEMINI_ARCHIFY / "SKILL.md").is_file(), "Gemini Archify SKILL.md is missing")
+    require(tree_hashes(ARCHIFY_STANDALONE) == tree_hashes(PLUGIN_ARCHIFY), "plugin Archify distribution differs")
+    require(tree_hashes(ARCHIFY_STANDALONE) == tree_hashes(CLAUDE_ARCHIFY), "Claude Archify distribution differs")
+    require(tree_hashes(ARCHIFY_STANDALONE) == tree_hashes(GEMINI_ARCHIFY), "Gemini Archify distribution differs")
 
     license_file = ROOT / "LICENSE"
     notices_file = ROOT / "THIRD_PARTY_NOTICES.md"
@@ -66,7 +80,14 @@ def main() -> None:
             f"{distribution} third-party notices differ",
         )
 
+    archify_license = ARCHIFY_STANDALONE / "LICENSE"
+    require(archify_license.is_file(), "bundled Archify LICENSE is missing")
+    for distribution in (PLUGIN_ARCHIFY, CLAUDE_ARCHIFY, GEMINI_ARCHIFY):
+        require((distribution / "LICENSE").is_file(), f"{distribution} Archify LICENSE is missing")
+        require(digest(distribution / "LICENSE") == digest(archify_license), f"{distribution} Archify LICENSE differs")
+
     package = json.loads((ROOT / "package.json").read_text())
+    archify_package = json.loads((ARCHIFY_STANDALONE / "package.json").read_text())
     machine_contract = json.loads((STANDALONE / "scripts/validation_contract.json").read_text())
     plugin = json.loads((PLUGIN_ROOT / ".codex-plugin/plugin.json").read_text())
     marketplace = json.loads((ROOT / ".agents/plugins/marketplace.json").read_text())
@@ -83,6 +104,10 @@ def main() -> None:
     require(bool(re.fullmatch(r"\d+\.\d+\.\d+", plugin["version"])), "version is not strict semver")
     require(plugin.get("license") == "MIT", "plugin license must be MIT")
     require(plugin.get("skills") == "./skills/", "plugin skill path mismatch")
+    require(archify_package.get("name") == "archify", "bundled Archify package name mismatch")
+    require(archify_package.get("version") == ARCHIFY_VERSION, "bundled Archify version mismatch")
+    require(archify_package.get("license") == "MIT", "bundled Archify license metadata mismatch")
+    require(archify_package.get("engines", {}).get("node") == ">=18", "bundled Archify Node contract mismatch")
     require(marketplace.get("name") == "build-html-slides", "marketplace name mismatch")
     require(len(marketplace.get("plugins", [])) == 1, "marketplace must contain one plugin")
     require(marketplace["plugins"][0]["name"] == plugin["name"], "marketplace plugin mismatch")
@@ -117,6 +142,7 @@ def main() -> None:
     readme_ko = (ROOT / "README.ko.md").read_text(encoding="utf-8")
     readme_ja = (ROOT / "README.ja.md").read_text(encoding="utf-8")
     installer = (ROOT / "install.sh").read_text(encoding="utf-8")
+    notices = notices_file.read_text(encoding="utf-8")
     skill = (STANDALONE / "SKILL.md").read_text(encoding="utf-8")
     media_strategy = (STANDALONE / "references/media-strategy.md").read_text(encoding="utf-8")
     legacy_diagram_name = "draw" + "io"
@@ -132,8 +158,9 @@ def main() -> None:
     require("final response MUST include" in agent_guidance, "agent post-install reporting contract is missing")
     require("im-not-ai" in agent_guidance and "humanize-korean" in agent_guidance, "agent im-not-ai guidance is missing")
     require("/humanize-korean" in agent_guidance and "$humanize-korean" in agent_guidance, "agent im-not-ai invocation guidance is missing")
-    require("tt-a1i/archify" in agent_guidance and "self-contained HTML" in agent_guidance, "agent Archify companion guidance is missing")
-    require("also install" not in agent_guidance or "explicitly agrees" in agent_guidance, "optional companion consent contract is missing")
+    require("tt-a1i/archify" in agent_guidance and "self-contained HTML" in agent_guidance, "agent Archify bundle guidance is missing")
+    require("bundled" in agent_guidance and "Archify v2.12.0" in agent_guidance, "agent bundled Archify version guidance is missing")
+    require("im-not-ai" in agent_guidance and "explicitly agrees" in agent_guidance, "optional im-not-ai consent contract is missing")
     require("does not include a raster image generator" in agent_guidance, "agent Claude image-generation guidance is missing")
     require("Required when Gemini CLI was installed" in agent_guidance, "agent Gemini post-install guidance is missing")
     require("availability is sufficient consent for use" in agent_guidance, "installed companion auto-use contract is missing")
@@ -141,26 +168,40 @@ def main() -> None:
     require("AI 에이전트에게 설치를 맡긴 경우" in readme, "README AI-agent installation guidance is missing")
     require("Claude Code 기본 설치에는 래스터 이미지 생성기가 포함되지 않습니다" in readme, "README Claude image-generation notice is missing")
     require("Gemini CLI Agent Skill" in readme, "README Gemini installation guidance is missing")
-    require("다시 허락을 묻지 않고 자동 사용" in readme, "README installed companion auto-use guidance is missing")
+    require("Archify v2.12.0을 독립 스킬로 함께 제공" in readme, "README bundled Archify guidance is missing")
+    require("다시 허락을 묻지 않고 자동 사용" in readme, "README installed skill auto-use guidance is missing")
     require("README.en.md" in readme and "README.ja.md" in readme, "README language navigation is missing")
     require("README.ko.md" in readme_en and "README.ja.md" in readme_en, "English README language navigation is missing")
     require("README.ko.md" in readme_ja and "README.en.md" in readme_ja, "Japanese README language navigation is missing")
     require("squint contact sheet" in readme_en, "English README squint guidance is missing")
     require("squint contact sheet" in readme_ja, "Japanese README squint guidance is missing")
     require("squint review" in readme_ko, "Korean README squint guidance is missing")
+    require("bundles Archify v2.12.0" in readme_en, "English README bundled Archify guidance is missing")
+    require("Archify v2.12.0を同梱" in readme_ja, "Japanese README bundled Archify guidance is missing")
     require("Post-install guidance:" in installer, "installer post-install guidance is missing")
     require("epoko77-ai/im-not-ai" in installer, "installer im-not-ai notice is missing")
     require("tt-a1i/archify" in installer, "installer Archify notice is missing")
-    require("Do not install either companion" in installer, "installer optional companion consent notice is missing")
+    require("Bundled Archify skipped; existing installation preserved" in installer, "installer Archify preservation contract is missing")
+    require("ask whether to install im-not-ai only" in installer, "installer optional im-not-ai consent notice is missing")
     require("does not include a raster image generator by default" in installer, "installer Claude image-generation notice is missing")
     require("Gemini CLI Agent Skills" in installer, "installer Gemini post-install notice is missing")
-    require("Already-installed humanize-korean and archify are used automatically" in installer, "installer companion auto-use notice is missing")
+    require("Available humanize-korean and bundled Archify are used automatically" in installer, "installer skill auto-use notice is missing")
     require("pure-HTML, image-free, or typography/diagram-only" in skill, "skill default photo-discovery contract is missing")
     require("perform a bounded search for relevant sourced photographs" in media_strategy, "media strategy default discovery contract is missing")
     require("suggest_design_directions.py" in skill, "skill design-candidate routing is missing")
     require("Squint review is an auxiliary" in skill, "skill squint limitation contract is missing")
+    require("Bundled distributions include `archify`" in skill, "skill bundled Archify routing is missing")
+    require("tt-a1i/archify" in notices, "Archify third-party notice is missing")
+    require("Cocoon-AI/architecture-diagram-generator" in notices, "Archify upstream attribution is missing")
+    require(ARCHIFY_VERSION in notices, "Archify version notice is missing")
+    require(ARCHIFY_UPSTREAM_COMMIT in notices, "Archify commit notice is missing")
+    require(ARCHIFY_PACKAGE_SHA256 in notices, "Archify package digest notice is missing")
 
-    print(f"Repository validation passed ({len(tree_hashes(STANDALONE))} shared skill files).")
+    print(
+        "Repository validation passed "
+        f"({len(tree_hashes(STANDALONE))} slide-skill files, "
+        f"{len(tree_hashes(ARCHIFY_STANDALONE))} Archify files)."
+    )
 
 
 if __name__ == "__main__":

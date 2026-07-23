@@ -226,11 +226,11 @@ python3 <설치된-build-html-slides-스킬>/scripts/install_browser_dependencie
 GitHub 저장소 링크를 받은 AI 에이전트가 설치를 수행했다면, 설치 완료 응답에 다음 내용을 **반드시** 포함해야 합니다.
 
 - [`epoko77-ai/im-not-ai`](https://github.com/epoko77-ai/im-not-ai)는 필수 의존성이 아닌 선택형 동반 스킬입니다. 이 저장소에 포함되거나 자동 설치되지 않으며, `humanize-korean`으로 사실·수치·고유명사·출처가 확정된 뒤 한국어 슬라이드 문구와 발표 노트를 자연스럽게 다듬을 수 있습니다. 별도로 설치한 뒤 Claude Code에서는 `/humanize-korean`, Codex에서는 `$humanize-korean`으로 실행하며 Codex는 Fast 단일 호출 모드를 사용합니다.
-- [`tt-a1i/archify`](https://github.com/tt-a1i/archify)는 아키텍처, 네트워크 토폴로지, ERD, UML, 시퀀스, 워크플로, 라이프사이클과 복잡한 흐름도를 자체 완결 HTML과 인라인 SVG로 만드는 선택형 동반 스킬입니다.
+- 이 저장소는 Archify v2.12.0을 독립 스킬로 함께 제공합니다. 원본은 [`tt-a1i/archify`](https://github.com/tt-a1i/archify)이며, 아키텍처, 네트워크 토폴로지, 시퀀스, 워크플로, 라이프사이클과 복잡한 데이터 흐름을 자체 완결 HTML과 인라인 SVG로 만들고 조건에 맞는 슬라이드에서 자동 사용합니다.
 - Claude Code를 설치했다면, 기본 Claude Code에는 래스터 이미지 생성기가 없다는 점을 알려야 합니다. 생성 이미지가 필요하면 호환되는 플러그인·MCP·외부 이미지 생성 도구를 별도로 구성해야 하며, 추가 설치나 인증 정보 설정 전에는 사용자 동의를 받아야 합니다.
 - 생성기가 없어도 스킬은 동작하며 공식·제공·조사 이미지와 HTML/CSS/SVG 다이어그램을 사용한다는 점, 그리고 설치 후 새 세션이나 작업을 시작해야 한다는 점을 알려야 합니다.
-- 설치 에이전트는 두 동반 스킬의 설치 여부를 확인한 뒤 누락된 항목만 묻습니다. 둘 다 없다면 `선택 도구인 im-not-ai(한국어 윤문)와 Archify(아키텍처·ERD·UML·흐름도)도 설치할까요?`라고 한 번에 질문합니다. 동의를 받기 전에는 동반 스킬이나 추가 의존성을 설치하지 않습니다.
-- 이미 설치된 `humanize-korean`과 `archify`는 각 적용 조건이 맞을 때 다시 허락을 묻지 않고 자동 사용합니다. 설치 여부와 사용 여부를 혼동하지 않습니다.
+- 설치 에이전트는 `humanize-korean`의 설치 여부만 확인합니다. 누락됐다면 `선택 도구인 im-not-ai(한국어 윤문)도 설치할까요?`라고 묻고, 동의 전에는 설치하지 않습니다. Archify는 이미 배포물에 포함되므로 별도 설치 여부를 묻지 않습니다.
+- 사용 가능한 `humanize-korean`과 함께 제공된 `archify`는 각 적용 조건이 맞을 때 다시 허락을 묻지 않고 자동 사용합니다. 기존에 별도로 설치된 Archify가 있으면 `--force`를 명시하지 않는 한 덮어쓰지 않습니다.
 
 이 완료 안내는 플러그인 설치와 단독 스킬 설치 모두에 적용됩니다. 설치하지 않은 선택 도구를 설치했다고 표현해서는 안 됩니다. 저장소의 [AGENTS.md](AGENTS.md)와 [CLAUDE.md](CLAUDE.md)에도 에이전트용 동일 계약이 있습니다.
 
@@ -258,6 +258,7 @@ codex plugin add build-html-slides@build-html-slides
 
 ```bash
 gemini skills install ./BUILD-HTML-SLIDES-GEMINI-vX.Y.Z.skill
+gemini skills install ./ARCHIFY-GEMINI-v2.12.0.skill
 gemini skills list
 ```
 
@@ -279,7 +280,7 @@ cd build-html-ppt
 ./install.sh --gemini-only
 ```
 
-Claude 스킬은 `~/.claude/skills/build-html-slides`, Codex 스킬은 `~/.codex/skills/build-html-slides`, Gemini 스킬은 `~/.gemini/skills/build-html-slides`에 설치됩니다. 저장소 없이 복사본을 유지하려면 `./install.sh --copy`를 함께 사용하세요.
+각 플랫폼의 `skills/build-html-slides`와 `skills/archify`에 두 독립 스킬이 함께 설치됩니다. 저장소 없이 복사본을 유지하려면 `./install.sh --copy`를 함께 사용하세요. 기존에 이 저장소와 무관한 Archify가 있으면 보존하며, 교체는 `--force`를 명시한 경우에만 수행합니다.
 
 ```bash
 ./update.sh       # 최신 버전으로 업데이트
@@ -368,11 +369,11 @@ node codex/skills/build-html-slides/scripts/render_slides.js --clean-workspace O
 
 이 프로젝트의 필수 의존성이 아니며 자동으로 설치되지도 않습니다. 다만 이미 설치되어 있으면 사실, 수치, 고유명사와 출처를 확정한 뒤 최종 문구 윤문 단계에 별도 질문 없이 자동 적용합니다. 설치를 원한다면 해당 저장소의 안내를 별도로 따르세요.
 
-### 기술 다이어그램: Archify
+### 함께 제공되는 기술 다이어그램: Archify
 
-아키텍처, 클라우드·네트워크 토폴로지, ERD, UML, 시퀀스, 워크플로, 라이프사이클이나 복잡한 데이터 흐름이 필요한 덱에는 [tt-a1i/archify](https://github.com/tt-a1i/archify)를 함께 쓰는 것을 권장합니다. Archify는 CSS와 인라인 SVG, 테마 전환, PNG·JPEG·WebP·SVG 내보내기를 포함한 자체 완결 HTML 다이어그램을 만듭니다.
+아키텍처, 클라우드·네트워크 토폴로지, 시퀀스, 워크플로, 라이프사이클이나 복잡한 데이터 흐름이 필요한 덱에는 [tt-a1i/archify](https://github.com/tt-a1i/archify)를 사용합니다. Archify는 CSS와 인라인 SVG, 테마 전환, PNG·JPEG·WebP·SVG 내보내기를 포함한 자체 완결 HTML 다이어그램을 만듭니다.
 
-Archify는 선택 의존성이며 이 저장소에 포함되거나 자동 설치되지 않습니다. 이미 설치되어 있으면 build-html-slides가 적합한 기술 슬라이드에서 허락을 다시 묻지 않고 자동 사용하며, 간단한 2~3개 요소 도식은 더 빠른 HTML/CSS 또는 인라인 SVG로 유지합니다. 결과 HTML을 재현 가능한 원본으로 보존하고, 발표자료에는 컨트롤을 제외한 인라인 SVG 또는 충분한 해상도의 WebP를 넣어 같은 geometry·AI 검토를 적용합니다. Archify의 공식 안내는 Claude Code, Codex CLI, opencode를 대상으로 하며 Gemini에서는 Gemini Agent Skill 호환 경로로 설치할 때 이를 별도 호환 사용으로 봅니다.
+이 저장소는 Archify v2.12.0을 별도 스킬로 번들링합니다. build-html-slides는 적합한 기술 슬라이드에서 허락을 다시 묻지 않고 자동 사용하며, 간단한 2~3개 요소 도식은 더 빠른 HTML/CSS 또는 인라인 SVG로 유지합니다. 결과 HTML을 재현 가능한 원본으로 보존하고, 발표자료에는 컨트롤을 제외한 인라인 SVG 또는 충분한 해상도의 WebP를 넣어 같은 geometry·AI 검토를 적용합니다. Node.js 18 이상이면 별도 런타임 의존성 설치 없이 동작합니다.
 
 ## 검증과 개발
 
@@ -394,7 +395,7 @@ claude plugin validate .claude-plugin/marketplace.json --strict
 ./scripts/sync-distributions.sh
 ```
 
-플랫폼과 배포 방식을 구분한 릴리스 패키지 여섯 개를 만들 수 있습니다.
+플랫폼과 배포 방식을 구분한 릴리스 패키지 일곱 개를 만들 수 있습니다.
 
 ```bash
 ./scripts/package-release.sh
@@ -402,22 +403,26 @@ claude plugin validate .claude-plugin/marketplace.json --strict
 
 생성 파일:
 
-- `BUILD-HTML-SLIDES-CODEX-SKILL-vX.Y.Z.zip`
+- `BUILD-HTML-SLIDES-CODEX-BUNDLE-vX.Y.Z.zip`
 - `BUILD-HTML-SLIDES-CODEX-PLUGIN-vX.Y.Z.zip`
-- `BUILD-HTML-SLIDES-CLAUDE-SKILL-vX.Y.Z.zip`
+- `BUILD-HTML-SLIDES-CLAUDE-BUNDLE-vX.Y.Z.zip`
 - `BUILD-HTML-SLIDES-CLAUDE-PLUGIN-vX.Y.Z.zip`
-- `BUILD-HTML-SLIDES-GEMINI-SKILL-vX.Y.Z.zip`
+- `BUILD-HTML-SLIDES-GEMINI-BUNDLE-vX.Y.Z.zip`
 - `BUILD-HTML-SLIDES-GEMINI-vX.Y.Z.skill`
+- `ARCHIFY-GEMINI-v2.12.0.skill`
 
 ## 저장소 구조
 
 ```text
 codex/skills/build-html-slides/             # 단독 Codex 스킬
+codex/skills/archify/                       # 함께 제공되는 Archify 스킬
 plugins/build-html-slides/                  # Codex 플러그인
 .agents/plugins/marketplace.json            # 공개 플러그인 마켓플레이스
 .claude/skills/build-html-slides/            # Claude Code 스킬
+.claude/skills/archify/                      # Claude Code용 Archify 스킬
 .claude-plugin/                              # Claude Code 플러그인·마켓플레이스
 .gemini/skills/build-html-slides/            # Gemini CLI Agent Skill
+.gemini/skills/archify/                      # Gemini CLI용 Archify Agent Skill
 agents/                                      # Claude 독립 시각 검토 에이전트
 scripts/                                    # 동기화, 검증, 릴리스 패키징
 ```

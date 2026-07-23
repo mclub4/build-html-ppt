@@ -14,9 +14,9 @@
 
 Use the smallest diagram that answers the presentation’s claim. Split overview, critical path, failure handling, and deployment into separate slides when needed.
 
-## Route to an installed diagram companion
+## Route to the bundled diagram skill
 
-When `archify` is already available, use it proactively for architecture, cloud or network topology, deployment, ERD, UML, sequence, workflow, lifecycle, codebase structure, and complex multi-component flows that benefit from a dedicated diagram layout. The user does not need to request Archify explicitly.
+Supported distributions bundle `archify` as an independent sibling skill. When it is available, use it proactively for architecture, cloud or network topology, deployment, sequence, workflow, lifecycle, data lineage, codebase structure, and complex multi-component flows that benefit from a dedicated diagram layout. The user does not need to request Archify explicitly.
 
 Keep the native HTML/CSS or inline-SVG path for simple two- or three-node flows, small comparisons, and diagrams whose primary value is slide-by-slide animation. Do not add Archify merely because a slide contains arrows.
 
@@ -29,7 +29,7 @@ For an Archify handoff:
 - if raster export is more reliable, use Archify's WebP export at sufficient resolution while retaining the source HTML;
 - embed only the diagram artwork, not Archify's theme toggle or export controls, in the presentation;
 - render and inspect the exported result at slide size under the same geometry and AI review contract as every other meaningful visual;
-- ask for consent before installing a missing Archify skill or any dependency. If unavailable or declined, use the native diagram workflow below.
+- if Archify is unavailable because the slide skill was installed by itself, use the native diagram workflow below and mention the incomplete bundle at handoff. Do not install it or any dependency during deck work without explicit consent.
 
 ## Establish truth before drawing
 

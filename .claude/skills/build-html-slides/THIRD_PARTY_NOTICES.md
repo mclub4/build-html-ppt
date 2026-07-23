@@ -24,3 +24,20 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Archify
+
+The independent `archify` skill bundled under `codex/skills/archify` and its
+platform mirrors is distributed from
+[`tt-a1i/archify`](https://github.com/tt-a1i/archify), version 2.12.0,
+commit `324c0c063bd5f89a36a582fcb9a3efb53caa4285`. The imported upstream
+package has SHA-256 `3a52613634287fe90f39f076c98cb1271cce58737458e632e7766e1a6b443849`.
+
+Copyright (c) 2026 tt-a1i (Archify)
+Copyright (c) 2025 Cocoon AI (original "architecture-diagram-generator")
+
+Archify is licensed under the MIT License. The complete upstream license and
+copyright notice are preserved in every bundled `archify/LICENSE` file.
+Archify identifies itself as a fork and rewrite of
+[`Cocoon-AI/architecture-diagram-generator`](https://github.com/Cocoon-AI/architecture-diagram-generator)
+v1.0; that upstream attribution is retained here and in the bundled license.

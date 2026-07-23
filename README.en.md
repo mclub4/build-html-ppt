@@ -119,6 +119,7 @@ codex plugin add build-html-slides@build-html-slides
 
 ```bash
 gemini skills install ./BUILD-HTML-SLIDES-GEMINI-vX.Y.Z.skill
+gemini skills install ./ARCHIFY-GEMINI-v2.12.0.skill
 gemini skills list
 ```
 
@@ -137,10 +138,10 @@ Restart the agent session after installation.
 An AI agent that installs this repository must explain that:
 
 - [`epoko77-ai/im-not-ai`](https://github.com/epoko77-ai/im-not-ai) is an optional Korean prose companion, not a bundled dependency;
-- [`tt-a1i/archify`](https://github.com/tt-a1i/archify) is an optional companion for architecture, topology, ERD, UML, sequence, lifecycle, and complex workflow diagrams;
-- an already installed `humanize-korean` or `archify` skill is used automatically when its routing conditions match;
+- this repository bundles Archify v2.12.0 from [`tt-a1i/archify`](https://github.com/tt-a1i/archify) as an independent skill for architecture, topology, sequence, workflow, lifecycle, data-flow, and complex system diagrams;
+- available `humanize-korean` and bundled `archify` are used automatically when their routing conditions match; an unrelated existing Archify install is preserved unless `--force` is explicit;
 - Claude Code does not include a raster image generator by default, so generated raster art requires a separately configured compatible plugin, MCP server, or external tool;
-- no optional companion or image-generation service is installed or configured without consent.
+- no optional companion or image-generation service is installed or configured without consent. Only missing `humanize-korean` should prompt an optional companion-install question.
 
 ## Usage
 

@@ -66,14 +66,14 @@ The preflight never installs software. If it fails, report the exact missing or 
 
 Full Validation controls assurance depth, not research breadth, art direction, or visual-media variety. It must not turn an image-worthy presentation into a chart-and-SVG report. For 20-25 slides, target 40-90 minutes. When a request asks for many, as many as possible, or a large collection of fan artworks, read `references/fan-art-budget.md` before searching. Use its planning targets to protect implementation and validation time, but treat them as checkpoints rather than hard caps. If the task is likely to exceed 90 minutes, explain why and ask whether to continue discovery or freeze the current set; do not abruptly stop the work.
 
-## Optional Companion Routing
+## Companion Skill Routing
 
 - Inspect the skills already available in the current agent session before drafting. Never install or configure a missing companion during deck work without explicit consent.
-- Availability is sufficient consent to use a companion whose routing rule matches. Do not ask whether to use an already-installed `humanize-korean` or `archify`; invoke it automatically at the appropriate workflow stage.
+- Availability is sufficient consent to use a companion whose routing rule matches. Do not ask whether to use an available `humanize-korean` or `archify`; invoke it automatically at the appropriate workflow stage.
 - If `humanize-korean` is available and the deliverable contains Korean, invoke it once after facts, numbers, proper nouns, citations, and slide order have settled. Apply it to slide copy and presenter notes without waiting for a separate request. Review the diff and reject any change to meaning, factual claims, figures, names, source scope, or technical terminology.
-- If `archify` is available and the deck needs an architecture, network or cloud topology, deployment view, ERD, UML, sequence, lifecycle, codebase structure, or a complex multi-component flow, invoke it proactively without waiting for a separate request. Read `references/architecture-diagrams.md` for the handoff contract.
+- Bundled distributions include `archify` as an independent sibling skill. When the deck needs an architecture, network or cloud topology, deployment view, sequence, lifecycle, data lineage, codebase structure, or a complex multi-component flow, invoke it proactively without waiting for a separate request. Read `references/architecture-diagrams.md` for the handoff contract.
 - Keep simple slide-native grids, two- or three-node flows, and diagrams whose main purpose is staged animation in semantic HTML/CSS or inline SVG. Do not pay the companion export and review cost when it adds no clarity.
-- Preserve Archify's self-contained HTML as the reproducible diagram source and use its inline SVG or a WebP export in the deck. Remove export controls from the embedded slide asset, match the deck theme, and rerun the same geometry and visual checks as for every other slide. If Archify is missing, ask before installing it; if the user declines, use the native diagram path.
+- Preserve Archify's self-contained HTML as the reproducible diagram source and use its inline SVG or a WebP export in the deck. Remove export controls from the embedded slide asset, match the deck theme, and rerun the same geometry and visual checks as for every other slide. If `archify` is unavailable because only the slide skill was copied, continue with the native diagram path and disclose that the full bundle was not installed; never install software during deck work without explicit consent.
 
 ## Story And Copy
 

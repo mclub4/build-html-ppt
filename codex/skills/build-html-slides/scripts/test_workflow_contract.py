@@ -136,17 +136,17 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("### Travel routing", playbook)
         self.assertIn("Japanese travel does not automatically mean dark green", playbook)
 
-    def test_installed_companions_are_routed_without_implicit_installation(self) -> None:
+    def test_available_companions_and_bundled_archify_are_routed_automatically(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         architecture = (ROOT / "references" / "architecture-diagrams.md").read_text(encoding="utf-8")
-        self.assertIn("## Optional Companion Routing", skill)
+        self.assertIn("## Companion Skill Routing", skill)
         self.assertIn("If `humanize-korean` is available", skill)
-        self.assertIn("If `archify` is available", skill)
+        self.assertIn("Bundled distributions include `archify`", skill)
         self.assertIn("without waiting for a separate request", skill)
         self.assertIn("Availability is sufficient consent", skill)
-        self.assertIn("Do not ask whether to use an already-installed", skill)
-        self.assertIn("ask before installing", skill)
-        self.assertIn("When `archify` is already available", architecture)
+        self.assertIn("Do not ask whether to use an available", skill)
+        self.assertIn("never install software during deck work", skill)
+        self.assertIn("Supported distributions bundle `archify`", architecture)
         self.assertIn("self-contained HTML output", architecture)
         self.assertIn("inline SVG", architecture)
 

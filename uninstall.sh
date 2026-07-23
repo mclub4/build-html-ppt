@@ -51,6 +51,7 @@ remove_owned() {
 
 if [ "$DO_CLAUDE" -eq 1 ]; then
   remove_owned "$REPO/.claude/skills/build-html-slides" "$CLAUDE_HOME/skills/build-html-slides" dir
+  remove_owned "$REPO/.claude/skills/archify" "$CLAUDE_HOME/skills/archify" dir
   for agent in "$REPO"/agents/build-html-slides-*.md; do
     remove_owned "$agent" "$CLAUDE_HOME/agents/$(basename "$agent")" file
   done
@@ -58,8 +59,10 @@ fi
 
 if [ "$DO_CODEX" -eq 1 ]; then
   remove_owned "$REPO/codex/skills/build-html-slides" "$CODEX_HOME/skills/build-html-slides" dir
+  remove_owned "$REPO/codex/skills/archify" "$CODEX_HOME/skills/archify" dir
 fi
 
 if [ "$DO_GEMINI" -eq 1 ]; then
   remove_owned "$REPO/.gemini/skills/build-html-slides" "$GEMINI_HOME/skills/build-html-slides" dir
+  remove_owned "$REPO/.gemini/skills/archify" "$GEMINI_HOME/skills/archify" dir
 fi
