@@ -75,7 +75,7 @@ class WorkflowContractTests(unittest.TestCase):
         contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
         machine = json.loads((ROOT / "scripts" / "validation_contract.json").read_text(encoding="utf-8"))
         self.assertIn("machine-readable authority", contract)
-        self.assertEqual(machine["schema_version"], 10)
+        self.assertEqual(machine["schema_version"], 11)
         self.assertEqual(machine["review_batch_size"], 4)
         self.assertEqual(machine["base_profiles"], ["normal", "short", "zoom150"])
         self.assertIn("font_integrity", machine["automation_checks_by_change"]["text"])

@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "charts": [
+    {
+      "id": "line",
+      "data_shapes": ["trend"],
+      "use_when": "Continuous values over ordered time with meaningful intermediate movement.",
+      "avoid_when": "There are only two time points or categories are not ordered.",
+      "max_categories": 6,
+      "non_color_encoding": ["line-style", "direct-label", "marker-shape"],
+      "accessible_fallback": "Direct-label each series and add a compact start/end/delta table."
+    },
+    {
+      "id": "bar",
+      "data_shapes": ["category-comparison", "ranking"],
+      "use_when": "Comparing magnitudes across a bounded set of categories.",
+      "avoid_when": "The slide needs to show a continuous distribution or more than twelve categories.",
+      "max_categories": 12,
+      "non_color_encoding": ["position", "direct-label", "pattern"],
+      "accessible_fallback": "Sort bars and print values at bar ends."
+    },
+    {
+      "id": "dot-plot",
+      "data_shapes": ["category-comparison", "ranking"],
+      "use_when": "Precise comparison matters and bars would consume too much ink.",
+      "avoid_when": "The audience expects part-to-whole area or category labels are extremely long.",
+      "max_categories": 20,
+      "non_color_encoding": ["position", "marker-shape", "direct-label"],
+      "accessible_fallback": "Use one aligned value column beside the dots."
+    },
+    {
+      "id": "stacked-bar",
+      "data_shapes": ["part-to-whole"],
+      "use_when": "A small number of stable parts must be compared across a few totals.",
+      "avoid_when": "More than five parts need precise cross-category comparison.",
+      "max_categories": 5,
+      "non_color_encoding": ["pattern", "segment-label", "consistent-order"],
+      "accessible_fallback": "Add total labels and a companion table for exact segment values."
+    },
+    {
+      "id": "histogram",
+      "data_shapes": ["distribution"],
+      "use_when": "Showing the shape, spread, skew, or modes of continuous observations.",
+      "avoid_when": "There are too few observations or bins would imply false precision.",
+      "max_categories": 20,
+      "non_color_encoding": ["position", "outline", "annotation"],
+      "accessible_fallback": "Annotate median and range and provide sample count."
+    },
+    {
+      "id": "box-plot",
+      "data_shapes": ["distribution", "uncertainty"],
+      "use_when": "Comparing spread and outliers across several groups for a data-literate audience.",
+      "avoid_when": "The audience is unfamiliar with quartiles or the sample is very small.",
+      "max_categories": 10,
+      "non_color_encoding": ["position", "median-line", "outlier-marker"],
+      "accessible_fallback": "Add median, interquartile range, and sample-size labels."
+    },
+    {
+      "id": "scatter",
+      "data_shapes": ["correlation", "distribution"],
+      "use_when": "Showing relationship, clusters, and outliers between two quantitative variables.",
+      "avoid_when": "The claim is causal or overplotting hides the distribution.",
+      "max_categories": 8,
+      "non_color_encoding": ["marker-shape", "direct-label", "small-multiple"],
+      "accessible_fallback": "Label important points and state correlation limitations in the caption."
+    },
+    {
+      "id": "range-interval",
+      "data_shapes": ["uncertainty", "category-comparison"],
+      "use_when": "The estimate and its uncertainty or target range are both decision-relevant.",
+      "avoid_when": "Intervals have different definitions or confidence levels.",
+      "max_categories": 12,
+      "non_color_encoding": ["interval-line", "point-marker", "direct-label"],
+      "accessible_fallback": "Print estimate and interval bounds in aligned text."
+    },
+    {
+      "id": "sankey-or-flow",
+      "data_shapes": ["flow"],
+      "use_when": "A small number of measurable transfers or losses between named stages matters.",
+      "avoid_when": "Values are unavailable, paths cross heavily, or direction is the only message.",
+      "max_categories": 8,
+      "non_color_encoding": ["width", "direction-arrow", "stage-label"],
+      "accessible_fallback": "Use a numbered flow with explicit quantities at each transition."
+    },
+    {
+      "id": "timeline",
+      "data_shapes": ["schedule"],
+      "use_when": "Sequence, duration, milestones, and dependencies are the claim.",
+      "avoid_when": "Dates are uncertain enough that a roadmap would imply false commitment.",
+      "max_categories": 12,
+      "non_color_encoding": ["position", "line-style", "milestone-shape"],
+      "accessible_fallback": "Add a dated milestone list in reading order."
+    },
+    {
+      "id": "map",
+      "data_shapes": ["geography"],
+      "use_when": "Location, distance, region, route, or spatial concentration is essential to the claim.",
+      "avoid_when": "Population or area size would visually distort a non-geographic comparison.",
+      "max_categories": 12,
+      "non_color_encoding": ["pattern", "symbol-shape", "direct-label"],
+      "accessible_fallback": "Add a ranked region table and label every highlighted location."
+    },
+    {
+      "id": "table",
+      "data_shapes": ["precise-values", "category-comparison"],
+      "use_when": "The audience must retrieve exact values or compare many attributes.",
+      "avoid_when": "A single visual pattern or trend is the real message.",
+      "max_categories": 20,
+      "non_color_encoding": ["alignment", "typographic-emphasis", "icon-marker"],
+      "accessible_fallback": "The table is already the fallback; highlight only decision-relevant cells."
+    }
+  ]
+}

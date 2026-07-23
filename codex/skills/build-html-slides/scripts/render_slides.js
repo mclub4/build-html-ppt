@@ -24,6 +24,7 @@ const AUTOMATION_CHECKS_BY_CHANGE = CONTRACT.automation_checks_by_change;
 const REVIEW_BATCH_SIZE = CONTRACT.review_batch_size;
 const IMPACT_SCOPES = new Set(CONTRACT.impact_scopes);
 const CONTENT_CHANGE_CATEGORIES = new Set(CONTRACT.content_change_categories);
+const SQUINT_REVIEW_CHECKS = [...CONTRACT.squint_review_checks];
 const MEDIA_WAIT_TIMEOUT_MS = 15000;
 const QUALITY_DIMENSIONS = [
   'story', 'art_direction', 'layout_rhythm', 'typography',
@@ -372,6 +373,61 @@ async function prepareFingerprintPage(page, url) {
   await page.addStyleTag({ content: MOTION_OVERRIDE, attributes: { 'data-slide-validation-motion': 'off' } });
   await waitForStyles(page);
   await waitForFrames(page);
+}
+
+function htmlEscape(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+async function createSquintContactSheet(browser, manifest, output, workspace) {
+  const tmpDirectory = path.join(workspace, 'tmp');
+  fs.mkdirSync(tmpDirectory, { recursive: true });
+  const htmlPath = path.join(tmpDirectory, 'squint-contact-sheet.html');
+  const imagePath = path.join(tmpDirectory, 'squint-contact-sheet.png');
+  const cards = manifest.slides.map(record => {
+    const relative = record.captures?.normal?.path;
+    if (!relative) throw new Error(`slide ${record.slide} has no normal capture for squint review`);
+    const capturePath = path.resolve(output, relative);
+    if (!fs.existsSync(capturePath)) throw new Error(`squint source capture not found: ${capturePath}`);
+    return `<figure><div class="thumb"><img src="${htmlEscape(pathToFileURL(capturePath).href)}" alt=""></div>`
+      + `<figcaption>${String(record.slide).padStart(2, '0')}</figcaption></figure>`;
+  }).join('');
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+    *{box-sizing:border-box}html,body{margin:0;background:#ecece8;color:#181816;font-family:Arial,sans-serif}
+    main{width:1280px;padding:34px;display:grid;grid-template-columns:repeat(4,1fr);gap:22px 18px}
+    figure{margin:0;min-width:0}.thumb{aspect-ratio:16/9;overflow:hidden;background:#bbb;border:1px solid #aaa}
+    img{width:100%;height:100%;object-fit:cover;display:block;filter:blur(2.4px) saturate(.88);transform:scale(1.015)}
+    figcaption{padding-top:7px;font-size:13px;font-weight:700;letter-spacing:0;color:#4b4b46}
+  </style></head><body><main>${cards}</main></body></html>`;
+  fs.writeFileSync(htmlPath, html);
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  try {
+    await page.goto(pathToFileURL(htmlPath).href, { waitUntil: 'domcontentloaded' });
+    await waitForMedia(page);
+    await page.screenshot({ path: imagePath, fullPage: true });
+  } finally {
+    await page.close();
+    fs.rmSync(htmlPath, { force: true });
+  }
+  const captureHashes = Object.fromEntries(manifest.slides.map(record => [
+    String(record.slide), record.captures.normal.sha256,
+  ]));
+  return {
+    status: 'pending',
+    reviewer: '',
+    reviewer_ref: '',
+    review_method: 'vision-squint-contact-sheet',
+    artifact_path: path.relative(output, imagePath).split(path.sep).join('/'),
+    artifact_sha256: sha256(fs.readFileSync(imagePath)),
+    normal_capture_sha256: captureHashes,
+    checks: Object.fromEntries(SQUINT_REVIEW_CHECKS.map(name => [name, 'pending'])),
+    observation: '',
+    limitations: ['text-overlap', 'line-breaks', 'crop', 'distortion', 'overflow'],
+  };
 }
 
 function hashLocalAsset(url, cache = null) {
@@ -1225,9 +1281,10 @@ async function main() {
       existing.cross_reviews = finalReview.reviews;
       existing.cross_review_batches = finalReview.batches;
       existing.retained_cross_reviews = [];
+      existing.squint_review = await createSquintContactSheet(browser, existing, args.output, args.workspace);
       fs.writeFileSync(path.join(args.output, 'review.json'), `${JSON.stringify(existing, null, 2)}\n`);
       process.stdout.write(
-        `OK: prepared final review without re-rendering; complete quality_score and `
+        `OK: prepared final review without re-rendering; inspect the squint contact sheet, complete quality_score and `
         + `${finalReview.pending} pending cross-review slide(s) in ${finalReview.batches.length} batch(es); `
         + `${finalReview.reused} unchanged cross-review slide(s) reused, then run finalize-verify\n`
         + `${path.join(args.output, 'review.json')}\n`
@@ -1520,6 +1577,7 @@ async function main() {
     cross_reviews: [],
     cross_review_batches: [],
     retained_cross_reviews: [...retainedCrossReviewBySlide.values()].sort((left, right) => left.slide - right.slide),
+    squint_review: null,
     slides: records,
   };
   const manifestPath = path.join(args.output, 'review.json');

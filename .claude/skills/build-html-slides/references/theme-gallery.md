@@ -218,9 +218,63 @@ Choose a primary visual system after identifying the audience, communication job
 - Signature slides: human-stakes cover, current-state evidence, handoff map, physical system detail, migration sequence, operating principle
 - Avoid: generic team stock photography, replacing technical proof with portraits, and applying cinematic darkness to every slide
 
+## 25. Constructive Geometry (Bauhaus-Inspired)
+
+- Best for: design systems, architecture education, structured workshops, technology concepts, and decisive internal proposals that benefit from visual energy without console styling
+- Type: bold geometric sans display with a quieter humanist sans body; use mono only for identifiers
+- Palette: bright paper with black plus two disciplined primary or subject-derived accents
+- Grammar: circles, bars, planes, and type blocks aligned to a visible grid; strong asymmetry, modular sequences, and open comparisons
+- Signature slides: geometric thesis, modular mechanism, type-led chapter, option comparison, decisive closing
+- Avoid: random shape confetti, making every element loud, and copying historical Bauhaus posters or typography
+
+## 26. Organic Systems (Biophilic / Biomimetic)
+
+- Best for: biology, medical research, climate, ecology, agriculture, food systems, sustainability, and nature-inspired engineering
+- Type: warm humanist sans or restrained serif/sans contrast with precise evidence captions
+- Palette: laboratory white or true photographic neutrals with two organism-, material-, or landscape-derived accents; green is not mandatory
+- Grammar: real macro, microscopy, field, organism, or material imagery; layered mechanisms, flowing but labeled relationships, calibrated details, and open evidence captions
+- Signature slides: living-system cover, macro evidence, mechanism sequence, ecosystem relationship, intervention comparison, findings close
+- Avoid: green wash, leaf icons as evidence, decorative biomorphic blobs, and generated scientific imagery presented as fact
+
+## 27. Scholarly Review
+
+- Best for: literature reviews, academic talks, humanities, philosophy, history, policy research, and evidence-heavy expert briefings
+- Type: readable scholarly serif or serif-led contrast with clear sans metadata and tabular numerals
+- Palette: paper, ink, one annotation color, and one restrained evidence accent
+- Grammar: argument maps, citation margins, comparative plates, source excerpts, method/result sequences, and footnotes sized for the room
+- Signature slides: research question, argument map, source plate, method-to-finding, disagreement matrix, open question
+- Avoid: shrinking a paper page into a slide, ornamental academic styling, unreadable footnotes, and treating citation count as visual proof
+
+## 28. Archival Analog (Vintage Analog / Retro Film)
+
+- Best for: technology history, retro games, music and film, brand archives, oral history, cultural retrospectives, and nostalgia grounded in real artifacts
+- Type: period-aware display face paired with a highly readable contemporary body; distress only on display roles
+- Palette: true artifact color with paper, black, and one period-derived accent; allow occasional darkroom or projection-black resets
+- Grammar: dated artifacts, filmstrip sequences, ticket or packaging details, contact prints, oral-history quotes, provenance labels, and chronological pacing
+- Signature slides: archive cover, dated artifact, filmstrip sequence, before/after era, oral-history quote, legacy close
+- Avoid: fake damage overlays, unreadable distress, invented nostalgia, and archive imagery without dates or provenance
+
+## 29. Editorial Grid / Magazine
+
+- Best for: industry trends, company or person profiles, product and market comparisons, portfolios, media-rich technology stories, and current-affairs explainers
+- Type: assertive editorial display with clean sans body and compact issue/date/source labels
+- Palette: paper or mixed surfaces with an ink base, one sharp index accent, and photo-derived secondary roles
+- Grammar: issue-style cover, photo/text spreads, profile index, pull-quote resets, comparison folios, source rails, and controlled density shifts
+- Signature slides: issue cover, profile spread, comparison folio, pull-quote reset, annotated evidence, editorial recommendation
+- Avoid: copied magazine mastheads, equal-card walls, tiny contact sheets, and placing every image inside the same frame
+
+## Auxiliary treatment grammars
+
+The following are accents for selected moments, not full-deck themes:
+
+- **Kinetic Typography:** cover, chapter, decisive claim, or closing.
+- **Exaggerated Minimalism:** one earned hero or thesis moment, not sparse body slides.
+- **3D Product Evidence:** accurate product, hardware, cutaway, or spatial explanation; never a fabricated real product.
+- **Parallax And Depth:** occasional layered transition or spatial reveal with reduced-motion and print fallbacks.
+
 ## Selection rules
 
-1. Choose based on communication job, audience, media, and emotional tone, not the topic noun or favorite color. A named gallery direction is never mandatory.
+1. Choose based on communication job, audience, media, evidence obligations, and emotional tone, not the topic noun or favorite color. A named gallery direction is never mandatory. Use `design-candidate-search.md` to compare three structured candidates before committing.
 2. Write a one-line theme contract covering mood, type roles, palette roles, shape language, media treatment, and motion.
 3. Pick three to five signature composition families from the selected theme and add two contrasting families for rhythm.
 4. Keep the system recognizable across dark, light, image-led, and data-led slides.

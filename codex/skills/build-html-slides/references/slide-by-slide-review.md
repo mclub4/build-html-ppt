@@ -20,7 +20,7 @@ For each generated batch of at most four slides. Keep the batch intact in one vi
 6. Fill only the checks required by `review_scope`. Complete each `identity_review` entry from pixel comparison, never from labels or filenames.
 7. Record a readable reviewer label and stable run-specific `reviewer_ref`.
 
-Use contact sheets only to notice deck-wide rhythm, repetition, density, or a report-like absence of subject imagery. They do not replace slide-level inspection. In Full Validation, the final quality editor must assess whether the deck's overall media mix fits the subject rather than rewarding chart-only rigor by default.
+Use ordinary contact sheets only to notice deck-wide rhythm, repetition, density, or a report-like absence of subject imagery. They do not replace slide-level inspection. In Full Validation, `--phase finalize-prepare` also creates one lightly blurred squint contact sheet from every current `normal` capture. The final quality editor uses it for focal hierarchy, emphasis range, deck rhythm, and color/density balance only. It cannot approve text overlap, awkward line breaks, crop, distortion, overflow, identity, or media appropriateness; open the relevant full-size captures for those checks. The final quality editor must assess whether the deck's overall media mix fits the subject rather than rewarding chart-only rigor by default.
 
 ## Visual Checks
 
@@ -60,10 +60,11 @@ Never change a FAIL record to PASS in place. A FAIL requires a deck change, a ne
 After all findings are settled:
 
 1. run `validate_all.py --phase finalize-prepare`;
-2. have an independent presentation editor score the deck once with `quality-bar.md`;
-3. complete exactly the generated `cross_review_batches`, using reviewers outside the full primary-reviewer set;
-4. bind cross-reviews to current capture hashes;
-5. run `validate_all.py --phase finalize-verify`.
+2. have an independent presentation editor inspect and fill the generated squint record once;
+3. have that editor score the deck once with `quality-bar.md`;
+4. complete exactly the generated `cross_review_batches`, using reviewers outside the full primary-reviewer set;
+5. bind squint and cross-reviews to current capture hashes;
+6. run `validate_all.py --phase finalize-verify`.
 
 Standard risk uses a bounded set containing visual-critical, warning-triggered, and distributed sample slides. High risk includes every slide. This independent pass is not removed as duplicate checking. Do not expand a standard final pass to all slides unless the generated batches or a new finding requires it. After a focused repair, reuse a passing independent review only when the slide capture hash and review contract are unchanged; regenerate the failed or changed slide's review.
 

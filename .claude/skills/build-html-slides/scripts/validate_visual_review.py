@@ -53,6 +53,7 @@ QUALITY_DIMENSIONS = (
     "story", "art_direction", "layout_rhythm", "typography",
     "imagery", "composition", "evidence", "presentation_utility",
 )
+SQUINT_REVIEW_CHECKS = tuple(CONTRACT["squint_review_checks"])
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 VOID_TAGS = {
     "area", "base", "br", "col", "embed", "hr", "image", "img", "input",
@@ -451,6 +452,71 @@ def validate_quality_score(
         errors.append(f"quality_score weakest_slides must contain {required_count} distinct valid slide numbers")
     if not valid_observation(score.get("notes")):
         errors.append("quality_score notes need a concrete review observation")
+
+
+def validate_squint_review(
+    manifest: dict,
+    manifest_path: Path,
+    slide_count: int,
+    primary_reviewer_refs: set[str],
+    errors: list[str],
+) -> None:
+    review = manifest.get("squint_review")
+    if not isinstance(review, dict) or review.get("status") != "pass":
+        errors.append("final phase requires a passing squint_review")
+        return
+    if review.get("review_method") != "vision-squint-contact-sheet":
+        errors.append("squint_review review_method must be 'vision-squint-contact-sheet'")
+    reviewer = str(review.get("reviewer", "")).strip()
+    reviewer_ref = str(review.get("reviewer_ref", "")).strip()
+    if not reviewer or len(reviewer_ref) < 8 or reviewer_ref == reviewer:
+        errors.append("squint_review needs reviewer and stable reviewer_ref")
+    if reviewer_ref in primary_reviewer_refs:
+        errors.append("squint_review reviewer_ref must differ from every primary visual reviewer_ref")
+    quality_ref = str(manifest.get("quality_score", {}).get("reviewer_ref", "")).strip()
+    if quality_ref and reviewer_ref != quality_ref:
+        errors.append("squint_review must be completed by the same independent final quality editor")
+
+    checks = review.get("checks")
+    if not isinstance(checks, dict) or tuple(checks) != SQUINT_REVIEW_CHECKS:
+        errors.append("squint_review checks must match the final hierarchy contract exactly")
+    elif any(str(checks.get(name, "")).lower() != "pass" for name in SQUINT_REVIEW_CHECKS):
+        errors.append("every squint_review hierarchy check must pass")
+    if not valid_observation(review.get("observation")):
+        errors.append("squint_review needs one concrete deck-wide hierarchy observation")
+    if review.get("limitations") != ["text-overlap", "line-breaks", "crop", "distortion", "overflow"]:
+        errors.append("squint_review must preserve its full-size inspection limitations")
+
+    hashes = review.get("normal_capture_sha256")
+    expected_hashes = {
+        str(record.get("slide")): record.get("captures", {}).get("normal", {}).get("sha256")
+        for record in manifest.get("slides", [])
+        if isinstance(record, dict)
+    }
+    if len(expected_hashes) != slide_count or hashes != expected_hashes:
+        errors.append("squint_review must bind every current normal capture hash exactly")
+
+    relative = review.get("artifact_path")
+    if not isinstance(relative, str) or not relative.strip() or Path(relative).is_absolute():
+        errors.append("squint_review artifact_path must be a relative PNG path")
+        return
+    artifact = (manifest_path.parent / relative).resolve()
+    workspace = manifest_path.parent.parent.resolve()
+    if artifact.suffix.lower() != ".png" or not artifact.is_relative_to(workspace) or not artifact.is_file():
+        errors.append("squint_review artifact_path must resolve to a current workspace PNG")
+        return
+    supplied_hash = review.get("artifact_sha256")
+    try:
+        dimensions, color_count, luma_range, actual_hash = png_info(artifact)
+    except (OSError, ValueError) as exc:
+        errors.append(f"squint_review artifact is invalid: {exc}")
+        return
+    if supplied_hash != actual_hash:
+        errors.append("squint_review artifact_sha256 mismatch")
+    if dimensions[0] < 640 or dimensions[1] < 180:
+        errors.append("squint_review contact sheet is too small for deck-wide hierarchy inspection")
+    if color_count <= 4 or luma_range < 8:
+        errors.append("squint_review contact sheet appears blank or near-solid")
 
 
 def validate_current_fingerprints(deck: Path, manifest: dict, errors: list[str]) -> None:
@@ -1045,7 +1111,10 @@ def main() -> int:
                 errors.append(f"reviewer_ref {reference!r} slide assignment is not contiguous")
 
     if phase == "final" and mode == "full":
+        validate_squint_review(manifest, args.manifest, len(titles), distinct_primary_refs, errors)
         validate_quality_score(manifest, mode, len(titles), distinct_primary_refs, errors)
+    elif manifest.get("squint_review") not in (None, {}):
+        errors.append("squint_review must remain empty until Full Validation final review")
 
     cross_reviews = manifest.get("cross_reviews")
     if not isinstance(cross_reviews, list):

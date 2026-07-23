@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression tests for adaptive visual-review manifest schema version 8."""
+"""Regression tests for the adaptive visual-review manifest contract."""
 
 from __future__ import annotations
 
@@ -285,6 +285,23 @@ class VisualReviewTests(unittest.TestCase):
                 cross_reviews.extend(
                     self.cross_review(records[number - 1], responsive, batch_id) for number in batch_slides
                 )
+        squint_payload = png_bytes(960, 540)
+        squint_review = None
+        if phase == "final" and mode == "full":
+            squint_review = {
+                "status": "pass",
+                "reviewer": "editor-a",
+                "reviewer_ref": "editor-ref-a",
+                "review_method": "vision-squint-contact-sheet",
+                "artifact_path": "tmp/squint-contact-sheet.png",
+                "artifact_sha256": hashlib.sha256(squint_payload).hexdigest(),
+                "normal_capture_sha256": {
+                    str(record["slide"]): record["captures"]["normal"]["sha256"] for record in records
+                },
+                "checks": {name: "pass" for name in CONTRACT["squint_review_checks"]},
+                "observation": "The blurred overview preserves a clear focal sequence, varied emphasis, and balanced deck-wide density.",
+                "limitations": ["text-overlap", "line-breaks", "crop", "distortion", "overflow"],
+            }
         review_batches = []
         ai_reviewed = [number for number in rendered if records[number - 1]["required_ai_profiles"]]
         for offset in range(0, len(ai_reviewed), 4):
@@ -391,6 +408,7 @@ class VisualReviewTests(unittest.TestCase):
             "quality_score": quality,
             "cross_reviews": cross_reviews,
             "cross_review_batches": cross_review_batches,
+            "squint_review": squint_review,
             "slides": records,
         }
 
@@ -432,6 +450,11 @@ class VisualReviewTests(unittest.TestCase):
                         path.write_bytes(png_bytes(*dimensions(profile), blank=True))
                     else:
                         path.write_bytes(evidence_bytes(profile))
+            squint_review = manifest.get("squint_review")
+            if isinstance(squint_review, dict) and squint_review.get("artifact_path"):
+                squint_path = root / squint_review["artifact_path"]
+                squint_path.parent.mkdir(parents=True, exist_ok=True)
+                squint_path.write_bytes(png_bytes(960, 540))
             if stale_rendered:
                 future = time.time_ns() + 2_000_000_000
                 os.utime(deck, ns=(future, future))
@@ -679,6 +702,22 @@ class VisualReviewTests(unittest.TestCase):
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
         self.assertIn("final phase requires a passing quality_score", result.stdout)
+
+    def test_final_phase_requires_squint_review(self) -> None:
+        deck = deck_for(2)
+        manifest = self.manifest(deck, mode="full", phase="final")
+        manifest["squint_review"] = None
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("final phase requires a passing squint_review", result.stdout)
+
+    def test_squint_review_binds_current_normal_capture_hashes(self) -> None:
+        deck = deck_for(2)
+        manifest = self.manifest(deck, mode="full", phase="final")
+        manifest["squint_review"]["normal_capture_sha256"]["1"] = "0" * 64
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("bind every current normal capture hash", result.stdout)
 
     def test_iteration_does_not_validate_quality_score(self) -> None:
         deck = deck_for(2)

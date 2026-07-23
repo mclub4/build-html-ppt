@@ -154,7 +154,7 @@ const { chromium } = loadPlaywright();
 
             manifest_path = review_dir / "review.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self.assertEqual(manifest["schema_version"], 10)
+            self.assertEqual(manifest["schema_version"], 11)
             self.assertEqual(list(manifest["viewports"]), ["normal", "short", "zoom150"])
             self.assertEqual(manifest["viewports"]["zoom150"]["viewport"], "1920x1080")
             self.assertEqual(manifest["viewports"]["zoom150"]["visual_viewport"], "1280x720")
@@ -249,6 +249,9 @@ const { chromium } = loadPlaywright();
             self.assertEqual(manifest["phase"], "final")
             self.assertTrue(manifest["cross_review_batches"])
             self.assertTrue(all(len(batch["slides"]) <= 4 for batch in manifest["cross_review_batches"]))
+            squint_path = (review_dir / manifest["squint_review"]["artifact_path"]).resolve()
+            self.assertTrue(squint_path.is_file())
+            self.assertEqual(manifest["squint_review"]["status"], "pending")
 
             manifest["quality_score"] = {
                 "status": "pass",
@@ -262,6 +265,13 @@ const { chromium } = loadPlaywright();
                 "weakest_slides": [1, 2, 3],
                 "notes": "The settled deck keeps readable hierarchy, varied composition, and presentation-ready evidence.",
             }
+            manifest["squint_review"].update({
+                "status": "pass",
+                "reviewer": "final-editor",
+                "reviewer_ref": "final-editor-run-001",
+                "checks": {name: "pass" for name in manifest["squint_review"]["checks"]},
+                "observation": "The blurred contact sheet keeps a clear focal sequence, varied emphasis, and balanced color-density rhythm.",
+            })
             for review in manifest["cross_reviews"]:
                 review["reviewer"] = "final-editor"
                 review["reviewer_ref"] = "final-editor-run-001"

@@ -293,7 +293,7 @@ def main() -> int:
                 ["node", str(SCRIPTS / "render_slides.js"), str(deck), str(review), "--finalize-prepare"],
             )
             print(
-                f"NEXT: fill the final quality score and generated cross-review batches in {manifest}, "
+                f"NEXT: inspect and fill squint_review, the final quality score, and generated cross-review batches in {manifest}, "
                 "then run --phase finalize-verify"
             )
         else:

@@ -42,6 +42,10 @@ def main() -> None:
     require((STANDALONE / "scripts/install_browser_dependencies.py").is_file(), "managed browser installer is missing")
     require((STANDALONE / "scripts/playwright_loader.js").is_file(), "shared Playwright loader is missing")
     require((STANDALONE / "scripts/validation_contract.json").is_file(), "machine validation contract is missing")
+    require((STANDALONE / "scripts/suggest_design_directions.py").is_file(), "design candidate search is missing")
+    require((STANDALONE / "scripts/suggest_chart.py").is_file(), "chart suggestion tool is missing")
+    require((STANDALONE / "references/design-candidates.json").is_file(), "design candidate data is missing")
+    require((STANDALONE / "references/chart-selection.json").is_file(), "chart selection data is missing")
     require((PLUGIN_SKILL / "SKILL.md").is_file(), "plugin SKILL.md is missing")
     require((CLAUDE_SKILL / "SKILL.md").is_file(), "Claude SKILL.md is missing")
     require((GEMINI_SKILL / "SKILL.md").is_file(), "Gemini SKILL.md is missing")
@@ -70,7 +74,7 @@ def main() -> None:
     claude_marketplace = json.loads(CLAUDE_MARKETPLACE.read_text())
 
     require(plugin["name"] == "build-html-slides", "plugin name mismatch")
-    require(machine_contract.get("schema_version") == 10, "validation contract schema mismatch")
+    require(machine_contract.get("schema_version") == 11, "validation contract schema mismatch")
     require(
         package.get("devDependencies", {}).get("playwright") == machine_contract.get("playwright_version"),
         "package and managed Playwright versions differ",
@@ -109,6 +113,9 @@ def main() -> None:
     agent_guidance = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
     claude_guidance = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    readme_en = (ROOT / "README.en.md").read_text(encoding="utf-8")
+    readme_ko = (ROOT / "README.ko.md").read_text(encoding="utf-8")
+    readme_ja = (ROOT / "README.ja.md").read_text(encoding="utf-8")
     installer = (ROOT / "install.sh").read_text(encoding="utf-8")
     skill = (STANDALONE / "SKILL.md").read_text(encoding="utf-8")
     media_strategy = (STANDALONE / "references/media-strategy.md").read_text(encoding="utf-8")
@@ -135,6 +142,12 @@ def main() -> None:
     require("Claude Code 기본 설치에는 래스터 이미지 생성기가 포함되지 않습니다" in readme, "README Claude image-generation notice is missing")
     require("Gemini CLI Agent Skill" in readme, "README Gemini installation guidance is missing")
     require("다시 허락을 묻지 않고 자동 사용" in readme, "README installed companion auto-use guidance is missing")
+    require("README.en.md" in readme and "README.ja.md" in readme, "README language navigation is missing")
+    require("README.ko.md" in readme_en and "README.ja.md" in readme_en, "English README language navigation is missing")
+    require("README.ko.md" in readme_ja and "README.en.md" in readme_ja, "Japanese README language navigation is missing")
+    require("squint contact sheet" in readme_en, "English README squint guidance is missing")
+    require("squint contact sheet" in readme_ja, "Japanese README squint guidance is missing")
+    require("squint review" in readme_ko, "Korean README squint guidance is missing")
     require("Post-install guidance:" in installer, "installer post-install guidance is missing")
     require("epoko77-ai/im-not-ai" in installer, "installer im-not-ai notice is missing")
     require("tt-a1i/archify" in installer, "installer Archify notice is missing")
@@ -144,6 +157,8 @@ def main() -> None:
     require("Already-installed humanize-korean and archify are used automatically" in installer, "installer companion auto-use notice is missing")
     require("pure-HTML, image-free, or typography/diagram-only" in skill, "skill default photo-discovery contract is missing")
     require("perform a bounded search for relevant sourced photographs" in media_strategy, "media strategy default discovery contract is missing")
+    require("suggest_design_directions.py" in skill, "skill design-candidate routing is missing")
+    require("Squint review is an auxiliary" in skill, "skill squint limitation contract is missing")
 
     print(f"Repository validation passed ({len(tree_hashes(STANDALONE))} shared skill files).")
 

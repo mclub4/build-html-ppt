@@ -2,7 +2,7 @@
 
 ## Theme inference
 
-Read `theme-gallery.md`, then define six decisions before styling: three mood adjectives; display and body typography; palette roles; shape language; media treatment; and motion character. Write them as a one-line theme contract before coding.
+Read `subject-routing.md` and `design-candidate-search.md` first. Select semantic facets, retrieve three candidates, compare them, and reject at least one before reading `theme-gallery.md` in depth. Then define six decisions before styling: three mood adjectives; display and body typography; palette roles; shape language; media treatment; and motion character. Write them as a one-line theme contract before coding.
 
 | Direction | Best for | Visual grammar |
 |---|---|---|
@@ -22,8 +22,22 @@ Read `theme-gallery.md`, then define six decisions before styling: three mood ad
 | Spatial product | AI products, mobility, digital twins, XR | layered depth, isolated objects, anchored labels, restrained translucency, state transitions |
 | Financial trust | banking, fintech, stablecoins, payments | tabular numerals, reserve composition, money movement, fiat/chain boundaries, audit trails, semantic risk color |
 | Idol editorial index | multi-act or multi-member orientation, chronology, comparison, and curation | authentic photo index, bold grotesk hierarchy, serif contrast, mono metadata, act-specific accents, timeline and listening map |
+| Constructive geometry (Bauhaus-inspired) | design systems, education, architecture, and decisive technical or creative proposals | bright paper, disciplined primary geometry, strong typography, modular sequences, asymmetric comparisons |
+| Organic systems (biophilic or biomimetic) | biology, medicine, climate, ecology, food, and sustainable systems | real macro or field imagery, warm scientific surfaces, layered mechanisms, organic process maps, evidence captions |
+| Scholarly review | papers, humanities, history, policy, and rigorous research reviews | citation margins, argument maps, comparative plates, restrained paper surfaces, quiet motion |
+| Archival analog (vintage analog or retro film) | technology history, games, music, film, brand archives, and oral history | dated artifacts, filmstrip sequences, true archive photography, restrained analog texture, provenance labels |
+| Editorial grid (magazine) | industry trends, profiles, comparisons, portfolios, and photo-rich research | issue cover, photo/text spreads, profile index, pull-quote resets, comparison folios |
 
-These are routing hints, not fixed presets. A topic may support several valid directions depending on audience and communication job, and the best answer may be a bespoke contract not named here. Use the larger gallery for additional vocabulary including Neo Brutalist, Riso Zine, Scientific Atlas, Blueprint Workshop, Documentary Photo Essay, Spatial Interface, Ledger Trust, and Idol Editorial Index. Mix only compatible attributes, and do not turn signature-slide lists into mandatory checklists.
+These are routing hints, not fixed presets. A topic may support several valid directions depending on audience and communication job, and the best answer may be a bespoke contract not named here. Use the larger gallery for additional vocabulary including Neo Brutalist, Riso Zine, Scientific Atlas, Blueprint Workshop, Documentary Photo Essay, Spatial Interface, Ledger Trust, and Idol Editorial Index. Mix only compatible attributes, and do not turn signature-slide lists into mandatory checklists. E-Ink/Paper is a treatment that can strengthen Paper Systems or Scholarly Review; it is not a reason to make every slide imitate a device screen.
+
+### Treatment grammars, not full-deck themes
+
+- **Kinetic Typography:** reserve for the cover, chapter turns, one decisive claim, or closing. Continuous animated headlines reduce reading stability.
+- **Exaggerated Minimalism:** use for the cover, thesis, or decision slide where one idea earns the space. It does not justify empty body slides.
+- **3D Product Evidence:** use for hardware or product explanation when the model, cutaway, or render accurately represents the subject. Do not invent a released product or replace factual photography.
+- **Parallax And Depth:** use lightly for transitions or layered spatial explanation. Preserve print, reduced motion, content bounds, and foreground readability.
+
+These treatments may modify one or two composition families. They should not become a repeated effect across an entire deck.
 
 ### Idol routing
 
