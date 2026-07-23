@@ -5,17 +5,19 @@ from __future__ import annotations
 
 import subprocess
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.validate_all import classify_change_scope, deterministic_commands
+from scripts.validate_all import classify_change_scope, deterministic_commands, failed_slide_scope
 
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRYPOINT = ROOT / "scripts" / "validate_all.py"
 PREFLIGHT = ROOT / "scripts" / "check_environment.py"
 TEMPLATE = ROOT / "assets" / "runtime-shell.html"
+FONT_FIXTURE = ROOT / "scripts" / "fixtures" / "inter-latin-400-normal.woff2"
 
 
 def notes() -> str:
@@ -37,20 +39,60 @@ class ValidateAllTests(unittest.TestCase):
         if check.returncode:
             raise unittest.SkipTest(check.stdout + check.stderr)
 
-    def test_prepare_runs_every_deterministic_gate_and_renderer(self) -> None:
+    def portable_deck(self, root: Path, content: str = "") -> Path:
+        assets = root / "assets"
+        assets.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(FONT_FIXTURE, assets / "inter.woff2")
+        html = TEMPLATE.read_text(encoding="utf-8")
+        html = html.replace(
+            "<style>",
+            "<style>@font-face{font-family:'Test Inter';src:url('assets/inter.woff2') format('woff2');"
+            "font-style:normal;font-weight:400;font-display:swap}",
+            1,
+        ).replace(
+            "</style>",
+            'h1,h2,h3,h4,h5,h6{font-weight:400}'
+            ':root{--font-display:"Test Inter",sans-serif;--font-body:"Test Inter",sans-serif}</style>',
+            1,
+        ).replace(
+            "<!-- SLIDE_2_CONTENT -->",
+            content,
+            1,
+        )
+        deck = root / "deck.html"
+        deck.write_text(html.replace('<html lang="ko">', '<html lang="en">', 1), encoding="utf-8")
+        return deck
+
+    def test_quick_prepare_is_an_immediate_creation_only_noop(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             deck = root / "deck.html"
-            deck.write_text(
-                TEMPLATE.read_text(encoding="utf-8").replace('<html lang="ko">', '<html lang="en">', 1),
-                encoding="utf-8",
+            deck.write_text(TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+            review = root / "review"
+            result = subprocess.run(
+                [
+                    "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "quick",
+                    "--review-dir", str(review),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
             )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("Quick Draft is creation-only", result.stdout)
+            self.assertNotIn("RUN:", result.stdout)
+            self.assertFalse(review.exists())
+
+    def test_full_prepare_runs_every_deterministic_gate_and_renderer(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = self.portable_deck(root, "<h2>Portable validation</h2>")
             notes_path = root / "deck-notes.md"
             notes_path.write_text(notes(), encoding="utf-8")
             review = root / "review"
             result = subprocess.run(
                 [
-                    "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "quick",
+                    "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "full",
                     "--notes", str(notes_path), "--review-dir", str(review),
                     "--change-type", "text",
                 ],
@@ -62,6 +104,23 @@ class ValidateAllTests(unittest.TestCase):
             self.assertIn("PASS: browser interaction and print E2E", result.stdout)
             self.assertIn("PASS: Chromium render and geometry gate", result.stdout)
             self.assertTrue((review / "review.json").is_file())
+            timings = json.loads((review / "timings.json").read_text(encoding="utf-8"))
+            self.assertEqual(timings["schema_version"], 1)
+            self.assertEqual(timings["invocations"][-1]["status"], "pass")
+            self.assertTrue(timings["invocations"][-1]["commands"])
+
+            status = subprocess.run(
+                [
+                    "python3", str(ENTRYPOINT), str(deck), "--status",
+                    "--review-dir", str(review),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+            self.assertIn("pending primary review batch", status.stdout)
+            self.assertIn("record_review.py", status.stdout)
 
     def test_prepare_requires_user_approved_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -93,7 +152,7 @@ class ValidateAllTests(unittest.TestCase):
             review = root / "review"
             result = subprocess.run(
                 [
-                    "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "quick",
+                    "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "full",
                     "--notes", str(notes_path), "--review-dir", str(review),
                 ],
                 capture_output=True,
@@ -143,22 +202,39 @@ class ValidateAllTests(unittest.TestCase):
             self.assertNotIn("source locality", structure_labels)
             self.assertNotIn("browser interaction and print E2E", structure_labels)
 
+    def test_failed_slide_scope_uses_only_slide_specific_failures(self) -> None:
+        manifest = {
+            "automation_gate": {
+                "failures": [
+                    {"slide": 4, "profile": "short", "check": "text_bounds"},
+                    {"check": "font_integrity"},
+                ]
+            },
+            "slides": [
+                {"slide": 2, "status": "pass"},
+                {"slide": 7, "status": "fail"},
+            ],
+            "cross_reviews": [
+                {"slide": 9, "status": "fail"},
+                {"slide": 10, "status": "pending"},
+            ],
+            "quality_score": {
+                "status": "fail",
+                "weakest_slides": [7, 11],
+            },
+        }
+        self.assertEqual(failed_slide_scope(manifest), [4, 7, 9, 11])
+
     def test_incremental_prepare_widens_a_misdeclared_text_change(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            deck = root / "deck.html"
-            deck.write_text(
-                TEMPLATE.read_text(encoding="utf-8")
-                .replace('<html lang="ko">', '<html lang="en">', 1)
-                .replace("<!-- SLIDE_2_CONTENT -->", "<h2>Initial structure</h2>", 1),
-                encoding="utf-8",
-            )
+            deck = self.portable_deck(root, "<h2>Initial structure</h2>")
             notes_path = root / "deck-notes.md"
             notes_path.write_text(notes(), encoding="utf-8")
             review = root / "review"
             initial = subprocess.run(
                 [
-                    "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "quick",
+                    "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "full",
                     "--notes", str(notes_path), "--review-dir", str(review),
                 ],
                 capture_output=True,
@@ -177,7 +253,7 @@ class ValidateAllTests(unittest.TestCase):
             )
             revised = subprocess.run(
                 [
-                    "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "quick",
+                    "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "full",
                     "--notes", str(notes_path), "--review-dir", str(review),
                     "--slides", "2", "--change-type", "text",
                 ],

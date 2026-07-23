@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import os
 import re
 import stat as stat_module
@@ -172,30 +171,15 @@ def required_checks(scope: str, identity_required: bool) -> tuple[str, ...]:
 def required_cross_review_slides(
     expected_slides: set[int], records: dict[int, dict], warnings: list[dict], review_risk: str
 ) -> set[int]:
-    if review_risk == "high":
-        return set(expected_slides)
     required = {
-        number for number, record in records.items() if record.get("visual_critical") is True
+        number for number, record in records.items()
+        if record.get("visual_critical") is True or record.get("identity_required") is True
     }
     required.update(
         warning.get("slide")
         for warning in warnings
         if isinstance(warning, dict) and warning.get("slide") in expected_slides
     )
-    ordinary = sorted(expected_slides - required)
-    if not ordinary:
-        return required
-    policy = CONTRACT["standard_cross_review"]
-    count = min(
-        policy["maximum_sample"],
-        max(policy["minimum_sample"], math.ceil(len(ordinary) * policy["sample_ratio"])),
-    )
-    for index in range(1, count + 1):
-        position = min(
-            len(ordinary) - 1,
-            max(0, math.floor((index * (len(ordinary) + 1)) / (count + 1) + 0.5) - 1),
-        )
-        required.add(ordinary[position])
     return required
 
 

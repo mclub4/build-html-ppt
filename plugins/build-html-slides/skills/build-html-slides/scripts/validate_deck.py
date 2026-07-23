@@ -165,7 +165,7 @@ def main() -> int:
 
     for tag in re.findall(r"<img\b[^>]*>", text, re.I):
         if not re.search(r"\balt\s*=\s*[\"'][^\"']*[\"']", tag, re.I):
-            print(f"WARNING: image is missing alt text: {tag[:120]}")
+            errors.append(f"image is missing alt attribute: {tag[:120]}")
         match = re.search(r"\bsrc\s*=\s*[\"']([^\"']+)[\"']", tag, re.I)
         if not match:
             errors.append("image without src")

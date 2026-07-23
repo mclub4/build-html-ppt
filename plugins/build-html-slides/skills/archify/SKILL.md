@@ -68,7 +68,7 @@ Archify's readability comes from **spatial narrative**, not from drawing every d
 4. **Cards for detail** — policies, tech stack notes, and "also connects to X" belong in summary cards, not as extra arrows.
 5. **Mode fit** — process / approval / tool-call stories → `workflow` or `sequence`. Component maps with ≤12 nodes → `architecture`. If the diagram needs 20+ edges, remove edges until the main path is obvious.
 
-Worked examples on this pattern: `examples/archify-repo.architecture.json` (this repo) and `examples/maka-architecture.architecture.json` (third-party desktop app).
+Worked examples shipped with this package: `examples/web-app.architecture.json` for an application component map and `examples/production-deployment.architecture.json` for a deployment topology.
 
 When validation fails on label overlap, read the **Suggested fix** lines (coordinates / `labelAt` / `labelDy`) and apply them directly — do not guess offsets blindly.
 
@@ -288,7 +288,7 @@ Render: `node bin/archify.mjs render architecture <input>.json <output>.html`.
 }
 ```
 
-`pos` still wins when present (override one cell). This is **not** auto-layout — spacing is fixed cell math. Example: `examples/archify-repo-grid.architecture.json`.
+`pos` still wins when present (override one cell). This is **not** auto-layout — spacing is fixed cell math. The snippet immediately above is the packaged grid reference; use `examples/web-app.architecture.json` for a complete architecture document and field shapes.
 
 **Inspect layout (#9)** — after editing JSON, dump computed boxes without opening HTML:
 
@@ -309,7 +309,7 @@ Output includes component rects, boundaries, connection point paths, and label p
 
 ### Hand-placed fallback (no renderer available)
 
-When Node/ajv can't run, copy `assets/template.html` and place SVG by hand. Study the worked diagram inside the template and `examples/web-app.html` for coordinate idioms, follow the Design System below, and run the self-review checklist before delivering.
+When Node/ajv can't run, copy `assets/template.html` and place SVG by hand. Study the worked diagram inside the template and `examples/web-app-rendered.html` for coordinate idioms, follow the Design System below, and run the self-review checklist before delivering.
 
 ### The Cardinal Rule: CSS classes, not inline colors
 

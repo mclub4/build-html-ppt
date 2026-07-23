@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RENDERER = ROOT / "scripts" / "render_slides.js"
 VALIDATOR = ROOT / "scripts" / "validate_visual_review.py"
 TEMPLATE = ROOT / "assets" / "runtime-shell.html"
+FONT_FIXTURE = ROOT / "scripts" / "fixtures" / "inter-latin-400-normal.woff2"
 
 
 class RenderPipelineTests(unittest.TestCase):
@@ -132,6 +133,101 @@ const { chromium } = loadPlaywright();
             self.assertEqual(render.returncode, 2)
             self.assertIn("user-approved mode", render.stderr)
 
+    def test_low_contrast_text_blocks_automation_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            deck.write_text(
+                TEMPLATE.read_text(encoding="utf-8").replace(
+                    "<!-- SLIDE_2_CONTENT -->",
+                    '<div style="width:100%;height:100%;background:#fff;padding:120px">'
+                    '<p style="color:#aaa;font-size:24px">Low contrast body copy</p></div>',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            review = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 1, render.stdout + render.stderr)
+            manifest = json.loads((review / "review.json").read_text(encoding="utf-8"))
+            failures = manifest["automation_gate"]["failures"]
+            self.assertTrue(any(failure["check"] == "contrast" for failure in failures), failures)
+
+    def test_image_backed_text_defers_contrast_to_visual_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            assets = root / "assets"
+            assets.mkdir()
+            self.create_webps((assets / "background.webp", "#888888", 2400))
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                '<div class="slide-media" aria-hidden="true"></div>',
+                '<div class="slide-media" aria-hidden="true"><img src="assets/background.webp" alt="" '
+                'style="width:100%;height:100%;object-fit:cover"></div>',
+                1,
+            ).replace(
+                "<!-- SLIDE_1_CONTENT -->",
+                '<h1 style="margin:120px;color:#777">Image-backed title</h1>',
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 0, render.stdout + render.stderr)
+            manifest = json.loads((review / "review.json").read_text(encoding="utf-8"))
+            warnings = manifest["automation_gate"]["warnings"]
+            self.assertTrue(any(warning["check"] == "contrast" for warning in warnings), warnings)
+
+    def test_manifest_records_actual_bundled_font_usage(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            assets = root / "assets"
+            assets.mkdir()
+            shutil.copy2(FONT_FIXTURE, assets / "inter.woff2")
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "<style>",
+                "<style>@font-face{font-family:'Test Inter';src:url('assets/inter.woff2') format('woff2');"
+                "font-style:normal;font-weight:400}",
+                1,
+            ).replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                '<p style="font-family:\'Test Inter\',sans-serif;font-size:32px">Portable font</p>',
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review), "--mode", "full"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            diagnostics = render.stdout + render.stderr
+            if (review / "review.json").is_file():
+                failed = json.loads((review / "review.json").read_text(encoding="utf-8"))
+                diagnostics += "\n" + json.dumps(failed.get("automation_gate", {}), indent=2)
+                diagnostics += "\n" + json.dumps(
+                    failed["slides"][1]["captures"]["normal"].get("font_integrity", {}),
+                    indent=2,
+                )
+            self.assertEqual(render.returncode, 0, diagnostics)
+            manifest = json.loads((review / "review.json").read_text(encoding="utf-8"))
+            audit = manifest["slides"][1]["captures"]["normal"]["font_integrity"]
+            self.assertTrue(audit["used_fonts"])
+            self.assertTrue(any(font["custom"] for font in audit["used_fonts"]), audit)
+            self.assertTrue(any(font["bundled_woff2"] for font in audit["used_fonts"]), audit)
+
     def test_full_then_incremental_render_validates(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -154,7 +250,7 @@ const { chromium } = loadPlaywright();
 
             manifest_path = review_dir / "review.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self.assertEqual(manifest["schema_version"], 11)
+            self.assertEqual(manifest["schema_version"], 13)
             self.assertEqual(list(manifest["viewports"]), ["normal", "short", "zoom150"])
             self.assertEqual(manifest["viewports"]["zoom150"]["viewport"], "1920x1080")
             self.assertEqual(manifest["viewports"]["zoom150"]["visual_viewport"], "1280x720")
@@ -198,7 +294,7 @@ const { chromium } = loadPlaywright();
             self.assertEqual(manifest["render_run"]["reused_slides"], [2, 3])
             self.assertEqual(manifest["render_run"]["impact_scope"], "direct")
             self.assertEqual(manifest["slides"][0]["review_scope"], "text")
-            self.assertEqual(list(manifest["slides"][0]["checks"]), ["text", "text_bounds", "density"])
+            self.assertEqual(list(manifest["slides"][0]["checks"]), ["text", "text_bounds", "contrast", "density"])
             self.assertEqual(reused_capture.stat().st_mtime_ns, reused_mtime)
             self.assertEqual(manifest["slides"][2]["captures"]["normal"]["sha256"], reused_hash)
             self.complete_rendered_reviews(manifest)
@@ -303,7 +399,7 @@ const { chromium } = loadPlaywright();
             root = Path(temporary)
             deck = root / "deck.html"
             html = TEMPLATE.read_text(encoding="utf-8").replace(
-                "<!-- SLIDE_3_CONTENT -->", "<p>Initial copy</p>", 1
+                "<!-- SLIDE_1_CONTENT -->", "<p>Initial copy</p>", 1
             ).replace(
                 "    </main>",
                 '      <section class="slide" data-title="Slide 4"><div class="slide-media" aria-hidden="true"></div><div class="slide-content"><p>Four</p></div></section>\n'
@@ -333,7 +429,7 @@ const { chromium } = loadPlaywright();
             self.assertEqual(finalize.returncode, 0, finalize.stderr)
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             initially_cross_reviewed = {review["slide"] for review in manifest["cross_reviews"]}
-            self.assertIn(3, initially_cross_reviewed)
+            self.assertIn(1, initially_cross_reviewed)
             for review in manifest["cross_reviews"]:
                 review["reviewer"] = "independent-reviewer"
                 review["reviewer_ref"] = "independent-review-run-001"
@@ -349,7 +445,7 @@ const { chromium } = loadPlaywright();
             revised = subprocess.run(
                 [
                     "node", str(RENDERER), str(deck), str(review_dir), "--mode", "full",
-                    "--slides", "3", "--change-type", "text",
+                    "--slides", "1", "--change-type", "text",
                 ],
                 capture_output=True,
                 text=True,
@@ -358,7 +454,7 @@ const { chromium } = loadPlaywright();
             self.assertEqual(revised.returncode, 0, revised.stderr)
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             retained = {review["slide"] for review in manifest["retained_cross_reviews"]}
-            self.assertEqual(retained, initially_cross_reviewed - {3})
+            self.assertEqual(retained, initially_cross_reviewed - {1})
             self.complete_rendered_reviews(manifest)
             manifest_path.write_text(f"{json.dumps(manifest, indent=2)}\n", encoding="utf-8")
             finalize_again = subprocess.run(
@@ -382,7 +478,7 @@ const { chromium } = loadPlaywright();
                 for number in batch["slides"]
             }
             self.assertEqual(complete_slides, retained)
-            self.assertEqual(pending_slides, {3})
+            self.assertEqual(pending_slides, {1})
 
     def test_reviewer_fail_requires_source_change_before_new_capture(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

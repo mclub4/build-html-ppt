@@ -11,6 +11,7 @@ CLAUDE_ARCHIFY="$ROOT/.claude/skills/archify/"
 GEMINI="$ROOT/.gemini/skills/build-html-slides/"
 GEMINI_ARCHIFY="$ROOT/.gemini/skills/archify/"
 
+cp "$ROOT/LICENSE" "$ROOT/THIRD_PARTY_NOTICES.md" "$SOURCE"
 rsync -a --delete "$SOURCE" "$PLUGIN"
 mkdir -p "$PLUGIN_ARCHIFY"
 rsync -a --delete "$ARCHIFY_SOURCE" "$PLUGIN_ARCHIFY"

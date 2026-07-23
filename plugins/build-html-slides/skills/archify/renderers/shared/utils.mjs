@@ -132,7 +132,7 @@ export function applyTemplate(template, { title, subtitle, footer, svg, cards, v
     .replaceAll('>', '\\u003e')
     .replaceAll('&', '\\u0026');
   return template
-    .replace(TEMPLATE_PLACEHOLDERS[0], () => `<html lang="en" data-theme="dark" data-preset="${esc(visualPreset)}">`)
+    .replace(TEMPLATE_PLACEHOLDERS[0], () => `<html lang="en" data-theme="light" data-preset="${esc(visualPreset)}">`)
     .replace(TEMPLATE_PLACEHOLDERS[1], () => `<title>${esc(title)} Diagram</title>`)
     .replace(TEMPLATE_PLACEHOLDERS[2], () => `<h1>${esc(title)}</h1>`)
     .replace(TEMPLATE_PLACEHOLDERS[3], () => `<p class="subtitle">${esc(subtitle ?? '')}</p>`)

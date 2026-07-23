@@ -1,5 +1,5 @@
 {
-  "schema_version": 11,
+  "schema_version": 13,
   "playwright_version": "1.61.1",
   "review_batch_size": 4,
   "impact_scopes": ["direct", "neighbors", "full"],
@@ -49,21 +49,21 @@
   "base_profiles": ["normal", "short", "zoom150"],
   "responsive_profiles": ["tablet", "mobile"],
   "checks_by_change": {
-    "all": ["crop", "aspect_ratio", "resolution", "content_match", "completion", "overflow", "occlusion", "text", "text_bounds", "density", "controls"],
-    "text": ["text", "text_bounds", "density"],
+    "all": ["crop", "aspect_ratio", "resolution", "content_match", "completion", "overflow", "occlusion", "text", "text_bounds", "contrast", "density", "controls"],
+    "text": ["text", "text_bounds", "contrast", "density"],
     "image": ["crop", "aspect_ratio", "resolution", "content_match", "completion"],
     "navigation": ["controls"]
   },
   "automation_checks_by_change": {
-    "all": ["text_bounds", "font_integrity", "container_density", "controls", "image_geometry"],
-    "text": ["text_bounds", "font_integrity", "container_density"],
+    "all": ["text_bounds", "font_integrity", "contrast", "container_density", "controls", "image_geometry"],
+    "text": ["text_bounds", "font_integrity", "contrast", "container_density"],
     "image": ["image_geometry"],
     "navigation": ["controls"]
   },
-  "standard_cross_review": {
-    "sample_ratio": 0.15,
-    "minimum_sample": 1,
-    "maximum_sample": 3
+  "cross_review_routes": {
+    "visual_critical": true,
+    "automation_warning": true,
+    "identity_required": true
   },
   "squint_review_checks": [
     "focal_hierarchy",

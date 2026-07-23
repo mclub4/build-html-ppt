@@ -16,7 +16,15 @@ Use the smallest diagram that answers the presentation’s claim. Split overview
 
 ## Route to the bundled diagram skill
 
-Supported distributions bundle `archify` as an independent sibling skill. When it is available, use it proactively for architecture, cloud or network topology, deployment, sequence, workflow, lifecycle, data lineage, codebase structure, and complex multi-component flows that benefit from a dedicated diagram layout. The user does not need to request Archify explicitly.
+Supported distributions bundle `archify` as an independent sibling skill. Do not load that large companion merely because the subject is software, infrastructure, AI, security, or another technical domain. First compare the candidate diagram with a photograph, real interface, chart, table, and simple slide-native visual.
+
+Load and use Archify only when the model judges all of the following to be true:
+
+- topology, sequence, boundaries, ownership, state, or multi-component relationships are central evidence for the slide's claim;
+- the audience would understand that evidence faster from a dedicated diagram than from the credible alternatives above;
+- the structure is more complex than a simple two- or three-node native flow, or requires reliable routing, grouping, or semantic boundaries.
+
+Make this decision from the complete brief, audience, evidence, and slide job. Do not implement a keyword, substring, regex, quota, or topic-to-diagram lookup. When the gate passes and Archify is available, use it proactively without asking for separate permission. When it does not pass, skip Archify and do not read its full skill instructions.
 
 Keep the native HTML/CSS or inline-SVG path for simple two- or three-node flows, small comparisons, and diagrams whose primary value is slide-by-slide animation. Do not add Archify merely because a slide contains arrows.
 
@@ -25,11 +33,30 @@ For an Archify handoff:
 - establish factual nodes, boundaries, labels, protocols, and relationships before invoking the companion;
 - match the deck's semantic colors and typography rather than accepting an unrelated default preset;
 - preserve Archify's self-contained HTML output in the deck assets as the reproducible source;
-- extract or export its inline SVG for the slide whenever practical, keeping icons and fonts self-contained and avoiding runtime CDN references;
-- if raster export is more reliable, use Archify's WebP export at sufficient resolution while retaining the source HTML;
-- embed only the diagram artwork, not Archify's theme toggle or export controls, in the presentation;
+- use the deterministic bridge below instead of manually copying viewer DOM or using the interactive export menu;
 - render and inspect the exported result at slide size under the same geometry and AI review contract as every other meaningful visual;
 - if Archify is unavailable because the slide skill was installed by itself, use the native diagram workflow below and mention the incomplete bundle at handoff. Do not install it or any dependency during deck work without explicit consent.
+
+## Export a slide asset deterministically
+
+Run the bridge from the `build-html-slides` skill root after Archify has delivered its self-contained HTML:
+
+```bash
+node scripts/export_archify_asset.js assets/system-architecture.html assets/system-architecture \
+  --format both \
+  --deck-theme OUTPUT.html \
+  --slide 7 \
+  --width 1600 \
+  --json
+```
+
+The bridge opens the Archify artifact in Chromium, invokes its canonical SVG serializer, removes scripts and viewer controls, applies the selected deck slide's semantic color and font tokens, writes one pure SVG plus an exact-size WebP, and reopens both outputs to verify their structure and dimensions. It defaults to a light theme. Use `--theme dark` only when the chosen deck art direction actually requires it.
+
+The runtime shell exposes `--slide-bg`, `--surface`, `--ink`, `--muted`, `--line`, `--accent`, `--accent-2`, `--positive`, `--warning`, `--danger`, and `--font-body` for this handoff. Replace these values as part of the deck theme. For a diagram-specific override, pass `--tokens theme.json` instead of `--deck-theme`; the JSON accepts matching names without the leading dashes plus `font_family` and optional exact `css_variables`.
+
+Preserve aspect ratio. `--width` derives height from the SVG viewBox; an incompatible explicit `--height` fails instead of stretching the diagram. Prefer the SVG when vector scaling and selectable labels matter. Prefer the 1600px-or-wider WebP when browser portability is more important, then size it no wider than the slide's content-safe area. Never screenshot the full Archify viewer.
+
+Insert the exported asset into the actual slide before validation. Full Validation must run through `validate_all.py`, whose Chromium render gate checks the embedded image's crop, aspect ratio, effective raster density, slide geometry, and visible result. The bridge's own verification is necessary but does not replace the deck-level E2E pass.
 
 ## Establish truth before drawing
 

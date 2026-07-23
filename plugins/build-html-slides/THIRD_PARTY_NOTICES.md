@@ -41,3 +41,23 @@ copyright notice are preserved in every bundled `archify/LICENSE` file.
 Archify identifies itself as a fork and rewrite of
 [`Cocoon-AI/architecture-diagram-generator`](https://github.com/Cocoon-AI/architecture-diagram-generator)
 v1.0; that upstream attribution is retained here and in the bundled license.
+
+This distribution applies two narrow local integration patches to the pinned
+Archify copy: newly rendered artifacts start in the light theme so slide
+integration does not implicitly impose a dark technical style, and stale
+example references in `SKILL.md` point to examples that are actually included
+in the package. These changes are maintained by the Build HTML Slides project
+and are not represented as upstream Archify behavior.
+
+## Inter font test fixture
+
+The validation test suite includes the Inter Latin Regular WOFF2 fixture from
+`@fontsource/inter` 5.3.0 solely to exercise portable-font loading and
+inspection.
+
+Copyright 2020 The Inter Project Authors
+
+Inter is licensed under the SIL Open Font License, Version 1.1. The complete
+license is preserved at
+`codex/skills/build-html-slides/scripts/fixtures/INTER-LICENSE.txt` and in each
+platform mirror.

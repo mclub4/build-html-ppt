@@ -91,13 +91,18 @@ function workspaceRoot() {
 }
 
 async function measureFontIntegrity(page, cdp) {
-  const candidates = await page.evaluate(() => {
+  const collected = await page.evaluate(() => {
     const normalizeFamily = value => value.trim().replace(/^['"]|['"]$/g, '').toLowerCase();
     const declaredFamilies = new Set();
+    const declaredSources = new Map();
     const collectRules = rules => {
       for (const rule of rules) {
         if (rule.type === CSSRule.FONT_FACE_RULE) {
-          declaredFamilies.add(normalizeFamily(rule.style.getPropertyValue('font-family')));
+          const family = normalizeFamily(rule.style.getPropertyValue('font-family'));
+          declaredFamilies.add(family);
+          const sources = declaredSources.get(family) || [];
+          sources.push(rule.style.getPropertyValue('src'));
+          declaredSources.set(family, sources);
         } else if (rule.cssRules) {
           collectRules(rule.cssRules);
         }
@@ -108,16 +113,23 @@ async function measureFontIntegrity(page, cdp) {
     }
 
     const active = document.querySelector('.slide.active');
-    if (!active || !declaredFamilies.size) return [];
+    if (!active) return { candidates: [], usage: [] };
     document.getElementById('__font-integrity-audit')?.remove();
     const root = document.createElement('div');
     root.id = '__font-integrity-audit';
     root.setAttribute('aria-hidden', 'true');
-    root.style.cssText = 'position:fixed;left:-12000px;top:0;opacity:0;pointer-events:none;z-index:-1';
+    root.style.cssText = 'position:fixed;left:0;top:0;color:transparent;pointer-events:none;z-index:2147483647';
     document.body.appendChild(root);
 
     const records = [];
+    const usage = [];
     const seen = new Set();
+    const usageSeen = new Set();
+    const loadedFamilies = new Set(
+      [...(document.fonts || [])]
+        .filter(face => face.status === 'loaded')
+        .map(face => normalizeFamily(face.family))
+    );
     const elements = [...active.querySelectorAll('*')].filter(element => (
       element.namespaceURI === 'http://www.w3.org/1999/xhtml'
       && !element.closest('[data-text-bounds-ignore]')
@@ -127,15 +139,40 @@ async function measureFontIntegrity(page, cdp) {
         .filter(node => node.nodeType === Node.TEXT_NODE)
         .map(node => node.nodeValue)
         .join('');
-      const hangul = [...new Set(Array.from(direct).filter(character => /[\uAC00-\uD7A3]/.test(character)))];
-      if (!hangul.length) continue;
+      if (!direct.trim()) continue;
       const style = getComputedStyle(element);
       const families = style.fontFamily.match(/(?:"[^"]*"|'[^']*'|[^,])+/g) || [];
-      const family = families.map(normalizeFamily).find(value => declaredFamilies.has(value));
-      if (!family) continue;
+      const normalizedFamilies = families.map(normalizeFamily);
+      const family = normalizedFamilies.find(value => declaredFamilies.has(value)) || '';
       const source = element.getAttribute('data-title') || element.getAttribute('aria-label') || element.id
         || direct.trim().replace(/\s+/g, ' ').slice(0, 48) || element.tagName.toLowerCase();
-      const styleKey = [family, style.fontWeight, style.fontStyle, style.fontStretch, style.fontVariationSettings].join('|');
+      const styleKey = [
+        style.fontFamily, style.fontWeight, style.fontStyle,
+        style.fontStretch, style.fontVariationSettings,
+      ].join('|');
+      if (!usageSeen.has(styleKey)) {
+        usageSeen.add(styleKey);
+        const id = `font-usage-${usage.length + 1}`;
+        element.dataset.fontUsageId = id;
+        const faceSources = family ? (declaredSources.get(family) || []) : [];
+        usage.push({
+          id,
+          source,
+          primaryFamily: normalizedFamilies[0] || '',
+          declaredFamily: family,
+          stack: style.fontFamily,
+          weight: style.fontWeight,
+          styleKey,
+          loadedFace: family ? loadedFamilies.has(family) : false,
+          bundledWoff2: faceSources.some(value => (
+            /url\([^)]*\.woff2[^)]*\)/i.test(value)
+            && !/https?:\/\//i.test(value)
+          )),
+        });
+      }
+      const hangul = [...new Set(Array.from(direct).filter(character => /[\uAC00-\uD7A3]/.test(character)))];
+      if (!hangul.length) continue;
+      if (!family) continue;
       for (const character of hangul) {
         const key = `${styleKey}|${character}`;
         if (seen.has(key)) continue;
@@ -145,6 +182,9 @@ async function measureFontIntegrity(page, cdp) {
         probe.dataset.fontIntegrityId = id;
         probe.textContent = character;
         Object.assign(probe.style, {
+          position: 'absolute',
+          left: '0',
+          top: '0',
           fontFamily: style.fontFamily,
           fontWeight: style.fontWeight,
           fontStyle: style.fontStyle,
@@ -159,31 +199,66 @@ async function measureFontIntegrity(page, cdp) {
         records.push({ id, character, family, styleKey, weight: style.fontWeight, source });
       }
     }
-    return records;
+    return { candidates: records, usage };
   });
 
-  if (!candidates.length) return { ok: true, checked: 0, issues: [], warnings: [] };
+  const candidates = collected.candidates || [];
+  const usage = collected.usage || [];
+  if (!candidates.length && !usage.length) {
+    return { ok: true, checked: 0, issues: [], warnings: [], used_fonts: [] };
+  }
   await cdp.send('DOM.enable');
   await cdp.send('CSS.enable');
-  const { root } = await cdp.send('DOM.getDocument', { depth: 1, pierce: true });
+  await cdp.send('DOM.getDocument', { depth: -1 });
+  const platformFontsFor = async selector => {
+    const evaluated = await cdp.send('Runtime.evaluate', {
+      expression: `document.querySelector(${JSON.stringify(selector)})`,
+      returnByValue: false,
+    });
+    const objectId = evaluated.result?.objectId;
+    if (!objectId) return [];
+    const { nodeId } = await cdp.send('DOM.requestNode', { objectId });
+    if (!nodeId) return [];
+    const result = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+    return result.fonts || [];
+  };
   const audited = [];
   for (const candidate of candidates) {
-    const { nodeId } = await cdp.send('DOM.querySelector', {
-      nodeId: root.nodeId,
-      selector: `[data-font-integrity-id="${candidate.id}"]`,
-    });
-    let font = null;
-    if (nodeId) {
-      const result = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
-      font = [...(result.fonts || [])].sort((left, right) => right.glyphCount - left.glyphCount)[0] || null;
-    }
+    const fonts = await platformFontsFor(`[data-font-integrity-id="${candidate.id}"]`);
+    const font = [...fonts].sort((left, right) => right.glyphCount - left.glyphCount)[0] || null;
     audited.push({
       ...candidate,
       signature: font ? `${font.isCustomFont ? 'custom' : 'system'}:${font.postScriptName || font.familyName}` : 'missing',
       custom: font?.isCustomFont === true,
     });
   }
-  await page.evaluate(() => document.getElementById('__font-integrity-audit')?.remove());
+  const usedFonts = [];
+  for (const item of usage) {
+    const fonts = await platformFontsFor(`[data-font-usage-id="${item.id}"]`);
+    const platformFonts = fonts.map(font => ({
+      family: font.familyName || '',
+      postscript: font.postScriptName || '',
+      custom: font.isCustomFont === true,
+      glyph_count: font.glyphCount || 0,
+    }));
+    usedFonts.push({
+      source: item.source,
+      primary_family: item.primaryFamily,
+      declared_family: item.declaredFamily,
+      stack: item.stack,
+      weight: item.weight,
+      bundled_woff2: item.bundledWoff2,
+      loaded_face: item.loadedFace,
+      custom: item.loadedFace || platformFonts.some(font => font.custom && font.glyph_count > 0),
+      platform_fonts: platformFonts,
+    });
+  }
+  await page.evaluate(() => {
+    document.getElementById('__font-integrity-audit')?.remove();
+    document.querySelectorAll('[data-font-usage-id]').forEach(element => {
+      delete element.dataset.fontUsageId;
+    });
+  });
 
   const issues = [];
   const groups = new Map();
@@ -211,7 +286,20 @@ async function measureFontIntegrity(page, cdp) {
       + `falls back to another platform font for Hangul ${rendered}; use a complete Korean font or rebuild the subset after copy changes`
     );
   }
-  return { ok: issues.length === 0, checked: candidates.length, issues, warnings: [] };
+  for (const font of usedFonts) {
+    if (font.declared_family && font.bundled_woff2 && !font.custom) {
+      issues.push(
+        `${font.source}: bundled WOFF2 family "${font.declared_family}" did not become the actual rendered font`
+      );
+    }
+  }
+  return {
+    ok: issues.length === 0,
+    checked: candidates.length,
+    issues,
+    warnings: [],
+    used_fonts: usedFonts,
+  };
 }
 
 function deckWorkspaceId(deck) {
@@ -1032,31 +1120,17 @@ function effectiveChangeType(requested, detected) {
 }
 
 function standardCrossReviewSlides(records, automationWarnings) {
-  const required = new Set(records.filter(record => record.visual_critical).map(record => record.slide));
+  const required = new Set(records.filter(record => (
+    record.visual_critical || record.identity_required
+  )).map(record => record.slide));
   for (const warning of automationWarnings || []) {
     if (Number.isInteger(warning.slide)) required.add(warning.slide);
-  }
-  const ordinary = records.map(record => record.slide).filter(number => !required.has(number));
-  if (!ordinary.length) return required;
-  const policy = CONTRACT.standard_cross_review;
-  const count = Math.min(
-    policy.maximum_sample,
-    Math.max(policy.minimum_sample, Math.ceil(ordinary.length * policy.sample_ratio))
-  );
-  for (let index = 1; index <= count; index += 1) {
-    const position = Math.min(
-      ordinary.length - 1,
-      Math.max(0, Math.round((index * (ordinary.length + 1)) / (count + 1)) - 1)
-    );
-    required.add(ordinary[position]);
   }
   return required;
 }
 
 function requiredCrossReviewSlides(records, automationWarnings, reviewRisk) {
-  return reviewRisk === 'high'
-    ? new Set(records.map(record => record.slide))
-    : standardCrossReviewSlides(records, automationWarnings);
+  return standardCrossReviewSlides(records, automationWarnings);
 }
 
 function emptyCrossReview(record, batchId) {
@@ -1142,6 +1216,7 @@ async function main() {
   const playwright = loadPlaywright();
   const scriptPath = path.resolve(__filename);
   const textBoundsScript = fs.readFileSync(path.join(__dirname, 'measure_text_bounds.js'), 'utf8');
+  const contrastScript = fs.readFileSync(path.join(__dirname, 'measure_contrast.js'), 'utf8');
   const controlGeometryScript = fs.readFileSync(path.join(__dirname, 'measure_geometry.js'), 'utf8');
   const imageGeometryScript = fs.readFileSync(path.join(__dirname, 'measure_image_geometry.js'), 'utf8');
   const containerDensityScript = fs.readFileSync(path.join(__dirname, 'measure_container_density.js'), 'utf8');
@@ -1385,6 +1460,9 @@ async function main() {
         if (measuredChecks.has('font_integrity') && profileName === profiles[0]) {
           measurements.font_integrity = await measureFontIntegrity(page, cdp);
         }
+        if (measuredChecks.has('contrast')) {
+          measurements.contrast_geometry = await page.evaluate(source => (0, eval)(source), contrastScript);
+        }
         if (measuredChecks.has('container_density')) {
           measurements.container_density = await page.evaluate(source => (0, eval)(source), containerDensityScript);
         }
@@ -1445,6 +1523,7 @@ async function main() {
   const geometryField = {
     text_bounds: 'text_geometry',
     font_integrity: 'font_integrity',
+    contrast: 'contrast_geometry',
     container_density: 'container_density',
     controls: 'control_geometry',
     image_geometry: 'image_geometry',

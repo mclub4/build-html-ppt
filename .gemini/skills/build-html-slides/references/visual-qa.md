@@ -59,6 +59,8 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - Media remains behind titles, labels, sources, and controls.
 - Text does not straddle incompatible light/dark regions without a stable scrim or backing.
 - Body text and controls target at least 4.5:1 contrast; large display text targets at least 3:1.
+- The automated gate calculates those ratios only when the text background resolves to a solid color. Image, gradient, translucent, blended, shadowed, or overlapping-media backgrounds are warnings routed to full-size AI contrast inspection, not sampled-color passes.
+- Every meaningful `<img>` needs useful alt text. Missing alt text is a deterministic Full Validation failure, while deliberately decorative images use `alt=""`.
 - Decorative shapes do not create accidental tangencies or obscure hierarchy.
 - Dividers, card edges, captions, and labels remain visually separate from imagery. A product or screenshot crossing a divider or entering its caption region is blocking occlusion even when no DOM bounding box leaves the slide.
 

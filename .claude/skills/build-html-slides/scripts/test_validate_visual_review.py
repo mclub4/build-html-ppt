@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import os
 import struct
 import subprocess
@@ -44,23 +43,11 @@ def checks_for(scope: str, identity: bool = False) -> tuple[str, ...]:
 
 
 def cross_review_numbers(records: list[dict], review_risk: str) -> list[int]:
-    if review_risk == "high":
-        return [record["slide"] for record in records]
-    required = {record["slide"] for record in records if record["visual_critical"]}
-    ordinary = [record["slide"] for record in records if record["slide"] not in required]
-    if ordinary:
-        policy = CONTRACT["standard_cross_review"]
-        count = min(
-            policy["maximum_sample"],
-            max(policy["minimum_sample"], math.ceil(len(ordinary) * policy["sample_ratio"])),
-        )
-        for index in range(1, count + 1):
-            position = min(
-                len(ordinary) - 1,
-                max(0, math.floor((index * (len(ordinary) + 1)) / (count + 1) + 0.5) - 1),
-            )
-            required.add(ordinary[position])
-    return sorted(required)
+    return sorted(
+        record["slide"]
+        for record in records
+        if record["visual_critical"] or record.get("identity_required")
+    )
 
 
 def deck_for(count: int, critical: int | None = None, identity: int | None = None) -> str:
@@ -396,8 +383,8 @@ class VisualReviewTests(unittest.TestCase):
             "automation_gate": {
                 "status": "pass",
                 "checks": list({
-                    "all": ("text_bounds", "font_integrity", "container_density", "controls", "image_geometry"),
-                    "text": ("text_bounds", "font_integrity", "container_density"),
+                    "all": ("text_bounds", "font_integrity", "contrast", "container_density", "controls", "image_geometry"),
+                    "text": ("text_bounds", "font_integrity", "contrast", "container_density"),
                     "image": ("image_geometry",),
                     "navigation": ("controls",),
                 }[scope]),
@@ -789,21 +776,21 @@ class VisualReviewTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("must be marked complete", result.stdout)
 
-    def test_final_full_requires_cross_review_for_ordinary_slide(self) -> None:
+    def test_final_full_requires_cross_review_for_cover(self) -> None:
         deck = deck_for(3)
         manifest = self.manifest(deck, 3, mode="full", phase="final")
         manifest["cross_reviews"] = [
-            review for review in manifest["cross_reviews"] if review["slide"] != 2
+            review for review in manifest["cross_reviews"] if review["slide"] != 1
         ]
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("slide 2 requires an independent final cross review", result.stdout)
+        self.assertIn("slide 1 requires an independent final cross review", result.stdout)
 
-    def test_standard_final_cross_review_is_risk_sampled(self) -> None:
+    def test_standard_final_cross_review_is_risk_routed(self) -> None:
         deck = deck_for(20)
         manifest = self.manifest(deck, 20, mode="full", phase="final", review_risk="standard")
         reviewed = [review["slide"] for review in manifest["cross_reviews"]]
-        self.assertEqual(reviewed, [1, 6, 11, 15, 20])
+        self.assertEqual(reviewed, [1, 20])
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
@@ -827,10 +814,10 @@ class VisualReviewTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("slide 2 is outside the generated final cross-review set", result.stdout)
 
-    def test_high_risk_final_cross_reviews_every_slide(self) -> None:
+    def test_high_risk_final_keeps_cross_review_risk_routed(self) -> None:
         deck = deck_for(12)
         manifest = self.manifest(deck, 12, mode="full", phase="final", review_risk="high")
-        self.assertEqual([review["slide"] for review in manifest["cross_reviews"]], list(range(1, 13)))
+        self.assertEqual([review["slide"] for review in manifest["cross_reviews"]], [1, 12])
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

@@ -24,9 +24,11 @@ class WorkflowContractTests(unittest.TestCase):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
         self.assertIn("This is a creation-only mode", skill)
+        self.assertIn("only a no-op safety guard", skill)
         self.assertIn("deliver immediately after implementation without running any validation command", skill)
         self.assertIn("Quick Draft is creation-only", contract)
         self.assertIn("Do not run `check_environment.py`", contract)
+        self.assertIn("accidental-call guard", contract)
         self.assertIn("Do not run `check_environment.py`", skill)
         self.assertIn("After the user chooses Full Validation", skill)
         self.assertIn("After the user chooses Full Validation", contract)
@@ -56,7 +58,14 @@ class WorkflowContractTests(unittest.TestCase):
             (ROOT / "scripts" / "validation_contract.json").read_text(encoding="utf-8")
         )
         self.assertEqual(machine_contract["review_batch_size"], 4)
-        self.assertLess(machine_contract["standard_cross_review"]["sample_ratio"], 1)
+        self.assertEqual(
+            machine_contract["cross_review_routes"],
+            {
+                "visual_critical": True,
+                "automation_warning": True,
+                "identity_required": True,
+            },
+        )
 
     def test_full_validation_uses_one_entrypoint_and_bounded_time_target(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -75,10 +84,11 @@ class WorkflowContractTests(unittest.TestCase):
         contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
         machine = json.loads((ROOT / "scripts" / "validation_contract.json").read_text(encoding="utf-8"))
         self.assertIn("machine-readable authority", contract)
-        self.assertEqual(machine["schema_version"], 11)
+        self.assertEqual(machine["schema_version"], 13)
         self.assertEqual(machine["review_batch_size"], 4)
         self.assertEqual(machine["base_profiles"], ["normal", "short", "zoom150"])
         self.assertIn("font_integrity", machine["automation_checks_by_change"]["text"])
+        self.assertIn("contrast", machine["automation_checks_by_change"]["text"])
         self.assertEqual(machine["impact_scopes"], ["direct", "neighbors", "full"])
         self.assertEqual(
             machine["content_change_categories"],
@@ -114,6 +124,26 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("Bundle a real bold/semibold face", typography)
         self.assertIn("has no visible emphasis", measure)
         self.assertIn("outside its declared local faces", measure)
+        self.assertIn("every family actually used", typography)
+        self.assertTrue((ROOT / "scripts" / "validate_fonts.py").is_file())
+
+    def test_review_recording_status_and_timings_are_documented(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
+        for document in (skill, contract):
+            self.assertIn("record_review.py", document)
+            self.assertIn("--status", document)
+            self.assertIn("timings.json", document)
+        self.assertTrue((ROOT / "scripts" / "record_review.py").is_file())
+
+    def test_contrast_and_alt_are_blocking_or_explicitly_deferred(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        visual = (ROOT / "references" / "visual-qa.md").read_text(encoding="utf-8")
+        self.assertIn("missing alt text blocks Full Validation", skill)
+        self.assertIn("4.5:1", visual)
+        self.assertIn("3:1", visual)
+        self.assertIn("routed to full-size AI contrast inspection", visual)
+        self.assertTrue((ROOT / "scripts" / "measure_contrast.js").is_file())
 
     def test_incremental_contract_scopes_work_without_dropping_independent_review(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -139,6 +169,10 @@ class WorkflowContractTests(unittest.TestCase):
     def test_available_companions_and_bundled_archify_are_routed_automatically(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         architecture = (ROOT / "references" / "architecture-diagrams.md").read_text(encoding="utf-8")
+        archify_skill = (ROOT.parent / "archify" / "SKILL.md").read_text(encoding="utf-8")
+        archify_utils = (
+            ROOT.parent / "archify" / "renderers" / "shared" / "utils.mjs"
+        ).read_text(encoding="utf-8")
         self.assertIn("## Companion Skill Routing", skill)
         self.assertIn("If `humanize-korean` is available", skill)
         self.assertIn("Bundled distributions include `archify`", skill)
@@ -147,8 +181,22 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("Do not ask whether to use an available", skill)
         self.assertIn("never install software during deck work", skill)
         self.assertIn("Supported distributions bundle `archify`", architecture)
+        self.assertIn("Do not load its full instructions during ordinary deck planning", skill)
+        self.assertIn("Technical vocabulary alone is never sufficient", skill)
+        self.assertIn("skip Archify entirely", skill)
+        self.assertIn("Do not implement a keyword, substring, regex, quota", architecture)
+        self.assertIn("export_archify_asset.js", architecture)
+        self.assertTrue((ROOT / "scripts" / "export_archify_asset.js").is_file())
         self.assertIn("self-contained HTML output", architecture)
-        self.assertIn("inline SVG", architecture)
+        self.assertIn("one pure SVG plus an exact-size WebP", architecture)
+        self.assertNotIn("archify-repo.architecture.json", archify_skill)
+        self.assertNotIn("maka-architecture.architecture.json", archify_skill)
+        self.assertNotIn("archify-repo-grid.architecture.json", archify_skill)
+        self.assertNotIn("examples/web-app.html", archify_skill)
+        self.assertIn("examples/web-app.architecture.json", archify_skill)
+        self.assertIn("examples/production-deployment.architecture.json", archify_skill)
+        self.assertIn("examples/web-app-rendered.html", archify_skill)
+        self.assertIn('data-theme="light"', archify_utils)
 
     def test_relevant_photography_is_default_unless_pure_html_is_explicit(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")

@@ -2,6 +2,8 @@
 
 Read `validation-contract.md` first. That file decides which slides and profiles require AI inspection. This file explains how to inspect them and fill `review.json` without overstating evidence.
 
+Use `validate_all.py OUTPUT.html --status` to list pending batches and the next phase. After inspecting the named current captures, use `record_review.py` with the matching `slide`, `cross-slide`, `quality`, or `squint` subcommand. Supply every requested check and a concrete observation. The recorder only performs schema-safe writes; it cannot see the captures and never creates a verdict.
+
 ## Before Vision
 
 This procedure applies to Full Validation. Run the renderer and do not open captures while `automation_gate.status` is failing. Fix text bounds, control geometry, image load/aspect/resolution, or other deterministic failures first. Quick Draft does not create captures or enter this procedure.
@@ -66,7 +68,7 @@ After all findings are settled:
 5. bind squint and cross-reviews to current capture hashes;
 6. run `validate_all.py --phase finalize-verify`.
 
-Standard risk uses a bounded set containing visual-critical, warning-triggered, and distributed sample slides. High risk includes every slide. This independent pass is not removed as duplicate checking. Do not expand a standard final pass to all slides unless the generated batches or a new finding requires it. After a focused repair, reuse a passing independent review only when the slide capture hash and review contract are unchanged; regenerate the failed or changed slide's review.
+The bounded set contains the cover, closing, explicit visual-critical/core slides, automation-warning slides, and identity-sensitive slides. Do not add distributed ordinary-slide samples, and do not expand high-risk cross-review to every slide. This independent pass is not removed as duplicate checking. After a focused repair, reuse a passing independent review only when the slide capture hash and review contract are unchanged; regenerate only the failed or changed slide's review.
 
 Image count does not create additional AI calls by itself. Inspect the rendered composition once per required slide/profile set. Do not open every fan-art source as a separate validation step, and do not infer critical status from styling classes such as `logo`, `key-visual`, `title-art`, or `diagram`.
 

@@ -4,11 +4,15 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
+import hashlib
 import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
+import uuid
 from pathlib import Path
 
 try:
@@ -33,7 +37,69 @@ def default_notes(deck: Path) -> Path:
     return next((path for path in candidates if path.is_file()), candidates[0])
 
 
-def run(label: str, command: list[str]) -> None:
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+class TimingRecorder:
+    def __init__(self, path: Path, deck: Path, phase: str, mode: str | None) -> None:
+        self.path = path
+        self.started = time.monotonic()
+        self.entry = {
+            "id": str(uuid.uuid4()),
+            "phase": phase,
+            "mode": mode,
+            "started_at": utc_now(),
+            "finished_at": None,
+            "status": "running",
+            "total_seconds": None,
+            "commands": [],
+        }
+        if path.is_file():
+            try:
+                self.data = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                self.data = {}
+        else:
+            self.data = {}
+        if self.data.get("schema_version") != 1 or self.data.get("deck") != str(deck):
+            self.data = {"schema_version": 1, "deck": str(deck), "invocations": []}
+        self.data["invocations"] = self.data.get("invocations", [])[-99:] + [self.entry]
+        self.flush()
+
+    def flush(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary = tempfile.mkstemp(
+            prefix=f".{self.path.name}.", suffix=".tmp", dir=self.path.parent
+        )
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                json.dump(self.data, handle, ensure_ascii=False, indent=2)
+                handle.write("\n")
+            Path(temporary).replace(self.path)
+        except Exception:
+            Path(temporary).unlink(missing_ok=True)
+            raise
+
+    def command(self, label: str, command: list[str], status: str, elapsed: float) -> None:
+        self.entry["commands"].append({
+            "label": label,
+            "command": command,
+            "status": status,
+            "seconds": round(elapsed, 3),
+        })
+        self.flush()
+
+    def finish(self, status: str, error: str = "") -> None:
+        self.entry["finished_at"] = utc_now()
+        self.entry["status"] = status
+        self.entry["total_seconds"] = round(time.monotonic() - self.started, 3)
+        if error:
+            self.entry["error"] = error
+        self.flush()
+
+
+def run(label: str, command: list[str], timings: TimingRecorder | None = None) -> None:
     started = time.monotonic()
     print(f"RUN: {label}")
     try:
@@ -44,10 +110,15 @@ def run(label: str, command: list[str]) -> None:
             timeout=COMMAND_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired as exc:
+        elapsed = time.monotonic() - started
+        if timings:
+            timings.command(label, command, "timeout", elapsed)
         raise RuntimeError(
             f"{label} exceeded the {COMMAND_TIMEOUT_SECONDS}s per-command safety timeout"
         ) from exc
     elapsed = time.monotonic() - started
+    if timings:
+        timings.command(label, command, "pass" if result.returncode == 0 else "fail", elapsed)
     if result.returncode:
         raise RuntimeError(f"{label} failed after {elapsed:.1f}s")
     print(f"PASS: {label} ({elapsed:.1f}s)")
@@ -79,6 +150,9 @@ def deterministic_commands(
         ),
     ]
     if changed & {"text", "structure"}:
+        commands.append(
+            ("portable WOFF2 fonts", [python, str(SCRIPTS / "validate_fonts.py"), str(deck)])
+        )
         commands.append(
             ("presenter notes", [python, str(SCRIPTS / "validate_speaker_notes.py"), str(deck), str(notes)])
         )
@@ -112,6 +186,29 @@ def review_directory(deck: Path, explicit: Path | None) -> Path | None:
     if result.returncode:
         raise RuntimeError((result.stderr or result.stdout).strip() or "could not resolve review directory")
     return Path(result.stdout.strip()).resolve()
+
+
+def failed_slide_scope(manifest: dict) -> list[int]:
+    """Return slide-specific failures that should drive a focused retry."""
+    failed: set[int] = set()
+    automation = manifest.get("automation_gate") or {}
+    for failure in automation.get("failures") or []:
+        number = failure.get("slide") if isinstance(failure, dict) else None
+        if isinstance(number, int) and not isinstance(number, bool) and number > 0:
+            failed.add(number)
+    for key in ("slides", "cross_reviews"):
+        for record in manifest.get(key) or []:
+            if not isinstance(record, dict) or str(record.get("status", "")).lower() != "fail":
+                continue
+            number = record.get("slide")
+            if isinstance(number, int) and not isinstance(number, bool) and number > 0:
+                failed.add(number)
+    quality = manifest.get("quality_score") or {}
+    if str(quality.get("status", "")).lower() == "fail":
+        for number in quality.get("weakest_slides") or []:
+            if isinstance(number, int) and not isinstance(number, bool) and number > 0:
+                failed.add(number)
+    return sorted(failed)
 
 
 def classify_change_scope(
@@ -185,6 +282,7 @@ def main() -> int:
     parser.add_argument("--slides")
     parser.add_argument("--change-type", choices=("all", "text", "image", "navigation"), default="all")
     parser.add_argument("--responsive", action="store_true")
+    parser.add_argument("--status", action="store_true")
     args = parser.parse_args()
     if args.phase == "finalize":
         print("NOTICE: --phase finalize is deprecated; using finalize-prepare")
@@ -193,8 +291,77 @@ def main() -> int:
     deck = args.deck.resolve()
     if not deck.is_file():
         parser.error(f"deck not found: {deck}")
+    if args.status:
+        try:
+            review = review_directory(deck, args.review_dir)
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+        manifest = review / "review.json"
+        if not manifest.is_file():
+            print("STATUS: no review manifest")
+            print(
+                f"NEXT: {sys.executable} {Path(__file__).resolve()} {deck} "
+                f"--phase prepare --mode full --review-dir {review}"
+            )
+            return 0
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+        pending_primary = [
+            batch for batch in data.get("review_batches", [])
+            if batch.get("status") != "complete"
+        ]
+        pending_cross = [
+            batch for batch in data.get("cross_review_batches", [])
+            if batch.get("status") != "complete"
+        ]
+        for batch in pending_primary:
+            print(f"STATUS: pending primary review batch {batch.get('id')}: slides {batch.get('slides')}")
+        for batch in pending_cross:
+            print(f"STATUS: pending cross review batch {batch.get('id')}: slides {batch.get('slides')}")
+        if pending_primary:
+            print(f"RECORD: {sys.executable} {SCRIPTS / 'record_review.py'} {manifest} slide ...")
+        if pending_cross:
+            print(f"RECORD: {sys.executable} {SCRIPTS / 'record_review.py'} {manifest} cross-slide ...")
+        timings_path = review / "timings.json"
+        latest = {}
+        if timings_path.is_file():
+            timing_data = json.loads(timings_path.read_text(encoding="utf-8"))
+            latest = (timing_data.get("invocations") or [{}])[-1]
+            print(
+                f"TIMING: latest {latest.get('phase', 'unknown')} {latest.get('status', 'unknown')} "
+                f"in {latest.get('total_seconds', '?')}s"
+            )
+        if data.get("phase") == "final":
+            score_pending = (data.get("quality_score") or {}).get("status") != "pass"
+            squint_pending = (data.get("squint_review") or {}).get("status") != "pass"
+            if score_pending:
+                print("STATUS: final quality score is pending")
+                print(f"RECORD: {sys.executable} {SCRIPTS / 'record_review.py'} {manifest} quality ...")
+            if squint_pending:
+                print("STATUS: squint review is pending")
+                print(f"RECORD: {sys.executable} {SCRIPTS / 'record_review.py'} {manifest} squint ...")
+            if not pending_cross and not score_pending and not squint_pending:
+                print(
+                    f"NEXT: {sys.executable} {Path(__file__).resolve()} {deck} "
+                    f"--phase finalize-verify --review-dir {review}"
+                )
+        elif not pending_primary:
+            next_phase = "finalize-prepare" if (
+                latest.get("phase") == "verify" and latest.get("status") == "pass"
+            ) else "verify"
+            print(
+                f"NEXT: {sys.executable} {Path(__file__).resolve()} {deck} "
+                f"--phase {next_phase} --review-dir {review}"
+            )
+        return 0
     if args.phase == "prepare" and args.mode is None:
         parser.error("--mode quick|full is required for prepare")
+    if args.phase == "prepare" and args.mode == "quick":
+        print(
+            "SKIP: Quick Draft is creation-only. validate_all.py performs no preflight, "
+            "deterministic checks, Chromium render, or review-workspace writes in quick mode."
+        )
+        return 0
     if args.phase != "prepare" and args.slides:
         parser.error("--slides is only valid during prepare")
 
@@ -202,13 +369,26 @@ def main() -> int:
     sources = (args.sources or deck.with_name("sources.json")).resolve()
     started = time.monotonic()
     fingerprint_cache: Path | None = None
+    timings: TimingRecorder | None = None
 
     try:
         review = review_directory(deck, args.review_dir)
+        timings = TimingRecorder(review / "timings.json", deck, args.phase, args.mode)
         manifest = review / "review.json"
         if args.phase == "prepare":
+            if not args.slides and manifest.is_file():
+                previous = json.loads(manifest.read_text(encoding="utf-8"))
+                retry_slides = failed_slide_scope(previous)
+                previous_hash = previous.get("deck_sha256")
+                current_hash = hashlib.sha256(deck.read_bytes()).hexdigest()
+                if retry_slides and previous_hash != current_hash:
+                    args.slides = ",".join(str(number) for number in retry_slides)
+                    print(
+                        "AUTO-SCOPE: retrying only previously failed slides "
+                        f"{args.slides}; typed change detection may widen the scope."
+                    )
             if not args.slides:
-                run("tool preflight", [sys.executable, str(SCRIPTS / "check_environment.py")])
+                run("tool preflight", [sys.executable, str(SCRIPTS / "check_environment.py")], timings)
             classification: dict[str, object] = {
                 "effective": "all" if not args.slides else args.change_type,
                 "impact": "full" if not args.slides else "direct",
@@ -245,7 +425,7 @@ def main() -> int:
                 or args.change_type == "navigation",
                 content_changes=list(classification["content_changes"]),
             ):
-                run(label, command)
+                run(label, command, timings)
 
             command = [
                 "node", str(SCRIPTS / "render_slides.js"), str(deck), str(review),
@@ -258,7 +438,7 @@ def main() -> int:
                 command.append("--responsive")
             if fingerprint_cache and fingerprint_cache.is_file():
                 command.extend(("--fingerprint-cache", str(fingerprint_cache)))
-            run("Chromium render and geometry gate", command)
+            run("Chromium render and geometry gate", command, timings)
             print(f"NEXT: complete only the AI batches listed in {manifest}, then run --phase verify")
         elif args.phase == "verify":
             run(
@@ -273,6 +453,7 @@ def main() -> int:
                     "--source-fingerprint-scope",
                     "metadata",
                 ],
+                timings,
             )
         elif args.phase == "finalize-prepare":
             run(
@@ -287,10 +468,12 @@ def main() -> int:
                     "--source-fingerprint-scope",
                     "metadata",
                 ],
+                timings,
             )
             run(
                 "prepare final review without rerender",
                 ["node", str(SCRIPTS / "render_slides.js"), str(deck), str(review), "--finalize-prepare"],
+                timings,
             )
             print(
                 f"NEXT: inspect and fill squint_review, the final quality score, and generated cross-review batches in {manifest}, "
@@ -309,13 +492,18 @@ def main() -> int:
                     "--source-fingerprint-scope",
                     "metadata",
                 ],
+                timings,
             )
     except (OSError, RuntimeError, ValueError) as exc:
         if fingerprint_cache:
             fingerprint_cache.unlink(missing_ok=True)
+        if timings:
+            timings.finish("fail", str(exc))
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
+    if timings:
+        timings.finish("pass")
     print(f"OK: complete validation entrypoint phase '{args.phase}' finished in {time.monotonic() - started:.1f}s")
     return 0
 

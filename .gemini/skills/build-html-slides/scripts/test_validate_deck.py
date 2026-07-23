@@ -46,6 +46,14 @@ class ValidateDeckTests(unittest.TestCase):
         result = self.validate(html, ("asset.webp",))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_missing_alt_is_blocking(self) -> None:
+        html = self.template_with(
+            '<div class="slide-media" aria-hidden="true"><img src="asset.webp"></div>'
+        )
+        result = self.validate(html, ("asset.webp",))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("image is missing alt", result.stdout)
+
     def test_png_image_fails(self) -> None:
         html = self.template_with(
             '<div class="slide-media" aria-hidden="true"><img src="asset.png" alt="test"></div>'

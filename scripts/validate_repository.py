@@ -95,7 +95,7 @@ def main() -> None:
     claude_marketplace = json.loads(CLAUDE_MARKETPLACE.read_text())
 
     require(plugin["name"] == "build-html-slides", "plugin name mismatch")
-    require(machine_contract.get("schema_version") == 11, "validation contract schema mismatch")
+    require(machine_contract.get("schema_version") == 13, "validation contract schema mismatch")
     require(
         package.get("devDependencies", {}).get("playwright") == machine_contract.get("playwright_version"),
         "package and managed Playwright versions differ",
