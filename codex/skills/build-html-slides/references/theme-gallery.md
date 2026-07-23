@@ -191,6 +191,33 @@ Choose a primary visual system after identifying the audience, communication job
 - Signature slides: multi-subject cover index, generation timeline, full-size act profile, lineup comparison, mood or sound map, curated playlist, editorial closing
 - Avoid: generated idols or fake performance stills, identical profile cards for every act, tiny contact sheets, treating popularity as a visual ranking without evidence, and forcing this direction onto every idol topic. A single-act fandom or meme story may need a scrapbook/fan-zine grammar; a premium comeback may need Editorial Culture, Product Keynote, or Cinematic Noir; a historical archive may need Museum Catalog or Documentary Photo Essay.
 
+## 22. Paper Systems
+
+- Best for: architecture decisions, standards, platform strategy, technical research, design reviews, and engineering proposals
+- Type: humanist or neo-grotesk sans with restrained serif contrast; mono only for identifiers and code
+- Palette: cool white or paper, deep ink, one decision color, and one semantic warning color
+- Grammar: thesis spreads, annotated schematics, decision matrices, marginal explanations, evidence strips, and open comparisons
+- Signature slides: decision cover, constraint map, option comparison, annotated architecture, evidence ledger, recommendation
+- Avoid: dark terminal wallpaper, tiny mono decoration, empty outlined panels, and turning every explanation into a node map
+
+## 23. Interface Lab
+
+- Best for: developer tools, testing, APIs, coding workflows, AI-assisted development, observability, and onboarding
+- Type: geometric or humanist sans; a real code face only for executable text, diffs, identifiers, and traces
+- Palette: bright neutral or product-brand base with two syntax-derived accents; use dark editor crops as evidence, not the whole theme
+- Grammar: authentic interface crops, code diffs, test traces, numbered experiments, benchmark callouts, and cause-to-fix sequences
+- Signature slides: workflow cover, before/after diff, experiment setup, trace diagnosis, benchmark result, adoption path
+- Avoid: fake browser or editor chrome, decorative code walls, invented screenshots, and neon console styling without evidence
+
+## 24. Human Infrastructure
+
+- Best for: migrations, incident learning, developer experience, operating models, data centers, hardware ecosystems, and organizational technology change
+- Type: humanist sans or editorial contrast with compact technical captions
+- Palette: true photographic color, paper or steel neutrals, one safety or route accent
+- Grammar: documentary WebP photography, handoff maps, facility and equipment details, timelines, quotes, and before/after operational evidence
+- Signature slides: human-stakes cover, current-state evidence, handoff map, physical system detail, migration sequence, operating principle
+- Avoid: generic team stock photography, replacing technical proof with portraits, and applying cinematic darkness to every slide
+
 ## Selection rules
 
 1. Choose based on communication job, audience, media, and emotional tone, not the topic noun or favorite color. A named gallery direction is never mandatory.
@@ -201,3 +228,4 @@ Choose a primary visual system after identifying the audience, communication job
 6. For finance and stablecoin decks, choose Ledger Trust when the communication job is trust, reserves, payment flow, settlement, or risk. Use Data Newsroom instead when the primary job is market evidence, and Mission Control when the primary job is infrastructure operations.
 7. For travel decks, classify the communication job before selecting a theme. Use Destination Magazine for ordinary leisure guides and trip planning, Soft Kinetic or Museum Catalog for premium hospitality, Documentary Photo Essay for reportage or heritage testimony, and Field Notes only for expeditions or observation-led field records. Do not select Field Notes merely because the subject is travel.
 8. For idol decks, use Idol Editorial Index only when the job is multi-subject orientation, comparison, chronology, or curation. Route single-act personality, fandom, meme, comeback, business, or historical stories according to their actual job, and create a bespoke contract when the gallery vocabulary would flatten the subject.
+9. For technology decks, compare a paper-led direction, an authentic-media direction, and a schematic or operational direction before choosing. Use Paper Systems for decisions and architecture, Interface Lab for coding and tools, Human Infrastructure for physical or organizational systems, Data Newsroom for evidence, and Product Keynote for launches. Mission Control, Technical Night, dark Spatial Interface, and Retro Future require an explicit operational, security, incident, monitoring, speculative, or brand reason; technology vocabulary alone is not enough.

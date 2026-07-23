@@ -19,6 +19,7 @@ Use this checklist while inspecting the rendered slides selected by `validation-
 - Large cards and panels contain enough information or visual evidence to justify their area; short copy is not stranded inside tall empty boxes.
 - Empty outlines, low-contrast placeholder-like shapes, and equal-height sparse cards do not make the slide look unfinished.
 - Dense slides have enough separation for scanning and comparison.
+- In the all-slide overview, technology content does not collapse into one repeated dark-console fingerprint. Near-black fields, neon status accents, mono micro-labels, glowing nodes, diagonals, and topology maps must reflect the actual communication job, not merely the presence of technical vocabulary.
 
 ## Typography
 
@@ -86,6 +87,7 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - broken/missing local assets;
 - visibly blurry, thumbnail-sized, previously upscaled, or heavily compressed raster imagery, regardless of file extension or nominal dimensions;
 - generic starter styling or repeated default composition;
+- a technology deck dominated by the same dark-console grammar without an operational or authentic brand rationale, after failing to consider paper-led and real-media directions;
 - a report-like, image-starved treatment of a materially observable subject despite suitable factual imagery being reasonably available;
 - wrong region, unsupported factual claims, or misleading provenance;
 - wrong character/person, wrong variant, unverifiable identity, or thematically inappropriate imagery;

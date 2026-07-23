@@ -208,6 +208,26 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("bespoke theme contract", skill)
         self.assertIn("not presets or a closed taxonomy", gallery)
 
+    def test_technology_theme_routing_resists_generic_dark_console_style(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        gallery = (ROOT / "references" / "theme-gallery.md").read_text(encoding="utf-8")
+        playbook = (ROOT / "references" / "theme-playbook.md").read_text(encoding="utf-8")
+        quality = (ROOT / "references" / "quality-bar.md").read_text(encoding="utf-8")
+        visual_qa = (ROOT / "references" / "visual-qa.md").read_text(encoding="utf-8")
+        prompt = (ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
+        editor = (ROOT.parents[2] / "agents" / "build-html-slides-quality-editor.md").read_text(encoding="utf-8")
+        self.assertIn("Technology is a subject domain, not a visual theme", playbook)
+        self.assertIn("paper-led, authentic-media, and schematic or operational candidates", skill)
+        self.assertIn("Do not choose a dark console treatment from technology nouns alone", skill)
+        self.assertIn("## 22. Paper Systems", gallery)
+        self.assertIn("## 23. Interface Lab", gallery)
+        self.assertIn("## 24. Human Infrastructure", gallery)
+        self.assertIn("technology vocabulary alone is not enough", gallery)
+        self.assertIn("generic template behavior", quality)
+        self.assertIn("dark-console fingerprint", visual_qa)
+        self.assertIn("technology as a subject domain rather than a dark-console theme", prompt)
+        self.assertIn("do not reward color swaps on the same console composition", editor)
+
 
 if __name__ == "__main__":
     unittest.main()

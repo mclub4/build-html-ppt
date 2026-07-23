@@ -7,8 +7,10 @@ Read `theme-gallery.md`, then define six decisions before styling: three mood ad
 | Direction | Best for | Visual grammar |
 |---|---|---|
 | Destination magazine | consumer travel guides, itineraries, city and food recommendations | destination-derived color, bold cover hierarchy, editorial photo pacing, route maps, neighborhood spreads, compact practical metadata |
-| Editorial field guide | security, policy, strategy, architecture | paper + forest/dark surfaces, serif display with sans utility, thin rules, mint/orange accents, generous margins, diagrams and matrices |
-| Technical night | infrastructure, developer tools, systems | near-black/navy, cyan or green accent, monospace details, glowing nodes, code and topology diagrams |
+| Paper systems | architecture decisions, standards, platform strategy, technical research | cool paper, deep ink, humanist type, annotated schematics, decision matrices, open comparisons |
+| Interface lab | developer tools, testing, APIs, coding workflows | bright neutral or brand-led surfaces, authentic interface crops, code diffs, traces, numbered experiments |
+| Human infrastructure | migrations, incidents, developer experience, hardware ecosystems | documentary photography, paper or steel neutrals, handoff maps, timelines, operational evidence |
+| Technical night | live operations, security response, runtime monitoring | near-black/navy, restrained status color, monospace evidence, control states and topology; never the generic technology default |
 | Minimal corporate | proposals, reports, roadmaps | warm white or navy, restrained blue/green, clean grid, quiet transitions, data-first layouts |
 | Cinematic game | game introductions, lore, entertainment | dark vignette, expressive display type, bold accent, large art crops, chapter cards, spoiler-aware copy |
 | Bright learning | education, onboarding, explainers | light surfaces, friendly saturated accents, simple diagrams, numbered steps, generous whitespace |
@@ -55,15 +57,42 @@ For an ordinary Tokyo, Kyoto, Osaka, or regional Japan guide, start from Destina
 Record this compact internal spec before implementation:
 
 ```text
-Mood: precise / urgent / humane
-Type: heavy Korean sans display + readable sans body + mono metadata
-Palette roles: dark field / paper reset / safety orange / mint status
-Shape: thin boundaries, square cards, rounded image masks only
-Media: documentary WebP photography + editable SVG systems diagrams
-Motion: short directional fades; chapter images settle more slowly
+Mood: precise / open / humane
+Type: confident Korean humanist sans display + readable sans body + mono only for code and identifiers
+Palette roles: cool paper / deep ink / cobalt decision / coral risk
+Shape: open alignment, thin rules, framed evidence only where boundaries carry meaning
+Media: authentic interface or facility WebP + editable SVG systems diagrams
+Motion: short directional fades; evidence appears in explanatory order
 ```
 
 Do not select a theme by swapping color tokens on the starter template. Change typography, spacing, image treatment, composition families, source treatment, and motion together.
+
+### Technology routing
+
+Technology is a subject domain, not a visual theme. Before styling a technology deck, compare three materially different directions:
+
+1. a light or paper-led editorial system;
+2. an authentic-media system built around real interfaces, equipment, facilities, products, or people when relevant;
+3. a schematic or operational system, using a dark command-room surface only when the communication job benefits from it.
+
+| Communication job | Strong starting directions |
+|---|---|
+| Executive decision, ADR, platform strategy | Paper Systems, Swiss Signal, Minimal Corporate, Data Newsroom |
+| Developer education, testing, API, coding workflow | Interface Lab, Bright Learning, Playful Modular, Product Keynote |
+| Migration, developer experience, incident learning, operating model | Human Infrastructure, Documentary Photo Essay, Data Newsroom |
+| Hardware, semiconductor, robotics, manufacturing | Human Infrastructure, Blueprint Workshop, Scientific Atlas |
+| Benchmark, research, performance evidence | Data Newsroom, Scientific Atlas, Paper Systems |
+| Live operations, security response, runtime monitoring | Mission Control or Technical Night |
+| Developer-tool launch or product promotion | Product Keynote, Interface Lab, Spatial Interface |
+
+Do not infer the recurring fingerprint `near-black or navy + cyan or acid green + mono micro-labels + glowing nodes + diagonal panel` merely because the title contains AI, cloud, CNI, MSA, testing, agent, RAG, architecture, or code. Mission Control and Technical Night require an operational, monitoring, incident, security, or command context. Otherwise prefer a paper-led or mixed-surface direction unless the subject's real brand identity supports darkness.
+
+For technology decks, extend the theme contract with:
+
+```text
+Luminosity: paper-led / mixed / dark-led - reason
+Distinctive evidence: the real media or information shape that prevents a generic tech-console look
+```
 
 ## Visual rhythm
 

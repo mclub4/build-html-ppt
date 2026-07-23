@@ -55,6 +55,7 @@ Do not use the same dominant composition on three consecutive slides. Do not use
 - Keep sources and controls quiet but readable. They must not compete with the headline or collide with the main composition.
 - Use surface changes as chapter punctuation, not random decoration.
 - Judge container occupancy, not only alignment. Large panels containing a few words, short bullets floating at the top of tall cards, and empty decorative rectangles are unfinished compositions. Use open layout or add evidence instead of enlarging the box.
+- For technology decks, inspect the deck-wide visual fingerprint. Repeating near-black or navy surfaces, cyan or acid-green accents, mono micro-labels, glowing nodes, diagonal control panels, and topology motifs without an operational or brand reason is generic template behavior. Vary the evidence form and luminosity for the communication job rather than recoloring the same console composition.
 
 ## Anti-regression rubric
 
@@ -76,6 +77,7 @@ This rubric is used only in Full Validation. After the render/fix loop is settle
 ## Blocking quality failures
 
 - The output still looks like the starter template.
+- A technology deck defaults to a repeated dark-console fingerprint without an operational, monitoring, incident, security, speculative, or authentic brand rationale, especially when a paper-led or real-media direction would communicate the subject more clearly.
 - Three or more consecutive slides share the same dominant layout.
 - A product, game, place, person, or event deck relies mainly on text and generic cards.
 - A materially observable industry, product chain, facility, device, experiment, biological phenomenon, or research modality is shown almost entirely through text, tables, charts, and generic SVGs even though suitable subject imagery is reasonably available.
