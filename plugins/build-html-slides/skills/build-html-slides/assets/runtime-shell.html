@@ -25,6 +25,8 @@
       --nav-muted: rgba(255, 255, 255, 0.58);
       --nav-accent: #ffffff;
       --nav-hover: rgba(255, 255, 255, 0.12);
+      --nav-exclusion-width: 280px;
+      --nav-exclusion-height: 84px;
       --font-display: "Pretendard Variable", "Pretendard", "SUIT Variable", "SUIT", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
       --font-body: "Pretendard Variable", "Pretendard", "SUIT Variable", "SUIT", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
       --font-mono: "JetBrains Mono", "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
@@ -103,6 +105,15 @@
       flex-direction: column;
       gap: var(--layout-gap);
       padding: var(--slide-pad-y) var(--slide-pad-x);
+    }
+    .nav-safe-note {
+      position: absolute;
+      left: var(--slide-pad-x);
+      right: var(--nav-exclusion-width);
+      bottom: 28px;
+      z-index: 4;
+      width: fit-content;
+      max-width: min(760px, calc(100% - var(--nav-exclusion-width)));
     }
     .key-visual, .logo, .title-art, .safe-media { max-width: 100%; max-height: 100%; object-fit: contain; }
 

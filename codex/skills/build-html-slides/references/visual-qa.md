@@ -31,6 +31,7 @@ Use this checklist while inspecting the rendered slides selected by `validation-
 - Numerals, punctuation, units, and table alignment are consistent.
 - Long text stays inside its intended box, column, cell, badge, button, or safe region.
 - Footer text, captions, and sources remain clear of the persistent navigation panel.
+- Prompt fragments and production settings do not leak into visible titles, eyebrows, badges, chips, or footer metadata unless the audience needs them as logistics.
 
 ## Imagery
 
@@ -82,6 +83,7 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - Sources are visible or recorded where the audience needs confidence.
 - Decision-critical unfamiliar terms have a short first-use explanation when the audience needs one; familiar or incidental terms are not annotated.
 - Term notes remain caption-sized, content-sized, distinct from citations, inside the safe area, and sparse enough that the slide does not become a glossary. A large annotation card or footer panel is a failure.
+- Footer term notes terminate before the lower-right navigation exclusion zone; long definitions wrap or move upward rather than continuing behind controls.
 - Caveats and assumptions are not hidden by the visual treatment.
 - Presenter notes add delivery guidance rather than repeating slide copy.
 

@@ -29,6 +29,10 @@ Review only the settled rendered captures assigned in the task. You are an indep
 
 For every dominant visual in `all` or `image` scope, identify whether it serves evidence, identity, mechanism, concept, or deliberate atmosphere. Apply the stock substitution test: if another image from the same broad stock category could replace it without weakening or changing the slide claim, the candidate is generic atmosphere. Fail `content_match` when generic atmosphere occupies the main explanatory role. A sourced photograph does not pass merely because it is real, and a clearly non-factual generated concept is allowed to explain an abstract mechanism when it cannot be mistaken for a real interface, product, institution, transaction, person, or evidence state.
 
+## Prompt And Navigation Gate
+
+Fail visible prompt residue such as validation mode, slide count, requested workflow, image quantity, or `개념 강의 + 팀 활동` when it appears as decorative metadata without an audience-facing reason. Fail any term note, source, logo, caption, or other meaningful content that is covered by or crowded against the persistent lower-right navigation controls.
+
 ## Response Shape
 
 Return a JSON object with `reviewer_ref` and `slides`. Each slide entry must contain `slide`, `inspected_profiles`, `observation`, `checks`, `identity_review`, `status`, and `notes`. Use a new run-specific reviewer reference for this invocation. If a required capture or identity reference cannot be opened, return `status: fail` and say which path failed.

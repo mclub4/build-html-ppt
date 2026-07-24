@@ -23,6 +23,8 @@ Quick Draft is the speed-first creation path. For an ordinary 10-15 slide presen
 - Explicit media-heavy, catalog, portfolio, artwork, or fan-art requests may require more discovery. Keep that research intentional instead of widening every query indefinitely.
 - Settle visible copy and notes before running `humanize-korean`, then perform one combined pass and inspect the semantic diff.
 - Write concise notes for roughly 30-60 seconds of delivery: purpose, natural talk track, emphasis, transition, and only necessary source or caveat guidance.
+- Keep production-language fragments out of visible slides. Validation mode, slide count, requested workflow, and phrases such as `개념 강의 + 팀 활동` remain private unless the audience needs them as logistics.
+- Quick Draft has no rendered navigation check. Place every footer definition, source, logo, and caption outside the lower-right navigation exclusion zone during authoring; use `.nav-safe-note` for footer term notes.
 
 ## Stop Condition
 

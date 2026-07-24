@@ -391,6 +391,31 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("rendered-surface", density)
         self.assertIn("term note must remain a compact caption", density)
 
+    def test_prompt_residue_stays_private_and_notes_reserve_navigation_space(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        cover = (ROOT / "references" / "cover-design.md").read_text(encoding="utf-8")
+        audience = (ROOT / "references" / "audience-story-routing.md").read_text(encoding="utf-8")
+        korean = (ROOT / "references" / "korean-copy.md").read_text(encoding="utf-8")
+        typography = (ROOT / "references" / "style-presets.md").read_text(encoding="utf-8")
+        quick = (ROOT / "references" / "quick-draft-authoring.md").read_text(encoding="utf-8")
+        quality = (ROOT / "references" / "quality-bar.md").read_text(encoding="utf-8")
+        visual = (ROOT / "references" / "visual-qa.md").read_text(encoding="utf-8")
+        shell = (ROOT / "assets" / "runtime-shell.html").read_text(encoding="utf-8")
+        reviewer = (ROOT.parents[2] / "agents" / "build-html-slides-visual-reviewer.md").read_text(encoding="utf-8")
+        editor = (ROOT.parents[2] / "agents" / "build-html-slides-quality-editor.md").read_text(encoding="utf-8")
+        self.assertIn("Separate private authoring constraints", skill)
+        self.assertIn("The authoring brief is private", cover)
+        self.assertIn("Separate authoring instructions from audience copy", audience)
+        self.assertIn("제작 프롬프트를 화면 문구로 옮기지 않기", korean)
+        self.assertIn("개념 강의 + 팀 활동", quick)
+        self.assertIn("280×84px", typography)
+        self.assertIn("lower-right navigation exclusion zone", quality)
+        self.assertIn("Footer term notes terminate before", visual)
+        self.assertIn("--nav-exclusion-width: 280px", shell)
+        self.assertIn(".nav-safe-note", shell)
+        self.assertIn("## Prompt And Navigation Gate", reviewer)
+        self.assertIn("## Prompt And Navigation Gate", editor)
+
 
 if __name__ == "__main__":
     unittest.main()

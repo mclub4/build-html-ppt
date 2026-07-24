@@ -1,6 +1,6 @@
 {
   "name": "build-html-slides",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Create audience-aware HTML presentations with presenter notes, WebP assets, Chromium visual QA, and bundled Archify diagrams.",
   "author": {
     "name": "HYUNJIN CHO",

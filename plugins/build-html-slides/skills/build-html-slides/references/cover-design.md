@@ -13,12 +13,15 @@ Before implementing the cover, write a private one-line brief containing:
 - composition direction, focal point, and required safe area;
 - any logo, date, presenter, confidentiality, or source metadata that genuinely belongs.
 
+The authoring brief is private. Do not copy prompt fragments, production instructions, or generation metadata onto the cover merely because the user mentioned them. Phrases such as `개념 강의 + 팀 활동`, `15장`, `빠른 검증`, `사진 많이`, the target duration, requested file format, or the current year are constraints unless the audience genuinely needs them as course or event logistics. Transform a useful constraint into an audience-facing promise, place necessary logistics on an agenda or course-information slide, or keep it out of the visible presentation. Never use prompt residue as an eyebrow, badge, footer chip, or decorative metadata filler.
+
 Consider at least two materially different cover directions in planning, such as full-bleed editorial image versus contained object composition, or cinematic scene versus typographic thesis. Choose the direction that best fits the audience and subject. This comparison does not require two finished renders.
 
 ## Visual Standard
 
 - Make the named subject a first-glance signal. Use its literal name or offer as the primary title; put explanatory value in supporting copy.
 - Give the cover one dominant focal hierarchy: subject or key visual first, title immediately legible, secondary metadata quiet.
+- Show only audience-facing metadata. Slide count, validation mode, production method, requested activity format, and generation year are not automatic cover content.
 - For an existing physical, observable, branded, entertainment, travel, scientific, or person-led subject, use the strongest accurate official, supplied, licensed, or sourced visual as the identity anchor. Do not replace it with generated lookalike art, generic geometry, a chart, or an empty mood field.
 - Generated scenery, texture, or conceptual art may support the cover when it cannot be mistaken for the real subject. It may lead only for an abstract thesis, confidential system, or clearly hypothetical scenario with no honest documentary referent.
 - Use logos, posters, title art, products, screenshots, diagrams, and character compositions with `contain` or a deliberately protected foreground. A covered backdrop may support them, but must not crop the identifying edges.
@@ -38,6 +41,7 @@ Fail the cover when any of these is true:
 - the named subject is ambiguous or visually subordinate;
 - an existing named subject is represented only by generated or generic imagery without an authentic identity anchor;
 - the title could belong to an unrelated generic deck;
+- prompt residue or production instructions appear as visible cover metadata without an audience-facing reason;
 - the key visual is weak, irrelevant, blurry, visibly upscaled, or incorrectly cropped;
 - a logo, face, product edge, title art, map, or identifying feature is cut off;
 - title wrapping, contrast, or hierarchy fails at normal, short, or zoom150;

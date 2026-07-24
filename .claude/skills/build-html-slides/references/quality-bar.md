@@ -93,6 +93,8 @@ This rubric is used only in Full Validation. After the render/fix loop is settle
 - Generic stock photography occupies main explanatory space while adding only a broad topic mood and no subject identity, evidence, mechanism, or concept.
 - A rendered slide contains oversized low-information surfaces or decorative empty boxes that are not justified by a hero, chapter, comparison, interaction, or fixed-format visual.
 - A visible audience term note is rendered as a large card or glossary strip, crowds a source citation, or competes with body copy.
+- Prompt residue such as validation mode, slide count, requested workflow, or `개념 강의 + 팀 활동` appears as decorative visible metadata without an audience-facing reason.
+- A term note, citation, logo, caption, or other meaningful footer content enters the lower-right navigation exclusion zone.
 - The cover lacks a clear first-glance identity signal for the named subject, looks like a generic title template, uses a weak or irrelevant visual, traps the title in an oversized empty panel, or crops an identifying feature. A technically valid but merely acceptable cover does not pass when the body is more art-directed.
 - The deck has no designed closing payoff.
 - A named mixed audience receives a generic topic order, or must endure specialist detail before understanding the shared stakes, decision, or relevance.
