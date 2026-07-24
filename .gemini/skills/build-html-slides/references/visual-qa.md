@@ -63,6 +63,7 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - Every meaningful `<img>` needs useful alt text. Missing alt text is a deterministic Full Validation failure, while deliberately decorative images use `alt=""`.
 - Decorative shapes do not create accidental tangencies or obscure hierarchy.
 - Dividers, card edges, captions, and labels remain visually separate from imagery. A product or screenshot crossing a divider or entering its caption region is blocking occlusion even when no DOM bounding box leaves the slide.
+- Large high-chroma surfaces belong to the established palette and visual sequence. An isolated saturated reset with no subject, brand, media, semantic, or narrative rationale is a visual defect, even when contrast passes.
 
 ## Geometry And Runtime
 

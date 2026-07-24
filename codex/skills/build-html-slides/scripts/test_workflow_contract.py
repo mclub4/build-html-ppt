@@ -48,6 +48,40 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("install_browser_dependencies.py --consent", skill)
         self.assertIn("install_browser_dependencies.py --consent", contract)
 
+    def test_quick_draft_uses_bounded_shared_authoring_path(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
+        quick = (ROOT / "references" / "quick-draft-authoring.md").read_text(encoding="utf-8")
+        shell = (ROOT / "assets" / "runtime-shell.html").read_text(encoding="utf-8")
+        prompt = (ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
+        self.assertIn("four or five reusable composition families", skill)
+        self.assertIn("at most two signature slides", skill)
+        self.assertIn("10-20 minutes", contract)
+        self.assertIn("never recreate the stage fitter", quick)
+        self.assertIn("Do not write hundreds of lines of slide-specific CSS", quick)
+        self.assertIn("four or five reusable composition families", prompt)
+        for helper in (
+            ".layout-hero",
+            ".layout-split",
+            ".layout-editorial",
+            ".layout-columns",
+            ".layout-gallery",
+        ):
+            self.assertIn(helper, shell)
+
+    def test_large_area_palette_roles_require_provenance(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        playbook = (ROOT / "references" / "theme-playbook.md").read_text(encoding="utf-8")
+        quality = (ROOT / "references" / "quality-bar.md").read_text(encoding="utf-8")
+        visual = (ROOT / "references" / "visual-qa.md").read_text(encoding="utf-8")
+        prompt = (ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
+        self.assertIn("palette provenance", skill)
+        self.assertIn("Palette provenance and area", playbook)
+        self.assertIn("Unsupported high-chroma colors", skill)
+        self.assertIn("one-off high-chroma full-slide reset", quality)
+        self.assertIn("Large high-chroma surfaces", visual)
+        self.assertIn("unsupported high-chroma colors remain small accents", prompt)
+
     def test_fan_art_targets_are_checkpoints_and_do_not_expand_review_implicitly(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")

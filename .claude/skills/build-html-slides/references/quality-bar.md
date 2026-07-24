@@ -34,6 +34,8 @@ Do not use the same dominant composition on three consecutive slides. Do not use
 
 In an ordinary explanatory deck, generic framed panels should not dominate more than roughly one third of body slides. Different panel counts still count as the same composition when the headline position, container treatment, and reading path remain unchanged.
 
+Every large-area saturated surface needs documented palette provenance and must belong to the subject, identity, semantic system, or sequence rather than acting as isolated novelty.
+
 ## Imagery expectations
 
 - Promotional, entertainment, travel, lifestyle, portfolio, and product decks: use meaningful raster imagery across most of the story.
@@ -82,6 +84,7 @@ This rubric is used only in Full Validation. After the render/fix loop is settle
 
 - The output still looks like the starter template.
 - A technology presentation defaults to a repeated dark-console fingerprint from technical vocabulary alone, without a brief-specific art-direction rationale or enough compositional variation. Darkness itself is not a failure.
+- A one-off high-chroma full-slide reset has no subject, brand, media, semantic, or narrative rationale.
 - Three or more consecutive slides share the same dominant layout.
 - Generic framed panels dominate the body, even if each slide changes the number of cards or accent color.
 - A product, game, place, person, or event deck relies mainly on text and generic cards.

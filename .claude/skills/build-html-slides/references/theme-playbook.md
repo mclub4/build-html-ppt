@@ -2,7 +2,7 @@
 
 ## Theme inference
 
-Read `subject-routing.md` and `design-candidate-search.md` first. Select semantic facets, retrieve three candidates, compare them, and reject at least one before reading `theme-gallery.md` in depth. Then define six decisions before styling: three mood adjectives; display and body typography; palette roles; shape language; media treatment; and motion character. Write them as a one-line theme contract before coding.
+Read `subject-routing.md` and `design-candidate-search.md` first. Select semantic facets, retrieve three candidates, compare them, and reject at least one before reading `theme-gallery.md` in depth. Then define six decisions before styling: three mood adjectives; display and body typography; palette roles and provenance; shape language; media treatment; and motion character. Write them as a one-line theme contract before coding.
 
 | Direction | Best for | Visual grammar |
 |---|---|---|
@@ -87,6 +87,17 @@ Motion: short directional fades; evidence appears in explanatory order
 
 Do not select a theme by swapping color tokens on the starter template. Change typography, spacing, image treatment, composition families, source treatment, and motion together.
 
+### Palette provenance and area
+
+Assign a reason to every color that occupies a large surface:
+
+- **subject or media-derived:** sampled or visually inferred from authentic subject imagery;
+- **brand or identity:** part of a verified identity system relevant to the presentation;
+- **semantic status:** communicates success, risk, warning, ownership, phase, or another stable meaning;
+- **editorial pacing:** a deliberate chapter or emotional shift that belongs to the established story.
+
+An unsupported high-chroma color may still work as a small label, line, number, mark, or navigation accent. It must not become a full-slide background merely because the sequence needs variety. A one-off dominant color should either recur in smaller roles elsewhere, be anchored by the slide's imagery, or have a clear narrative reason. Record this reasoning in the theme contract rather than choosing a memorable hex value in isolation.
+
 ### Technology routing
 
 Technology is a subject domain, not a visual theme. Before styling a technology deck, compare three materially different directions:
@@ -127,7 +138,7 @@ Plan the sequence as a set of spreads, not isolated pages.
 - Avoid three consecutive slides with the same dominant grid. A color change alone does not create rhythm.
 - Treat a sequence of top headline + two/three/four framed panels as one repeated composition even when panel counts, labels, or accent colors change.
 
-For a typical 8-15 slide deck, use at least five composition families from `quality-bar.md`. Promotional and narrative decks should normally include a cover, editorial split, full-bleed or contained key visual, lineup/gallery, decision slide, and designed closing. Technical decks should normally include a stakes image, system context, process or loop, failure/timeline, authority or comparison, and roadmap/closing.
+Quick Draft uses at least four shared composition families for a typical 8-15 slide presentation; Full Validation or a longer presentation normally shows at least five. Promotional and narrative work should normally include a cover, editorial split, full-bleed or contained key visual, lineup/gallery, decision slide, and designed closing. Technical work should normally include a stakes image, system context, process or loop, failure/timeline, authority or comparison, and roadmap/closing.
 
 ## Financial and stablecoin visuals
 
@@ -177,7 +188,8 @@ Before the first render, confirm that `assets/runtime-shell.html` supplied only 
 - No large sparse card or placeholder-like empty shape remains; every large surface carries proportionate information or a deliberate visual role.
 - No `PLACE NOTE`, image-here label, temporary/dummy media, empty frame, or generic replacement graphic remains. If a promised factual image is unavailable, redesign the composition instead of styling the missing slot.
 - Display and body fonts were deliberately selected for this subject and writing system; the neutral runtime-shell font stack is no longer the art direction.
-- At least five composition families are visible in the storyboard.
+- Quick Draft has at least four shared composition families; Full Validation or a longer presentation normally has at least five.
+- Every large-area non-neutral color has palette provenance, and no unsupported high-chroma color is used as a one-off full-slide reset.
 - The cover and closing are designed for this subject.
 - The deck's visual identity is recognizable with the text blurred.
 - The body has a contemporary, topic-specific fingerprint beyond "paper background + clean cards" or "dark background + glowing nodes."
