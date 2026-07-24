@@ -387,8 +387,6 @@ def main() -> int:
                         "AUTO-SCOPE: retrying only previously failed slides "
                         f"{args.slides}; typed change detection may widen the scope."
                     )
-            if not args.slides:
-                run("tool preflight", [sys.executable, str(SCRIPTS / "check_environment.py")], timings)
             classification: dict[str, object] = {
                 "effective": "all" if not args.slides else args.change_type,
                 "impact": "full" if not args.slides else "direct",
@@ -404,7 +402,7 @@ def main() -> int:
                     }[args.change_type]
                 ),
             }
-            if args.slides:
+            if manifest.is_file():
                 fingerprint_cache = review / ".fingerprint-cache.json"
                 classification = classify_change_scope(
                     deck,
@@ -415,6 +413,21 @@ def main() -> int:
                     args.responsive,
                     fingerprint_cache,
                 )
+                changed_slides = classification.get("changed_slides")
+                if (
+                    not args.slides
+                    and classification.get("impact") != "full"
+                    and isinstance(changed_slides, list)
+                    and changed_slides
+                    and all(isinstance(number, int) and number > 0 for number in changed_slides)
+                ):
+                    args.slides = ",".join(str(number) for number in changed_slides)
+                    print(
+                        "AUTO-SCOPE: source fingerprints isolated the revision to slide(s) "
+                        f"{args.slides}; typed change detection may still add neighbors."
+                    )
+            if not args.slides:
+                run("tool preflight", [sys.executable, str(SCRIPTS / "check_environment.py")], timings)
             validation_scope = str(classification["effective"])
             for label, command in deterministic_commands(
                 deck,

@@ -95,7 +95,7 @@ Full Validation requires the display, body, and mono families actually used by v
 
 ## Incremental Revision
 
-After the initial render, use:
+After the initial render, ordinary revisions may run `prepare` without `--slides`. When a current review manifest exists, `validate_all.py` always compares the new source fingerprints first and automatically supplies the directly changed slide set to the renderer. Use an explicit `--slides` hint when the intended edit scope is already known or when recovering a failed slide:
 
 ```bash
 python3 scripts/validate_all.py OUTPUT.html --phase prepare \
@@ -109,7 +109,7 @@ python3 scripts/validate_all.py OUTPUT.html --phase prepare \
 - **Neighbor impact:** structure, order, transition, or adjacency-sensitive changes refresh affected slides plus immediate neighbors.
 - **Full impact:** shared CSS that affects the whole deck, dynamic active-state selectors, runtime/navigation code, profile set, mode, review risk, slide-count changes, or unsafe deck-wide dependencies refresh every slide.
 
-Linked CSS is read through Chromium CSSOM and attributed to matching slides when possible. CSS background assets and inline-style assets inherit the same scope. Authors may also declare isolated rules with `<style data-slide-scope="N">`. The classifier cache is reused by the renderer only while the deck and every tracked local file retain the same size, mtime, and ctime.
+Linked and embedded CSS is read through Chromium CSSOM and attributed to the slide containing each actually matched element, including selectors rooted at a slide ID or `data-*` attribute. CSS background assets and inline-style assets inherit the same scope. For complex selectors, pseudo-elements, or rules prepared before their target markup exists, declare the dependency explicitly with `<style data-slide-scope="N">`. Keep shared theme/runtime rules in ordinary shared style blocks; do not create one CSS file per slide. The classifier cache is reused by the renderer only while the deck and every tracked local file retain the same size, mtime, and ctime.
 
 Run checks by change type:
 

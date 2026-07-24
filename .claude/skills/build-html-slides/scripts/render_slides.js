@@ -658,11 +658,18 @@ async function collectFingerprints(page) {
         .replace(/::[a-z-]+(?:\([^)]*\))?/gi, '')
         .replace(/:(?:hover|active|focus|focus-visible|focus-within|visited|target)(?![\w-])/gi, '');
       try {
-        const targets = slides.flatMap((slide, index) => (
-          slide.matches(query) || slide.querySelector(query) ? [index] : []
-        ));
-        const outside = [...document.querySelectorAll(query)].some(element => !element.closest('section.slide'));
-        return outside ? null : targets;
+        const matched = [...document.querySelectorAll(query)];
+        if (matched.some(element => !element.closest('section.slide'))) return null;
+        const targets = new Set();
+        matched.forEach(element => {
+          const owner = element.closest('section.slide');
+          const index = slides.indexOf(owner);
+          if (index >= 0) targets.add(index);
+        });
+        slides.forEach((slide, index) => {
+          if (slide.matches(query)) targets.add(index);
+        });
+        return [...targets].sort((left, right) => left - right);
       } catch (_error) {
         return null;
       }
@@ -678,7 +685,7 @@ async function collectFingerprints(page) {
               slideStyles[index].push(material);
               assets.forEach(asset => slideAssets[index].add(asset));
             });
-          } else if (targets === null || targets?.length === slides.length) {
+          } else if (targets === null || targets?.length === 0 || targets?.length === slides.length) {
             globalStyles.push(material);
             assets.forEach(asset => globalStyleAssets.add(asset));
           }
