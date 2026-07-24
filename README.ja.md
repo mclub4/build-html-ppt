@@ -165,9 +165,9 @@ python3 scripts/validate_all.py OUTPUT.html --phase finalize-verify
 検証ファイルは既定で成果物フォルダーの外に保存されます。
 
 ```text
-~/.codex/build-html-slides/workspaces/<deck-id>/
-~/.claude/build-html-slides/workspaces/<deck-id>/
-~/.gemini/build-html-slides/workspaces/<deck-id>/
+~/.codex/build-html-slides/workspaces/<presentation-id>/
+~/.claude/build-html-slides/workspaces/<presentation-id>/
+~/.gemini/build-html-slides/workspaces/<presentation-id>/
 ```
 
 ## 開発
