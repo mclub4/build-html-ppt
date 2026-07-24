@@ -24,6 +24,10 @@ The parent agent must provide the final `review.json`, sibling `sources.json` wh
 6. Independently cross-review exactly the slides in `cross_review_batches` whose status is `pending`, then mark each finished batch `complete`. Leave existing `complete` batches untouched; they are hash-verified independent reviews retained from unchanged captures. Standard risk contains visual-critical, warning-triggered, and distributed sample slides; high risk contains every slide. Include per-target `identity_review` results whenever a sampled slide requires identity review. Do not reuse a primary reviewer's wording or any reviewer reference from the primary-reviewer set.
 7. Return findings only. Do not search for replacement assets, rerun earlier review batches, edit files, or inflate a score to make validation pass.
 
+## Mandatory Pixel-Edge Sweep
+
+For every full-size capture opened during final or cross-review, independently trace image-to-frame boundaries, translucent and pseudo-element residue, the first glyph of each text block, final display-title lines, and the complete lower-right navigation exclusion zone. Fail visible frame gaps or overshoot, stale/doubled translucent shapes, media biting into a text starting edge, one-character or punctuation-only final lines, and any caption, note, source, logo, image, or decoration that enters or crowds the navigation zone. Record the concrete location; a generic “no overlap” statement cannot close the cross-review.
+
 ## Media Contribution Gate
 
 Judge every dominant visual by its evidence, identity, mechanism, concept, or deliberate-atmosphere role. Apply the stock substitution test and fail generic stock used as the main explanation when another image from the same broad category could replace it without changing the claim. A clearly non-factual generated concept may be the stronger medium for an abstract mechanism, provided it cannot be mistaken for a real interface, product, institution, transaction, person, or evidence state. Real photography is required for authentic subjects and evidence, not as an automatic badge of educational value.

@@ -25,6 +25,18 @@ Review only the settled rendered captures assigned in the task. You are an indep
 7. Return one concrete observation and one verdict per slide. Name visible elements and their locations; do not reuse generic approval language.
 8. Do not search the web, rediscover sources, or inspect unassigned profiles. Do not edit the deck, captures, or manifest. Return structured findings to the parent agent so only failed or warned slides are rerendered.
 
+## Mandatory Pixel-Edge Sweep
+
+Run this sweep on every assigned full-size capture before returning PASS. Zoom mentally into boundaries instead of judging only the overall composition:
+
+1. Trace every image against its frame, mask, divider, and intended bleed. Fail visible gaps, overshoot, mismatched corners, accidental tangencies, or a crop that no longer matches the frame.
+2. Trace every translucent layer and visible `::before`/`::after`-style decoration. Fail stale duplicates, detached shadows, doubled silhouettes, residual bands, or shapes left behind after a layout change.
+3. Inspect the first visible glyph and line start of every text block. Fail any image, mask, gradient, or foreground layer that covers, clips, or visually bites into the text starting edge.
+4. Read every multiline display title and quote through its last line. Fail a single Korean character, sentence ending, or punctuation mark stranded alone.
+5. Inspect the full lower-right navigation exclusion zone, not only direct button overlap. Fail captions, notes, sources, logos, images, or decoration that enter the zone or lose deliberate breathing room behind the controls.
+
+Map failures to the existing review checks: image/frame mismatch to `crop` or `occlusion`; translucent/pseudo residue to `occlusion`; covered text start to `occlusion` and `text_bounds`; orphaned final line to `text`; navigation-zone intrusion to `controls` and the affected `text_bounds`, `crop`, or `occlusion` check. A PASS observation must name concrete locations for every applicable part of this sweep. “Everything fits” or “no overlap” is not sufficient evidence.
+
 ## Media Contribution Gate
 
 For every dominant visual in `all` or `image` scope, identify whether it serves evidence, identity, mechanism, concept, or deliberate atmosphere. Apply the stock substitution test: if another image from the same broad stock category could replace it without weakening or changing the slide claim, the candidate is generic atmosphere. Fail `content_match` when generic atmosphere occupies the main explanatory role. A sourced photograph does not pass merely because it is real, and a clearly non-factual generated concept is allowed to explain an abstract mechanism when it cannot be mistaken for a real interface, product, institution, transaction, person, or evidence state.

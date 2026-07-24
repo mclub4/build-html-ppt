@@ -60,6 +60,9 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 ## Layers And Contrast
 
 - Media remains behind titles, labels, sources, and controls.
+- At 100% capture size, image edges terminate exactly at their intended frame, mask, divider, or bleed boundary; a one- or two-pixel-looking gap, overshoot, accidental tangent, or mismatched corner is a visible defect.
+- Translucent overlays and `::before`/`::after` decoration leave no stale duplicate, detached shadow, doubled edge, or residual shape after layout changes.
+- Inspect the first glyph and first line start of every text block. Foreground media, masks, gradients, and decorative layers must not cover or visually bite into that starting edge.
 - Text does not straddle incompatible light/dark regions without a stable scrim or backing.
 - Body text and controls target at least 4.5:1 contrast; large display text targets at least 3:1.
 - The automated gate calculates those ratios only when the text background resolves to a solid color. Image, gradient, translucent, blended, shadowed, or overlapping-media backgrounds are warnings routed to full-size AI contrast inspection, not sampled-color passes.
@@ -84,13 +87,17 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - Decision-critical unfamiliar terms have a short first-use explanation when the audience needs one; familiar or incidental terms are not annotated.
 - Term notes remain caption-sized, content-sized, distinct from citations, inside the safe area, and sparse enough that the slide does not become a glossary. A large annotation card or footer panel is a failure.
 - Footer term notes terminate before the lower-right navigation exclusion zone; long definitions wrap or move upward rather than continuing behind controls.
+- Treat the lower-right navigation exclusion zone as occupied space, not only the visible button rectangle. Captions, notes, sources, logos, images, and decoration must terminate with deliberate breathing room before it.
 - Caveats and assumptions are not hidden by the visual treatment.
 - Presenter notes add delivery guidance rather than repeating slide copy.
 
 ## Blocking Defects
 
 - cropped or stretched meaningful imagery;
+- image/frame edges that visibly gap, overshoot, mismatch masks, or create accidental tangencies;
+- stale translucent or pseudo-element residue, doubled silhouettes, or detached decorative layers;
 - text outside a box or safe area;
+- foreground imagery or decoration covering the first glyph or text starting edge;
 - orphaned final-line characters or punctuation, colliding text rows, overlapping text regions, or copy covered by navigation;
 - unreadable contrast or foreground media over copy;
 - broken/missing local assets;

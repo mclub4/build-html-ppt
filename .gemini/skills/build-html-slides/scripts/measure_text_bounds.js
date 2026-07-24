@@ -340,7 +340,7 @@
     let occluded = false;
     for (const line of record.lines) {
       const y = line.top + line.height / 2;
-      for (const ratio of [0.15, 0.35, 0.5, 0.65, 0.85]) {
+      for (const ratio of [0.02, 0.08, 0.18, 0.35, 0.5, 0.7, 0.9]) {
         const x = line.left + line.width * ratio;
         if (x < 0 || y < 0 || x >= viewportWidth || y >= viewportHeight) continue;
         const stack = document.elementsFromPoint(x, y);
