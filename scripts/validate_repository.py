@@ -28,14 +28,25 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+IGNORED_DIRECTORIES = frozenset({"__pycache__", ".pytest_cache", ".omc", ".git"})
+IGNORED_NAMES = frozenset({".build-html-slides-copy-origin", ".DS_Store"})
+IGNORED_SUFFIXES = frozenset({".pyc", ".pyo"})
+
+
+def is_transient(path: Path, root: Path) -> bool:
+    relative = path.relative_to(root)
+    return (
+        path.name in IGNORED_NAMES
+        or path.suffix in IGNORED_SUFFIXES
+        or bool(IGNORED_DIRECTORIES.intersection(relative.parts))
+    )
+
+
 def tree_hashes(root: Path) -> dict[str, str]:
     return {
         str(path.relative_to(root)): digest(path)
         for path in sorted(root.rglob("*"))
-        if path.is_file()
-        and path.name != ".build-html-slides-copy-origin"
-        and path.suffix != ".pyc"
-        and "__pycache__" not in path.parts
+        if path.is_file() and not is_transient(path, root)
     }
 
 
