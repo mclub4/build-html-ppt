@@ -7,10 +7,10 @@ Read `subject-routing.md` and `design-candidate-search.md` first. Select semanti
 | Direction | Best for | Visual grammar |
 |---|---|---|
 | Destination magazine | consumer travel guides, itineraries, city and food recommendations | destination-derived color, bold cover hierarchy, editorial photo pacing, route maps, neighborhood spreads, compact practical metadata |
-| Paper systems | architecture decisions, standards, platform strategy, technical research | cool paper, deep ink, humanist type, annotated schematics, decision matrices, open comparisons |
+| Paper systems | architecture decisions, standards, platform strategy, technical research | cool paper, deep ink, deliberate serif/sans or width contrast, annotated schematics, margin evidence, open comparisons, and editorial scale shifts; never a pale wall of equal cards |
 | Interface lab | developer tools, testing, APIs, coding workflows | bright neutral or brand-led surfaces, authentic interface crops, code diffs, traces, numbered experiments |
 | Human infrastructure | migrations, incidents, developer experience, hardware ecosystems | documentary photography, paper or steel neutrals, handoff maps, timelines, operational evidence |
-| Technical night | live operations, security response, runtime monitoring | near-black/navy, restrained status color, monospace evidence, control states and topology; never the generic technology default |
+| Technical night | live operations, security response, runtime monitoring, or another brief that benefits from deliberate darkness | near-black/navy, restrained status color, monospace evidence, control states and topology; valid by art direction, never automatic from the topic noun |
 | Minimal corporate | proposals, reports, roadmaps | warm white or navy, restrained blue/green, clean grid, quiet transitions, data-first layouts |
 | Cinematic game | game introductions, lore, entertainment | dark vignette, expressive display type, bold accent, large art crops, chapter cards, spoiler-aware copy |
 | Bright learning | education, onboarding, explainers | light surfaces, friendly saturated accents, simple diagrams, numbered steps, generous whitespace |
@@ -29,6 +29,12 @@ Read `subject-routing.md` and `design-candidate-search.md` first. Select semanti
 | Editorial grid (magazine) | industry trends, profiles, comparisons, portfolios, and photo-rich research | issue cover, photo/text spreads, profile index, pull-quote resets, comparison folios |
 
 These are routing hints, not fixed presets. A topic may support several valid directions depending on audience and communication job, and the best answer may be a bespoke contract not named here. Use the larger gallery for additional vocabulary including Neo Brutalist, Riso Zine, Scientific Atlas, Blueprint Workshop, Documentary Photo Essay, Spatial Interface, Ledger Trust, and Idol Editorial Index. Mix only compatible attributes, and do not turn signature-slide lists into mandatory checklists. E-Ink/Paper is a treatment that can strengthen Paper Systems or Scholarly Review; it is not a reason to make every slide imitate a device screen.
+
+### Technology concept routing
+
+Technology is a subject, not a visual genre. For an educational concept such as CQRS, do not treat "avoid dark console" as "select pale paper." Compare at least one contemporary editorial or constructive-geometric direction with the evidence-led technical candidate. Use real interfaces, product or company evidence, diagrams, and typography according to the actual claim.
+
+If Paper Systems wins, it must behave like a designed technical publication: strong display/body contrast, open comparisons, annotated diagrams, margin evidence, controlled dark or saturated resets, and a recognizable motif. Repeated white rectangles under a large heading, long empty card bottoms, muted green rules on every slide, and a single rounded sans for every role are failure patterns.
 
 ### Treatment grammars, not full-deck themes
 
@@ -99,7 +105,7 @@ Technology is a subject domain, not a visual theme. Before styling a technology 
 | Live operations, security response, runtime monitoring | Mission Control or Technical Night |
 | Developer-tool launch or product promotion | Product Keynote, Interface Lab, Spatial Interface |
 
-Do not infer the recurring fingerprint `near-black or navy + cyan or acid green + mono micro-labels + glowing nodes + diagonal panel` merely because the title contains AI, cloud, CNI, MSA, testing, agent, RAG, architecture, or code. Mission Control and Technical Night require an operational, monitoring, incident, security, or command context. Otherwise prefer a paper-led or mixed-surface direction unless the subject's real brand identity supports darkness.
+Do not infer the recurring fingerprint `near-black or navy + cyan or acid green + mono micro-labels + glowing nodes + diagonal panel` merely because the title contains AI, cloud, CNI, MSA, testing, agent, RAG, architecture, or code. A dark-led presentation is fully valid when the audience, emotional tone, pacing, evidence contrast, venue, or subject identity benefits from it, including outside operations and security. Choose it from the whole brief, then vary composition and evidence instead of repeating one console skeleton.
 
 For technology decks, extend the theme contract with:
 
@@ -119,6 +125,7 @@ Plan the sequence as a set of spreads, not isolated pages.
 - Place the densest diagram or table after its context has been established.
 - End by resolving the opening promise, not by repeating a generic thank-you page.
 - Avoid three consecutive slides with the same dominant grid. A color change alone does not create rhythm.
+- Treat a sequence of top headline + two/three/four framed panels as one repeated composition even when panel counts, labels, or accent colors change.
 
 For a typical 8-15 slide deck, use at least five composition families from `quality-bar.md`. Promotional and narrative decks should normally include a cover, editorial split, full-bleed or contained key visual, lineup/gallery, decision slide, and designed closing. Technical decks should normally include a stakes image, system context, process or loop, failure/timeline, authority or comparison, and roadmap/closing.
 
@@ -173,3 +180,4 @@ Before the first render, confirm that `assets/runtime-shell.html` supplied only 
 - At least five composition families are visible in the storyboard.
 - The cover and closing are designed for this subject.
 - The deck's visual identity is recognizable with the text blurred.
+- The body has a contemporary, topic-specific fingerprint beyond "paper background + clean cards" or "dark background + glowing nodes."

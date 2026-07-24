@@ -5,7 +5,7 @@ Use this reference before storyboarding and again during visual review. It captu
 ## What strong decks do
 
 - Lead with a point of view. Each slide states a claim, decision, tension, or transition instead of naming a topic.
-- Build visual rhythm. Alternate image-led, statement, evidence, process, comparison, and decision slides instead of repeating one card grid.
+- Build visual rhythm. Alternate image-led, statement, evidence, process, comparison, and decision slides instead of repeating one card grid or one top-headline-plus-panel skeleton.
 - Make imagery carry meaning. Product shots prove the object, screenshots prove the experience, people create stakes, and generated scenes establish atmosphere or a chapter change.
 - Use one art direction across many compositions. Typography, color roles, line weight, radii, image treatment, and source treatment stay coherent while layouts change.
 - Design the ending. The last slide resolves the opening promise and leaves one useful action or memorable statement.
@@ -32,6 +32,8 @@ For an 8-15 slide deck, normally use at least five composition families from thi
 
 Do not use the same dominant composition on three consecutive slides. Do not use a generic card grid more than twice in a 10-slide deck unless the subject is explicitly a catalog or dashboard. Change the information shape, not only the background color.
 
+In an ordinary explanatory deck, generic framed panels should not dominate more than roughly one third of body slides. Different panel counts still count as the same composition when the headline position, container treatment, and reading path remain unchanged.
+
 ## Imagery expectations
 
 - Promotional, entertainment, travel, lifestyle, portfolio, and product decks: use meaningful raster imagery across most of the story.
@@ -55,7 +57,9 @@ Do not use the same dominant composition on three consecutive slides. Do not use
 - Keep sources and controls quiet but readable. They must not compete with the headline or collide with the main composition.
 - Use surface changes as chapter punctuation, not random decoration.
 - Judge container occupancy, not only alignment. Large panels containing a few words, short bullets floating at the top of tall cards, and empty decorative rectangles are unfinished compositions. Use open layout or add evidence instead of enlarging the box.
-- For technology decks, inspect the deck-wide visual fingerprint. Repeating near-black or navy surfaces, cyan or acid-green accents, mono micro-labels, glowing nodes, diagonal control panels, and topology motifs without an operational or brand reason is generic template behavior. Vary the evidence form and luminosity for the communication job rather than recoloring the same console composition.
+- Judge typography as art direction, not only font loading. A single safe sans used with similar width and texture for display, body, metadata, and technical labels is generic unless the layout creates unmistakable role contrast.
+- Audience term notes are micro-annotations, not cards. Fail large annotation surfaces, glossary bands, or notes that visually merge with source citations.
+- For technology presentations, inspect the presentation-wide visual fingerprint. A dark-led system is valid when deliberately chosen from the audience, emotional tone, pacing, evidence contrast, venue, or subject identity. Repeating near-black or navy surfaces, cyan or acid-green accents, mono micro-labels, glowing nodes, diagonal control panels, and topology motifs merely because the subject is technical is generic template behavior. Vary the evidence form, luminosity, and composition rather than recoloring the same console structure.
 
 ## Anti-regression rubric
 
@@ -64,9 +68,9 @@ Score each dimension from 0 to 3 on rendered slides.
 | Dimension | 0 | 1 | 2 | 3 |
 |---|---|---|---|---|
 | Story | disconnected topics | understandable list | coherent arc | memorable argument with payoff |
-| Art direction | default template | colors changed only | cohesive system | distinctive, topic-specific visual world |
-| Layout rhythm | one repeated layout | minor variation | several useful families | deliberate pacing and chapter resets |
-| Typography | cramped or generic | readable | strong hierarchy | expressive and language-aware |
+| Art direction | default template | colors changed only | cohesive but familiar system | distinctive, contemporary, topic-specific visual world |
+| Layout rhythm | one repeated layout | changed panel counts on one skeleton | several useful families | deliberate pacing and chapter resets |
+| Typography | cramped, generic, or one-role | readable but safe | strong hierarchy and role contrast | expressive, language-aware, and integral to the concept |
 | Imagery | subject unseen, absent, or filler | sparse, repetitive, or wrong medium | subject-appropriate real/scientific/diagram coverage | narrative, sourced, well-cropped, varied, and evidentially clear |
 | Composition | clipped/underfilled/overfull | mechanically aligned | balanced | confident focal hierarchy and movement |
 | Evidence | unsupported or detached | present but weak | integrated sources | evidence strengthens the visual argument |
@@ -77,14 +81,17 @@ This rubric is used only in Full Validation. After the render/fix loop is settle
 ## Blocking quality failures
 
 - The output still looks like the starter template.
-- A technology deck defaults to a repeated dark-console fingerprint without an operational, monitoring, incident, security, speculative, or authentic brand rationale, especially when a paper-led or real-media direction would communicate the subject more clearly.
+- A technology presentation defaults to a repeated dark-console fingerprint from technical vocabulary alone, without a brief-specific art-direction rationale or enough compositional variation. Darkness itself is not a failure.
 - Three or more consecutive slides share the same dominant layout.
+- Generic framed panels dominate the body, even if each slide changes the number of cards or accent color.
 - A product, game, place, person, or event deck relies mainly on text and generic cards.
 - A materially observable industry, product chain, facility, device, experiment, biological phenomenon, or research modality is shown almost entirely through text, tables, charts, and generic SVGs even though suitable subject imagery is reasonably available.
 - A rendered slide contains oversized low-information surfaces or decorative empty boxes that are not justified by a hero, chapter, comparison, interaction, or fixed-format visual.
+- A visible audience term note is rendered as a large card or glossary strip, crowds a source citation, or competes with body copy.
 - The cover lacks a clear first-glance identity signal for the named subject, looks like a generic title template, uses a weak or irrelevant visual, traps the title in an oversized empty panel, or crops an identifying feature. A technically valid but merely acceptable cover does not pass when the body is more art-directed.
 - The deck has no designed closing payoff.
 - A named mixed audience receives a generic topic order, or must endure specialist detail before understanding the shared stakes, decision, or relevance.
+- A mixed or company-wide audience encounters a decision-critical unfamiliar acronym or entity with no explanation, or the presentation compensates by covering slides in unnecessary glossary notes.
 - Raster assets are not WebP, except that SVG remains preferred for true vector content.
 - Reviewers approve from HTML source without inspecting settled rendered slides.
 - Full Validation lacks all-slide AI coverage, required adaptive profiles, review-batch membership, concrete observations, stable reviewer references, or passing change-type verdicts.

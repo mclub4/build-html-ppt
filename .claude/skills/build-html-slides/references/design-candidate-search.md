@@ -23,6 +23,14 @@ python3 scripts/suggest_design_directions.py \
 
 The tool returns three deliberately different candidates. Compare all three against the actual audience, available authentic media, writing system, room, and desired pacing. Reject at least one with a concrete reason. The highest numeric score is not an automatic winner, and a named candidate is never mandatory.
 
+For software, architecture, platform, and technical-explainer presentations, the comparison must include materially different body grammars rather than three recolored system diagrams. When available, compare:
+
+- one evidence-led schematic or operational direction;
+- one contemporary editorial, geometric, or type-led direction;
+- one authentic-interface, documentary, or real-media direction.
+
+Paper Systems is not the automatic answer to a rejected dark-console style. Reject it when it would produce a pale report made from repeated top headings, equal cards, muted green rules, and generic tables. Whatever direction wins must name one distinctive visual motif, one typography contrast, and at least four information-native composition families before HTML authoring.
+
 ## Design dials
 
 - `variance 1-3`: highly restrained; repeated alignment is acceptable when information architecture is the point.
@@ -36,6 +44,8 @@ The tool returns three deliberately different candidates. Compare all three agai
 - `density 8-10`: expert review, reference, or evidence-heavy material; split slides before shrinking type.
 
 These dials are internal art-direction constraints, not visible UI controls and not promises that every slide has the same density or motion.
+
+`variance` describes composition change, not decorative noise. A deck with different card counts but the same top-title-plus-panel skeleton still has low variance.
 
 ## Candidate data boundary
 

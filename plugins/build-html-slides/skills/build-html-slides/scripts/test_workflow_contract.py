@@ -12,18 +12,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WorkflowContractTests(unittest.TestCase):
-    def test_new_deck_requires_explicit_mode_choice(self) -> None:
+    def test_new_presentation_resolves_audience_and_mode_together(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
-        self.assertIn("For every new deck, require an explicit mode choice", skill)
-        self.assertIn("Do not silently infer a mode", skill)
-        self.assertIn("New-deck creation requires an explicit user choice", contract)
-        self.assertIn("Do not silently infer the mode", contract)
+        for document in (skill, contract):
+            self.assertIn("audience", document)
+            self.assertIn("validation mode", document)
+            self.assertIn("one opening message", document)
+            self.assertIn("청중은 알아서 해줘", document)
+            self.assertIn("general company-wide concept-sharing audience", document)
+            self.assertIn("빠른 검증 (Quick Draft)", document)
+            self.assertIn("정밀 검증 (Full Validation)", document)
+            self.assertIn("creation-only", document)
+        self.assertIn("Require an explicit mode choice and do not silently infer it", skill)
+        self.assertIn("The user must choose a mode explicitly", contract)
 
     def test_quick_draft_skips_validation_and_full_requires_preflight(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
-        self.assertIn("This is a creation-only mode", skill)
+        self.assertIn("this is a creation-only mode with no rendered validation", skill)
         self.assertIn("only a no-op safety guard", skill)
         self.assertIn("deliver immediately after implementation without running any validation command", skill)
         self.assertIn("Quick Draft is creation-only", contract)
@@ -145,6 +152,22 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("routed to full-size AI contrast inspection", visual)
         self.assertTrue((ROOT / "scripts" / "measure_contrast.js").is_file())
 
+    def test_unfamiliar_term_notes_are_semantic_audience_aware_and_sparse(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        audience = (ROOT / "references" / "audience-story-routing.md").read_text(encoding="utf-8")
+        korean = (ROOT / "references" / "korean-copy.md").read_text(encoding="utf-8")
+        visual = (ROOT / "references" / "visual-qa.md").read_text(encoding="utf-8")
+        quality = (ROOT / "references" / "quality-bar.md").read_text(encoding="utf-8")
+        self.assertIn("semantic terminology burden list", skill)
+        self.assertIn("Do not run a keyword, acronym, capitalization, or frequency parser", audience)
+        self.assertIn("first meaningful occurrence", audience)
+        self.assertIn("NXT컨소시엄", audience)
+        self.assertIn("KDX", audience)
+        self.assertIn("One or two notes on a slide is normally enough", audience)
+        self.assertIn("용어 — 이 발표에서 뜻하는 역할", korean)
+        self.assertIn("Decision-critical unfamiliar terms", visual)
+        self.assertIn("unnecessary glossary notes", quality)
+
     def test_incremental_contract_scopes_work_without_dropping_independent_review(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         contract = (ROOT / "references" / "validation-contract.md").read_text(encoding="utf-8")
@@ -256,7 +279,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("bespoke theme contract", skill)
         self.assertIn("not presets or a closed taxonomy", gallery)
 
-    def test_technology_theme_routing_resists_generic_dark_console_style(self) -> None:
+    def test_technology_theme_routing_allows_deliberate_dark_without_topic_noun_default(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         gallery = (ROOT / "references" / "theme-gallery.md").read_text(encoding="utf-8")
         playbook = (ROOT / "references" / "theme-playbook.md").read_text(encoding="utf-8")
@@ -265,16 +288,54 @@ class WorkflowContractTests(unittest.TestCase):
         prompt = (ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
         editor = (ROOT.parents[2] / "agents" / "build-html-slides-quality-editor.md").read_text(encoding="utf-8")
         self.assertIn("Technology is a subject domain, not a visual theme", playbook)
-        self.assertIn("paper-led, authentic-media, and schematic or operational candidates", skill)
-        self.assertIn("Do not choose a dark console treatment from technology nouns alone", skill)
+        self.assertIn("evidence-led schematic direction", skill)
+        self.assertIn("contemporary editorial or geometric direction", skill)
+        self.assertIn("Dark-led directions remain valid", skill)
         self.assertIn("## 22. Paper Systems", gallery)
         self.assertIn("## 23. Interface Lab", gallery)
         self.assertIn("## 24. Human Infrastructure", gallery)
         self.assertIn("technology vocabulary alone is not enough", gallery)
+        self.assertIn("A dark-led presentation is fully valid", playbook)
         self.assertIn("generic template behavior", quality)
+        self.assertIn("Darkness itself is not a failure", quality)
         self.assertIn("dark-console fingerprint", visual_qa)
-        self.assertIn("technology as a subject domain rather than a dark-console theme", prompt)
-        self.assertIn("do not reward color swaps on the same console composition", editor)
+        self.assertIn("Both dark-led and paper-led systems remain valid", prompt)
+        self.assertIn("Different card counts are not layout rhythm", editor)
+
+    def test_contemporary_art_direction_rejects_pale_card_walls_and_generic_type(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        candidates = (ROOT / "references" / "design-candidate-search.md").read_text(encoding="utf-8")
+        playbook = (ROOT / "references" / "theme-playbook.md").read_text(encoding="utf-8")
+        quality = (ROOT / "references" / "quality-bar.md").read_text(encoding="utf-8")
+        typography = (ROOT / "references" / "style-presets.md").read_text(encoding="utf-8")
+        prompt = (ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
+        editor = (ROOT.parents[2] / "agents" / "build-html-slides-quality-editor.md").read_text(encoding="utf-8")
+        self.assertIn("Paper Systems is one candidate, not the corrective default", skill)
+        self.assertIn("pale report with repeated top-title-plus-card rows", skill)
+        self.assertIn("Different panel counts still count as the same composition", quality)
+        self.assertIn("roughly one third of body slides", quality)
+        self.assertIn("same family, width, and texture", typography)
+        self.assertIn("contemporary editorial", candidates)
+        self.assertIn("single rounded sans for every role", playbook)
+        self.assertIn("different card counts are not layout rhythm", editor.lower())
+        self.assertIn("Paper Systems is a candidate", prompt)
+
+    def test_term_notes_are_micro_annotations_and_source_classes_are_reserved(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        audience = (ROOT / "references" / "audience-story-routing.md").read_text(encoding="utf-8")
+        typography = (ROOT / "references" / "style-presets.md").read_text(encoding="utf-8")
+        visual = (ROOT / "references" / "visual-qa.md").read_text(encoding="utf-8")
+        prompt = (ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
+        density = (ROOT / "scripts" / "measure_container_density.js").read_text(encoding="utf-8")
+        self.assertIn("data-term-note", skill)
+        self.assertIn("data-source-citation", skill)
+        self.assertIn("never as a large card", skill)
+        self.assertIn("no large white card", audience)
+        self.assertIn("audience term notes: typically 10–12px", typography)
+        self.assertIn("large annotation card", visual)
+        self.assertIn("never combine the generic .source citation class", prompt)
+        self.assertIn("rendered-surface", density)
+        self.assertIn("term note must remain a compact caption", density)
 
 
 if __name__ == "__main__":

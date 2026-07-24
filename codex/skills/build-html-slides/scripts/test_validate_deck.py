@@ -157,6 +157,16 @@ class ValidateDeckTests(unittest.TestCase):
         self.assertIn(".page-separator, .pager-separator", geometry)
         self.assertIn("Math.abs(dy) > 1.5", geometry)
 
+    def test_reserved_source_class_cannot_be_reused_as_component_modifier(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            "<!-- SLIDE_2_CONTENT -->",
+            '<div class="event-stream source"><b>source stream</b><span>delta</span></div>',
+            1,
+        )
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("reserved citation class .source", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

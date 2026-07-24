@@ -1319,7 +1319,9 @@ const { chromium } = loadPlaywright();
             deck = root / "deck.html"
             html = TEMPLATE.read_text(encoding="utf-8").replace(
                 "<!-- SLIDE_2_CONTENT -->",
-                '<div class="card" style="width:900px;height:420px;border:1px solid #bbb"><p>짧은 사실</p></div>',
+                '<div class="step-panel" style="width:900px;height:420px;background:#fff;border:1px solid #bbb">'
+                '<p style="position:absolute;top:20px">짧은 사실</p>'
+                '<span style="position:absolute;bottom:20px">01</span></div>',
                 1,
             )
             deck.write_text(html, encoding="utf-8")
@@ -1339,6 +1341,38 @@ const { chromium } = loadPlaywright();
             self.assertEqual({warning["profile"] for warning in warnings}, {"normal", "short", "zoom150"})
             self.assertEqual(manifest["slides"][1]["required_ai_profiles"], ["normal", "short", "zoom150"])
             self.assertTrue(any(2 in batch["slides"] for batch in manifest["review_batches"]))
+
+    def test_oversized_term_note_and_citation_crowding_route_slide_to_ai_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                '<p data-term-note style="position:absolute;left:80px;bottom:54px;width:560px;'
+                'padding:22px;background:#fff;font-size:20px">NXT — 대체 거래 시장</p>'
+                '<p data-source-citation style="position:absolute;left:80px;bottom:48px;font-size:9px">'
+                '출처 · 공식 자료</p>',
+                1,
+            )
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 0, render.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            warnings = [
+                warning for warning in manifest["automation_gate"]["warnings"]
+                if warning["slide"] == 2 and warning["check"] == "container_density"
+            ]
+            messages = [warning["warning"] for warning in warnings]
+            self.assertTrue(any("compact caption" in message for message in messages), messages)
+            self.assertTrue(any("overlaps or crowds" in message for message in messages), messages)
+            self.assertEqual({warning["profile"] for warning in warnings}, {"normal", "short", "zoom150"})
+            self.assertEqual(manifest["slides"][1]["required_ai_profiles"], ["normal", "short", "zoom150"])
 
     def test_identity_contract_binds_reference_and_routes_quick_review(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

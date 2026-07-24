@@ -158,11 +158,11 @@ Useful starting directions, not fixed templates:
 | Consumer travel magazine | Bold contemporary Korean sans for city, food, and itinerary covers; serif/sans editorial contrast only when the destination story benefits from it | Pretendard, SUIT, or Noto Sans KR |
 | Heritage, reflective travel, culture | MaruBuri or Noto Serif KR when warmth, history, or literary pacing matters; a restrained grotesk for contemporary treatment | Pretendard, SUIT, or Noto Sans KR |
 | Finance, stablecoin, enterprise | IBM Plex Sans KR, Pretendard, or SUIT with firm numeric hierarchy | Same family or Noto Sans KR; IBM Plex Mono for code/addresses |
-| Product, technology, strategy | Pretendard, SUIT, Noto Sans KR, or another clean humanist sans | Same family with distinct weight/width; JetBrains Mono or IBM Plex Mono only for technical tokens |
+| Product, technology, strategy | Pretendard, SUIT, Noto Sans KR, an editorial Korean serif, or another licensed face selected for the actual tone | Pair with a compatible but visibly distinct body role when useful; use a true mono only for technical tokens |
 | Game, anime, entertainment | One topic-appropriate expressive display face for short headlines | Pretendard, SUIT, or Noto Sans KR for all explanatory copy |
 | Premium, fashion, hospitality | An elegant licensed serif or high-contrast display face | A quiet sans with compatible Korean metrics |
 
-Test the exact Korean/Latin/numeral mix before committing. Use no more than two primary families plus one mono family. A novelty face belongs only in short display copy, never paragraphs or tables. Quick Draft may use an intentional cross-platform fallback stack but provides no portability assurance. Full Validation requires every family actually used by visible display, body, or mono text to be a local WOFF2 inside the deck bundle with a redistribution-compatible license and retained credit. Never load a remote font at runtime. The deterministic font gate and renderer record the computed family and loaded face so an undeclared system fallback cannot silently pass.
+Test the exact Korean/Latin/numeral mix before committing. Use no more than two primary families plus one mono family. A novelty face belongs only in short display copy, never paragraphs or tables. Do not assign the same family, width, and texture to display, body, metadata, and technical labels without a clear art-direction reason; that produces a safe but visibly generic result. Quick Draft may use an intentional cross-platform fallback stack but provides no portability assurance. Full Validation requires every family actually used by visible display, body, or mono text to be a local WOFF2 inside the deck bundle with a redistribution-compatible license and retained credit. Never load a remote font at runtime. The deterministic font gate and renderer record the computed family and loaded face so an undeclared system fallback cannot silently pass.
 
 Declare only weights that the bundled file actually contains. A static Regular face is `font-weight: 400`, not `100 900`; a variable face may declare its real range. Bundle a real bold/semibold face or use a supported variable weight instead of asking Chromium to manufacture a heavier Korean glyph. Keep `font-synthesis: none` on the deck so missing weights fail visibly during authoring rather than producing uneven synthetic strokes. Do not request weights beyond a variable face's declared range, such as `950` from a `100 900` file.
 
@@ -175,7 +175,9 @@ Use values appropriate to the 1280×720 logical canvas:
 - display title: typically 44–68px;
 - section title: typically 32–48px;
 - body: typically 18–24px;
-- support/source text: typically 13–16px;
+- support annotations: typically 10–13px;
+- source citations: typically 8–10px;
+- audience term notes: typically 10–12px, one short line when possible;
 - code: at least 13px.
 
 These values scale with the stage. Do not use viewport-width font sizing that changes the internal hierarchy independently of the stage scale.
@@ -189,6 +191,7 @@ Validate settled browser lines after local fonts finish loading. Element width a
 - Do not leave only one or two Korean characters, a sentence ending such as `다.`, or closing punctuation on the last line of a display title or quote. Rephrase, rebalance the text box, reduce the display size, or add a phrase-boundary break.
 - Set Korean display line-height from the actual face and weight. Start with enough separation for the font's glyph metrics; never tighten multiline copy below `0.9` without rendered proof, and reject any visible row collision regardless of the declared CSS value.
 - Keep footer copy, credits, and captions outside the persistent navigation rectangle at every retained profile.
+- Mark visible audience definitions with `data-term-note` and source lines with `data-source-citation`. Keep term notes content-sized and visually subordinate; do not give them card-scale width, tall padding, or a large opaque background. Maintain a visible gap between notes, citations, and navigation.
 - `measure_text_bounds.js` reconstructs Chromium lines, checks Korean final-line fragments, line advance, sibling text intersections, navigation occlusion, unsupported local font weights, and no-op emphasis under the existing `text_bounds` automation gate.
 - `data-line-break-ok` is limited to an intentional one- or two-character poster/chapter treatment that remains visibly balanced. It bypasses only the orphan-line heuristic, never collision or bounds checks. `data-text-overlap-ok` is limited to deliberate legible overprint and still requires AI inspection; do not use either attribute to silence an accidental layout defect.
 
@@ -216,6 +219,7 @@ Whitespace and empty boxes are not interchangeable. Whitespace can connect a foc
 - Large surfaces must earn their area through comparison, grouping, interaction, a chart, a diagram, an image, an annotated object, or a deliberate hero/chapter composition.
 - Do not use a tall card merely to occupy an empty grid track. Change the composition: open typography, editorial split, dominant image, metric cluster, timeline, rule-based list, or asymmetric evidence layout.
 - Do not add low-contrast rectangles, outlines, empty slots, or decorative boxes that resemble missing content.
+- A large surface discovered from its rendered background, border, or shadow is still a container even when its class is not named `.card` or `.panel`.
 - `data-density-ignore` is reserved for intentional hero/chapter whitespace or fixed-format UI mockups. The rendered slide must still look complete, and the visual reviewer must explain why the empty area is intentional.
 
 ## Navigation Panel

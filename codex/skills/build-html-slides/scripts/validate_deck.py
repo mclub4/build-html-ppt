@@ -246,6 +246,13 @@ def main() -> int:
         print("WARNING: external URL text found; citations are allowed, runtime dependencies are errors.")
     if re.search(r"<section[^>]*>\s*</section>", text, re.I | re.S):
         print("WARNING: empty slide found.")
+    for class_value in re.findall(r"\bclass\s*=\s*[\"']([^\"']+)[\"']", text, re.I):
+        classes = class_value.split()
+        if "source" in classes and len(classes) > 1:
+            errors.append(
+                "reserved citation class .source must not be combined with component classes; "
+                "use data-source-citation or a namespaced class such as .event-stream--source"
+            )
 
     if errors:
         for item in errors:

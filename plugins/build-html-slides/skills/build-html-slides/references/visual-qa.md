@@ -19,7 +19,7 @@ Use this checklist while inspecting the rendered slides selected by `validation-
 - Large cards and panels contain enough information or visual evidence to justify their area; short copy is not stranded inside tall empty boxes.
 - Empty outlines, low-contrast placeholder-like shapes, and equal-height sparse cards do not make the slide look unfinished.
 - Dense slides have enough separation for scanning and comparison.
-- In the all-slide overview, technology content does not collapse into one repeated dark-console fingerprint. Near-black fields, neon status accents, mono micro-labels, glowing nodes, diagonals, and topology maps must reflect the actual communication job, not merely the presence of technical vocabulary.
+- In the all-slide overview, technology content does not collapse into one repeated dark-console fingerprint. A deliberately chosen dark-led system is valid; near-black fields, neon status accents, mono micro-labels, glowing nodes, diagonals, and topology maps must follow the whole communication brief rather than technical vocabulary alone.
 
 ## Typography
 
@@ -77,6 +77,8 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 
 - Dates, prices, availability, regulation, schedules, and product names match the target market.
 - Sources are visible or recorded where the audience needs confidence.
+- Decision-critical unfamiliar terms have a short first-use explanation when the audience needs one; familiar or incidental terms are not annotated.
+- Term notes remain caption-sized, content-sized, distinct from citations, inside the safe area, and sparse enough that the slide does not become a glossary. A large annotation card or footer panel is a failure.
 - Caveats and assumptions are not hidden by the visual treatment.
 - Presenter notes add delivery guidance rather than repeating slide copy.
 
@@ -89,7 +91,9 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - broken/missing local assets;
 - visibly blurry, thumbnail-sized, previously upscaled, or heavily compressed raster imagery, regardless of file extension or nominal dimensions;
 - generic starter styling or repeated default composition;
-- a technology deck dominated by the same dark-console grammar without an operational or authentic brand rationale, after failing to consider paper-led and real-media directions;
+- repeated top-headline-plus-panel layouts, safe-but-generic typography, or paper styling whose only idea is pale cards and muted rules;
+- term notes rendered as large cards, glossary bands, or blocks that crowd source citations or navigation;
+- a technology presentation dominated by the same dark-console grammar because of technical vocabulary alone, without a brief-specific rationale, candidate comparison, or meaningful compositional variation;
 - a report-like, image-starved treatment of a materially observable subject despite suitable factual imagery being reasonably available;
 - wrong region, unsupported factual claims, or misleading provenance;
 - wrong character/person, wrong variant, unverifiable identity, or thematically inappropriate imagery;

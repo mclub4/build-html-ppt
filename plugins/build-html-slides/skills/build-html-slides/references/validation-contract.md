@@ -4,13 +4,13 @@ This file defines validation semantics. `scripts/validation_contract.json` is th
 
 ## Choose By Intent
 
-New-deck creation requires an explicit user choice between Quick Draft and Full Validation. If the user has not already chosen, present both modes with their validation scope and relative turnaround, ask once, and stop before research, drafting, file creation, or asset generation. Do not silently infer the mode. Recognize an explicit choice from meaning and context rather than a keyword list, regular expression, or substring heuristic.
+New-presentation creation resolves audience and validation mode before work begins. If either is absent, ask every unresolved intake question in one opening message and stop before research, drafting, file creation, or asset generation. For Korean interaction, label the choices `빠른 검증 (Quick Draft)` and `정밀 검증 (Full Validation)` and state that the former is creation-only with no rendered validation. The user must choose a mode explicitly. Audience choices may include a domain team, company-wide concept sharing, executives, clients, or newcomers. If the user delegates audience choice with `청중은 알아서 해줘`, assume a general company-wide concept-sharing audience with mixed domain familiarity. Do not ask again for information already supplied, and do not split audience and mode questions across separate turns. Recognize answers from meaning and context rather than a keyword list, regular expression, or substring heuristic.
 
 | Mode | Use when | New evidence |
 | --- | --- | --- |
 | Edit Only | The user primarily wants an ordinary revision and does not seek new assurance | None |
-| Quick Draft | The user prioritizes iteration or a first usable version | None; creation only |
-| Full Validation | The deck is intended for delivery, publication, or a consequential decision, or strong assurance is requested | Automated geometry and AI review for every slide, independent review, final score |
+| 빠른 검증 (Quick Draft) | The user prioritizes iteration or a first usable version | None; creation only |
+| 정밀 검증 (Full Validation) | The presentation is intended for delivery, publication, or a consequential decision, or strong assurance is requested | Automated geometry and AI review for every slide, independent review, final score |
 
 Edit Only applies to an existing deck revision when the user asks for a change without requesting new validation evidence. It is not a substitute for asking the required new-deck mode question.
 

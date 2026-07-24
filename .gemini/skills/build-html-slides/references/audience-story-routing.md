@@ -1,6 +1,6 @@
 # Audience-Aware Story Routing
 
-Read this before storyboarding whenever the speaker names an audience or the audience can be inferred from the request. Audience affects slide order, evidence timing, terminology, and presenter notes, not only tone.
+Read this before storyboarding. Audience affects slide order, evidence timing, terminology, visible definitions, and presenter notes, not only tone.
 
 ## Build the audience model
 
@@ -10,6 +10,25 @@ Create a compact internal table before ordering slides:
 |---|---|---|---|---|---|
 
 Identify the decision owner, implementation owner, operational user, and any audience that can block the proposal. One person may hold several roles. Do not ask another question when the user already supplied enough context; infer reasonable jobs and record uncertainty in notes.
+
+If no audience was supplied, ask for it in the same opening message as the validation-mode question. Offer a short set of useful examples and allow `청중은 알아서 해줘`. That delegation selects a general company-wide concept-sharing audience with mixed domain familiarity. Ask once only; do not reopen the question after storyboarding begins.
+
+## Decide which terms need visible help
+
+Judge terminology semantically from the audience model. Do not run a keyword, acronym, capitalization, or frequency parser.
+
+Add a compact visible note at the first meaningful occurrence only when all of these are true:
+
+1. the term is necessary to understand the current claim or decision;
+2. the intended audience is unlikely to know it reliably;
+3. the visible copy does not already explain it;
+4. one short plain-language line can remove the ambiguity.
+
+Good candidates include unfamiliar external organizations, market names, regulatory instruments, product abbreviations, or internal shorthand that a mixed audience cannot infer. For example, a company-wide STO overview may briefly identify `NXT컨소시엄` and `KDX` as candidates for a trust-beneficiary-certificate over-the-counter market, while an STO domain-team status update may omit those notes. Definitions must be grounded in the same research as the slide and must not invent an acronym expansion.
+
+Do not annotate common language, every acronym, incidental source names, or terms the named audience shares. Do not repeat the same definition on every slide. Executive audiences usually need the consequence or decision role, not a dictionary entry.
+
+Use a short form such as `용어 — 이 발표에서 뜻하는 역할` and mark it with `data-term-note`. Place it beside the first meaningful use or in a compact micro-note rail. It should look like a quiet caption, not another content block: no large white card, tall padding, full-width glossary band, or oversized border. Keep it inside the content-safe area, visually subordinate but readable, and physically separate from `data-source-citation` and navigation. One or two notes on a slide is normally enough. When more are necessary, simplify the slide, stage the concepts across several slides, or move secondary definitions to presenter notes. A dense glossary footer is a failure, not thoroughness.
 
 ## Choose the attention order
 
@@ -61,3 +80,5 @@ Use notes to bridge audience layers. Signal when a technical section begins, exp
 - Does every specialist slide answer a question established earlier?
 - Would moving any slide earlier or later reduce confusion or attention loss?
 - Does the closing give each audience a clear implication or next action?
+- Can the least familiar intended audience follow every decision-critical acronym or entity without turning the slide into a glossary?
+- Were familiar or incidental terms left unannotated so notes remain sparse?
