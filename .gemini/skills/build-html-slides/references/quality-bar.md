@@ -46,6 +46,7 @@ Every large-area saturated surface needs documented palette provenance and must 
 - Use distinct assets for distinct narrative jobs. A different crop of the same image is not a new visual idea.
 - Convert every raster deliverable asset to WebP before referencing it in HTML. Keep SVG for logos, icons, and editable vector diagrams.
 - Avoid low-resolution thumbnails, screenshots with unreadable embedded text, generic stock filler, and decorative images that do not support the slide claim.
+- Apply the stock substitution test. If a same-category stock image could replace the visual without changing the slide's meaning, it is atmosphere rather than explanation and must not dominate an evidence, identity, mechanism, or concept slide.
 - Reject images that do not visibly match the named subject. Character/person decks require canonical-reference comparison as defined in `identity-review.md`; metadata and source tags alone are insufficient.
 - Reject generated media used as an authentic depiction of an existing person, group, released game, product, place, event, artwork, interface, or documentary result. Generated atmosphere may support a factual slide but cannot occupy its subject, evidence, or identity role.
 - Reject unfinished media slots. A label such as `PLACE NOTE`, an empty image frame, a repeated geometric fallback, or generic art standing in for an expected real place/product/person/event image is a blocking placeholder, not intentional visual variety.
@@ -89,6 +90,7 @@ This rubric is used only in Full Validation. After the render/fix loop is settle
 - Generic framed panels dominate the body, even if each slide changes the number of cards or accent color.
 - A product, game, place, person, or event deck relies mainly on text and generic cards.
 - A materially observable industry, product chain, facility, device, experiment, biological phenomenon, or research modality is shown almost entirely through text, tables, charts, and generic SVGs even though suitable subject imagery is reasonably available.
+- Generic stock photography occupies main explanatory space while adding only a broad topic mood and no subject identity, evidence, mechanism, or concept.
 - A rendered slide contains oversized low-information surfaces or decorative empty boxes that are not justified by a hero, chapter, comparison, interaction, or fixed-format visual.
 - A visible audience term note is rendered as a large card or glossary strip, crowds a source citation, or competes with body copy.
 - The cover lacks a clear first-glance identity signal for the named subject, looks like a generic title template, uses a weak or irrelevant visual, traps the title in an oversized empty panel, or crops an identifying feature. A technically valid but merely acceptable cover does not pass when the body is more art-directed.

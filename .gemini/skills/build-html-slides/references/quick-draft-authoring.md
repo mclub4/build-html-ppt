@@ -19,6 +19,7 @@ Quick Draft is the speed-first creation path. For an ordinary 10-15 slide presen
 ## Bound The Expensive Passes
 
 - For an ordinary 10-15 slide presentation, seek roughly 6-10 strong factual or atmospheric images when imagery helps. Stop once identity, evidence, context, and rhythm needs are covered.
+- Count only images that pass the visual-contribution and stock-substitution tests in `media-strategy.md`. Do not fill the image target with interchangeable stock photography.
 - Explicit media-heavy, catalog, portfolio, artwork, or fan-art requests may require more discovery. Keep that research intentional instead of widening every query indefinitely.
 - Settle visible copy and notes before running `humanize-korean`, then perform one combined pass and inspect the semantic diff.
 - Write concise notes for roughly 30-60 seconds of delivery: purpose, natural talk track, emphasis, transition, and only necessary source or caveat guidance.

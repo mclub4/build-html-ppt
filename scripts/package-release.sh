@@ -12,6 +12,7 @@ mkdir -p "$DIST"
 
 python3 - "$ROOT" "$VERSION" "$ARCHIFY_VERSION" <<'PY'
 from pathlib import Path
+import hashlib
 import sys
 import zipfile
 
@@ -72,13 +73,32 @@ gemini_archify_source = root / ".gemini/skills/archify"
 gemini_archify_archive = dist / f"ARCHIFY-GEMINI-v{archify_version}.skill"
 with zipfile.ZipFile(gemini_archify_archive, "w", compression=zipfile.ZIP_DEFLATED) as output:
     write_tree(output, gemini_archify_source, Path("."))
+
+release_assets = [
+    dist / f"BUILD-HTML-SLIDES-CODEX-BUNDLE-v{version}.zip",
+    codex_plugin_archive,
+    dist / f"BUILD-HTML-SLIDES-CLAUDE-BUNDLE-v{version}.zip",
+    claude_archive,
+    dist / f"BUILD-HTML-SLIDES-GEMINI-BUNDLE-v{version}.zip",
+    gemini_archive,
+    gemini_archify_archive,
+]
+checksum_path = dist / f"build-html-slides-v{version}-sha256.txt"
+checksum_path.write_text(
+    "".join(
+        f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
+        for path in release_assets
+    ),
+    encoding="utf-8",
+)
 PY
 
-printf 'Created:\n  %s\n  %s\n  %s\n  %s\n  %s\n  %s\n  %s\n' \
+printf 'Created:\n  %s\n  %s\n  %s\n  %s\n  %s\n  %s\n  %s\n  %s\n' \
   "$DIST/BUILD-HTML-SLIDES-CODEX-BUNDLE-v$VERSION.zip" \
   "$DIST/BUILD-HTML-SLIDES-CODEX-PLUGIN-v$VERSION.zip" \
   "$DIST/BUILD-HTML-SLIDES-CLAUDE-BUNDLE-v$VERSION.zip" \
   "$DIST/BUILD-HTML-SLIDES-CLAUDE-PLUGIN-v$VERSION.zip" \
   "$DIST/BUILD-HTML-SLIDES-GEMINI-BUNDLE-v$VERSION.zip" \
   "$DIST/BUILD-HTML-SLIDES-GEMINI-v$VERSION.skill" \
-  "$DIST/ARCHIFY-GEMINI-v$ARCHIFY_VERSION.skill"
+  "$DIST/ARCHIFY-GEMINI-v$ARCHIFY_VERSION.skill" \
+  "$DIST/build-html-slides-v$VERSION-sha256.txt"

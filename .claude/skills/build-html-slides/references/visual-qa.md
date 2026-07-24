@@ -34,6 +34,8 @@ Use this checklist while inspecting the rendered slides selected by `validation-
 
 ## Imagery
 
+- Every main visual has a legible job: evidence, identity, mechanism, concept, or deliberate atmosphere.
+- Apply the stock substitution test: when a same-category stock image could replace the visual without changing the claim, fail it as the main explanatory visual. It may remain only where atmosphere is the explicit job.
 - The deck's medium matches the subject. Physical industries, products, facilities, equipment, people, experiments, organisms, tissue, and clinical or laboratory phenomena receive enough sourced real-world or scientific imagery to establish the subject; charts and SVGs do not replace seeing the thing itself.
 - Unless the brief explicitly required pure HTML or no photography, an image-free chapter reflects a documented semantic choice after relevant visual discovery rather than convenience or an unattempted search.
 - The cover or opening sequence visually establishes a materially observable subject unless confidentiality, availability, or a deliberate abstract communication job justifies another approach.
@@ -98,6 +100,7 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - a report-like, image-starved treatment of a materially observable subject despite suitable factual imagery being reasonably available;
 - wrong region, unsupported factual claims, or misleading provenance;
 - wrong character/person, wrong variant, unverifiable identity, or thematically inappropriate imagery;
+- generic stock imagery used as explanatory evidence despite contributing no specific identity, mechanism, concept, or factual proof;
 - any visible placeholder or generic replacement graphic standing in for missing factual or subject-specific media;
 - an unconsidered generic font stack or typography that conflicts with the subject, language, or audience;
 - stale captures presented as current evidence.

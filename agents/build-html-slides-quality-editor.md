@@ -24,6 +24,10 @@ The parent agent must provide the final `review.json`, sibling `sources.json` wh
 6. Independently cross-review exactly the slides in `cross_review_batches` whose status is `pending`, then mark each finished batch `complete`. Leave existing `complete` batches untouched; they are hash-verified independent reviews retained from unchanged captures. Standard risk contains visual-critical, warning-triggered, and distributed sample slides; high risk contains every slide. Include per-target `identity_review` results whenever a sampled slide requires identity review. Do not reuse a primary reviewer's wording or any reviewer reference from the primary-reviewer set.
 7. Return findings only. Do not search for replacement assets, rerun earlier review batches, edit files, or inflate a score to make validation pass.
 
+## Media Contribution Gate
+
+Judge every dominant visual by its evidence, identity, mechanism, concept, or deliberate-atmosphere role. Apply the stock substitution test and fail generic stock used as the main explanation when another image from the same broad category could replace it without changing the claim. A clearly non-factual generated concept may be the stronger medium for an abstract mechanism, provided it cannot be mistaken for a real interface, product, institution, transaction, person, or evidence state. Real photography is required for authentic subjects and evidence, not as an automatic badge of educational value.
+
 ## Response Shape
 
 Return JSON with `reviewer_ref`, `squint_review`, `dimensions`, `total`, `weakest_slides`, `notes`, and `cross_reviews`. The squint record contains the four generated checks, one deck-wide observation, and `status`; preserve its generated artifact path, hashes, method, and limitations. Return one cross-review for each pending target and no substitutes; preserve complete targets already present in the manifest. Each new cross-review contains `slide`, `review_batch_id`, `inspected_profiles`, `observation`, `checks`, `identity_review`, `status`, and `notes`. Use one new run-specific reviewer reference for the squint record, quality score, and new cross-reviews.

@@ -275,6 +275,26 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("four to eight distinct sourced visual anchors", media)
         self.assertIn("must not remove useful subject imagery", quality)
 
+    def test_visuals_are_selected_by_claim_contribution_not_photo_presence(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        media = (ROOT / "references" / "media-strategy.md").read_text(encoding="utf-8")
+        generation = (ROOT / "references" / "image-generation.md").read_text(encoding="utf-8")
+        quick = (ROOT / "references" / "quick-draft-authoring.md").read_text(encoding="utf-8")
+        quality = (ROOT / "references" / "quality-bar.md").read_text(encoding="utf-8")
+        visual = (ROOT / "references" / "visual-qa.md").read_text(encoding="utf-8")
+        reviewer = (ROOT.parents[2] / "agents" / "build-html-slides-visual-reviewer.md").read_text(encoding="utf-8")
+        editor = (ROOT.parents[2] / "agents" / "build-html-slides-quality-editor.md").read_text(encoding="utf-8")
+        self.assertIn("evidence, identity, mechanism, concept, or atmosphere", skill)
+        self.assertIn("## Require a visual contribution", media)
+        self.assertIn("stock substitution test", media)
+        self.assertIn("Financial education or fintech explainer", media)
+        self.assertIn("generated concept illustration", generation)
+        self.assertIn("interchangeable stock photography", quick)
+        self.assertIn("Generic stock photography occupies main explanatory space", quality)
+        self.assertIn("Every main visual has a legible job", visual)
+        self.assertIn("## Media Contribution Gate", reviewer)
+        self.assertIn("## Media Contribution Gate", editor)
+
     def test_cover_is_a_first_class_design_and_review_contract(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         cover = (ROOT / "references" / "cover-design.md").read_text(encoding="utf-8")

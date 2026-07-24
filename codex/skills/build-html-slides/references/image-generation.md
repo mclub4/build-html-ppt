@@ -38,6 +38,7 @@ Record it as `source_kind: generated` in `sources.json`. `source_cache.py --chec
 ## Generation Rules
 
 - Generate atmosphere, editorial concepts, clearly hypothetical scenes, scene-setting backgrounds, textures, and original illustrative metaphors.
+- For abstract mechanisms, compare a generated concept illustration with a diagram, chart, annotated screenshot, and sourced contextual photograph. Use generation when it explains the idea more directly than generic stock and cannot be mistaken for a real interface, product, institution, transaction, person, or evidence state.
 - Do not fabricate documentary evidence, product screenshots, logos, interfaces, people, events, charts, or technical states that the audience could mistake for factual material.
 - Give every generated image a narrative job and record `source_kind: generated`, the tool/provider, prompt summary, generation time, and local hash in `sources.json`.
 - Convert final raster output to WebP while preserving useful source dimensions and aspect ratio.

@@ -1,6 +1,6 @@
 {
   "name": "build-html-slides",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "description": "Codex, Claude Code, and Gemini CLI skills for art-directed, validated HTML presentations.",
   "license": "MIT",
