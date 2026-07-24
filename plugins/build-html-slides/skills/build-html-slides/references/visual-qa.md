@@ -2,6 +2,8 @@
 
 Use this checklist while inspecting the rendered slides selected by `validation-contract.md`. Mode, profile, reviewer-count, and finalization rules do not live here.
 
+Check tuples, deterministic thresholds and message strings, the lower-right navigation exclusion zone, the refute-or-confirm protocol for warned slides, and the non-negotiable blocking gates live in `reviewer-gates.md`. This file is the judgment list: what a reviewer looks at that no measurement can reach.
+
 ## Hierarchy And Story
 
 - The opening establishes a clear promise or stake.
@@ -25,35 +27,32 @@ Use this checklist while inspecting the rendered slides selected by `validation-
 
 - Titles fit without awkward single-character wraps or stranded punctuation.
 - Display titles and quotes do not leave one or two Korean characters, sentence endings such as `다.`, or closing punctuation alone on the final line.
-- Multiline display glyphs have visible separation; no row intersects the glyphs above or below it even when the element itself remains in bounds.
 - Body text remains readable on the logical 1280×720 canvas.
 - Korean and Latin glyphs look compatible.
 - Numerals, punctuation, units, and table alignment are consistent.
-- Long text stays inside its intended box, column, cell, badge, button, or safe region.
-- Footer text, captions, and sources remain clear of the persistent navigation panel.
+- Type roles are distinguishable: display, body, metadata, and technical labels do not share one family, width, and texture without an art-direction reason.
 - Prompt fragments and production settings do not leak into visible titles, eyebrows, badges, chips, or footer metadata unless the audience needs them as logistics.
+
+Glyph-row collision, foreground bite into glyph ink, text leaving its box, and navigation coverage are measured by `measure_text_bounds.js` and `measure_geometry.js`. Adjudicate their findings; do not re-derive them by eye.
 
 ## Imagery
 
-- Every main visual has a legible job: evidence, identity, mechanism, concept, or deliberate atmosphere.
-- Apply the stock substitution test: when a same-category stock image could replace the visual without changing the claim, fail it as the main explanatory visual. It may remain only where atmosphere is the explicit job.
-- The deck's medium matches the subject. Physical industries, products, facilities, equipment, people, experiments, organisms, tissue, and clinical or laboratory phenomena receive enough sourced real-world or scientific imagery to establish the subject; charts and SVGs do not replace seeing the thing itself.
+- Every main visual has a legible job: evidence, identity, mechanism, concept, or deliberate atmosphere. The three media rules — visual contribution, stock substitution, authenticity — are defined once in `media-strategy.md`; apply them here rather than restating them.
+- The deck's medium matches the subject. Physical industries, products, facilities, equipment, people, experiments, organisms, tissue, and clinical or laboratory phenomena receive enough sourced real-world or scientific imagery to establish the subject; charts and SVGs do not replace seeing the thing itself. Data-heavy slides may still be chart-first.
 - Unless the brief explicitly required pure HTML or no photography, an image-free chapter reflects a documented semantic choice after relevant visual discovery rather than convenience or an unattempted search.
-- The cover or opening sequence visually establishes a materially observable subject unless confidentiality, availability, or a deliberate abstract communication job justifies another approach.
-- Data-heavy slides may remain chart-first, but the overall sequence still has image-led context and chapter rhythm when the subject benefits from it.
 - Official marks retain aspect ratio and clear space.
 - Key visuals use `contain` when faces, products, title art, UI, diagrams, or edges matter.
 - Decorative `cover` crops do not remove meaningful content.
 - Raster assets are sharp enough at the actual full-size presentation capture and stored as WebP. Converting a small or damaged JPEG to WebP does not improve it.
 - Product packaging, faces, screenshots, diagrams, and embedded labels retain crisp edges and readable detail. Reject obvious thumbnails, prior upscales, blur, ringing, mosquito noise, block artifacts, banding, and over-compression.
 - Prefer at least 1.25 source pixels per maximum rendered device pixel. Treat less than 1.0 as blocking unless an irreplaceable user-supplied historical asset is explicitly marked, disclosed, and presented small enough to look intentional.
-- Reused imagery serves a different narrative role and does not look like filler.
+- Reused imagery serves a different narrative role and does not look like filler. Two substantive slides never share the same skeleton, card and column counts, and asset set — `validate_slide_variety.py` blocks that pair.
 - Sources, credits, signatures, and watermarks remain accurate.
-- Each meaningful image visibly matches the subject and narrative claim of its slide; filenames, alt text, captions, folders, and search tags are not proof.
-- Named characters and people match a separate official/authoritative reference, including the intended costume, age, form, and distinguishing traits. Uncertain identity is a failure.
+- Each meaningful image visibly matches the subject and narrative claim of its slide; filenames, alt text, captions, folders, and search tags are not proof. Named characters and people match a separate official reference including costume, age, form, and distinguishing traits, per `identity-review.md`; uncertain identity is a failure.
 - Every apparent media slot is finished. Labels such as `PLACE NOTE`, dummy/temporary art, empty image frames, and repeated generic substitute graphics fail when the slide promises a real place, product, person, character, venue, or event image.
-- Judge the visible subject separately from the raster canvas. Large intrinsic white or transparent margins that make the subject look tiny are a composition failure even when `object-fit: contain` passes.
 - Compare repeated image frames as a family. One unusually tall, wide, or whitespace-heavy asset must not push a shared grid track, divider, caption, or label out of alignment.
+
+Container escape and subject prominence — including the transparent-margin case where `object-fit: contain` passes but the subject renders tiny — are measured by `measure_image_geometry.js` from the declared `data-media-purpose` and `data-image-role`. Adjudicate its findings rather than estimating them.
 
 For games and animation, inspect official key art, wallpapers, title art, screenshots, and creator-hosted fan work against spoiler boundaries and distribution rights. Public or commercial decks require verified reuse rights or safer replacements.
 
@@ -62,10 +61,8 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - Media remains behind titles, labels, sources, and controls.
 - At 100% capture size, image edges terminate exactly at their intended frame, mask, divider, or bleed boundary; a one- or two-pixel-looking gap, overshoot, accidental tangent, or mismatched corner is a visible defect.
 - Translucent overlays and `::before`/`::after` decoration leave no stale duplicate, detached shadow, doubled edge, or residual shape after layout changes.
-- Inspect the first glyph and first line start of every text block. Foreground media, masks, gradients, and decorative layers must not cover or visually bite into that starting edge.
 - Text does not straddle incompatible light/dark regions without a stable scrim or backing.
-- Body text and controls target at least 4.5:1 contrast; large display text targets at least 3:1.
-- The automated gate calculates those ratios only when the text background resolves to a solid color. Image, gradient, translucent, blended, shadowed, or overlapping-media backgrounds are warnings routed to full-size AI contrast inspection, not sampled-color passes.
+- Body text and controls require at least 4.5:1 contrast; large display text requires at least 3:1. `measure_contrast.js` proves a `[worst, best]` interval against the real paint stack, blocks a provable failure on its own, and hands over only a straddling interval as an `UNDECIDABLE contrast` warning. That warning is closed by a `CONFIRM` or `REFUTE` observation naming what sits behind the text at the reported point, never by an approval.
 - Every meaningful `<img>` needs useful alt text. Missing alt text is a deterministic Full Validation failure, while deliberately decorative images use `alt=""`.
 - Decorative shapes do not create accidental tangencies or obscure hierarchy.
 - Dividers, card edges, captions, and labels remain visually separate from imagery. A product or screenshot crossing a divider or entering its caption region is blocking occlusion even when no DOM bounding box leaves the slide.
@@ -86,8 +83,6 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - Sources are visible or recorded where the audience needs confidence.
 - Decision-critical unfamiliar terms have a short first-use explanation when the audience needs one; familiar or incidental terms are not annotated.
 - Term notes remain caption-sized, content-sized, distinct from citations, inside the safe area, and sparse enough that the slide does not become a glossary. A large annotation card or footer panel is a failure.
-- Footer term notes terminate before the lower-right navigation exclusion zone; long definitions wrap or move upward rather than continuing behind controls.
-- Treat the lower-right navigation exclusion zone as occupied space, not only the visible button rectangle. Captions, notes, sources, logos, images, and decoration must terminate with deliberate breathing room before it.
 - Caveats and assumptions are not hidden by the visual treatment.
 - Presenter notes add delivery guidance rather than repeating slide copy.
 
@@ -96,15 +91,14 @@ For games and animation, inspect official key art, wallpapers, title art, screen
 - cropped or stretched meaningful imagery;
 - image/frame edges that visibly gap, overshoot, mismatch masks, or create accidental tangencies;
 - stale translucent or pseudo-element residue, doubled silhouettes, or detached decorative layers;
-- text outside a box or safe area;
-- foreground imagery or decoration covering the first glyph or text starting edge;
-- orphaned final-line characters or punctuation, colliding text rows, overlapping text regions, or copy covered by navigation;
-- unreadable contrast or foreground media over copy;
+- orphaned final-line characters or punctuation;
+- an unresolved deterministic warning — no `CONFIRM` or `REFUTE` observation on record for it;
+- two substantive slides that are near-duplicate compositions;
 - broken/missing local assets;
 - visibly blurry, thumbnail-sized, previously upscaled, or heavily compressed raster imagery, regardless of file extension or nominal dimensions;
 - generic starter styling or repeated default composition;
 - repeated top-headline-plus-panel layouts, safe-but-generic typography, or paper styling whose only idea is pale cards and muted rules;
-- term notes rendered as large cards, glossary bands, or blocks that crowd source citations or navigation;
+- term notes rendered as large cards or glossary bands;
 - a technology presentation dominated by the same dark-console grammar because of technical vocabulary alone, without a brief-specific rationale, candidate comparison, or meaningful compositional variation;
 - a report-like, image-starved treatment of a materially observable subject despite suitable factual imagery being reasonably available;
 - wrong region, unsupported factual claims, or misleading provenance;

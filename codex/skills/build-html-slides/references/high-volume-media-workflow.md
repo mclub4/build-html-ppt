@@ -1,6 +1,17 @@
 # High-Volume Sourced Media
 
-Use this workflow when a presentation needs many distinct images of existing subjects and serial image research would dominate the schedule. Examples include products and menu items, artworks, athletes, performers, characters, travel destinations, buildings, archival objects, interfaces, scientific specimens, or multiple photos of one named subject. Apply it from the actual media burden, not a keyword or a fixed slide-count parser.
+Use this workflow when a presentation needs many distinct images of existing subjects: products, food, artworks, athletes, performers, characters, travel destinations, buildings, archival objects, interfaces, scientific specimens, or multiple photos of one named subject.
+
+## Numeric trigger
+
+Count the frozen media roster from step 1, then decide arithmetically — not by judgment:
+
+| Roster size | Route |
+| --- | --- |
+| 1-11 distinct sourced subjects **and** at most 20 candidate originals | inspect inline; do not build contact sheets |
+| **12 or more** distinct sourced subjects, **or more than 20** candidate originals, **or 4 or more** candidates for one named subject | run this workflow |
+
+Twelve is the batch size of `build_media_contact_sheet.js`, so the trigger is exactly the point at which one sheet stops covering the roster. Recount after any roster change; the trigger is re-evaluated, not decided once. Do not apply the workflow below the trigger — building sheets for eight images costs more than opening eight images.
 
 The goal is not to weaken factual or identity review. It is to move cheap checks earlier, batch visual judgment, and reserve expensive research for the candidates that actually fail.
 
@@ -92,7 +103,7 @@ Use the normal slide captures for the full visual pass. Let deterministic geomet
 ## Mode behavior
 
 - **Quick Draft**: use the roster and lightweight discovery gate, but do not run Chromium or AI review. Build with the selected candidates and disclose that image identity, crop, and visual quality were not validated.
-- **Full Validation**: use the batch contact-sheet pass when the number or diversity of sourced subjects makes serial inspection expensive. This is an authoring accelerator, not another mandatory review layer for every presentation. Final slide review remains required, but it must not reopen every source page or repeat candidate-level investigation for assets that passed and did not change.
+- **Full Validation**: use the batch contact-sheet pass whenever the numeric trigger is met, and only then. This is an authoring accelerator, not another mandatory review layer. Final slide review remains required, but it must not reopen every source page or repeat candidate-level investigation for assets that passed and did not change.
 
 ## Stop rule
 

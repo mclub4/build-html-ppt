@@ -42,6 +42,118 @@ class InteractionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("#prev must use an inline SVG icon", result.stdout)
 
+    def test_cached_node_with_named_handler_passes(self) -> None:
+        """Idiomatic JS: cache the node up top, bind a named handler further down."""
+        html = TEMPLATE.read_text(encoding="utf-8")
+        html = html.replace(
+            "      prev.addEventListener('click', () => show(index - 1));\n"
+            "      next.addEventListener('click', () => show(index + 1));\n",
+            "",
+            1,
+        )
+        html = html.replace(
+            "      full.addEventListener('click',",
+            "      function goPrevious() { show(index - 1); }\n"
+            "      function goNext() { show(index + 1); }\n"
+            "      // spacing that used to break the 80-character proximity window\n"
+            "      const NAVIGATION_STEP_COMMENT = 'previous and next are wired below';\n"
+            "      prevButton.addEventListener('click', goPrevious);\n"
+            "      nextButton.addEventListener('click', goNext);\n"
+            "      full.addEventListener('click',",
+            1,
+        )
+        html = html.replace(
+            "      const prev = document.getElementById('prev');\n"
+            "      const next = document.getElementById('next');",
+            "      const prevButton = document.getElementById('prev');\n"
+            "      const nextButton = document.getElementById('next');\n"
+            "      const prev = prevButton;\n"
+            "      const next = nextButton;",
+            1,
+        )
+        self.assertIn("prevButton.addEventListener", html)
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_commented_out_anchor_is_ignored(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            "<!-- SLIDE_2_CONTENT -->",
+            '<!-- <a href="#">draft link kept for reference</a> -->',
+            1,
+        )
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_anchor_inside_script_string_literal_is_ignored(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            "      addEventListener('resize', fit);",
+            "      const TEMPLATE_SNIPPET = '<a href=\"#\">placeholder</a>';\n"
+            "      void TEMPLATE_SNIPPET;\n"
+            "      addEventListener('resize', fit);",
+            1,
+        )
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_live_empty_anchor_still_fails(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            "<!-- SLIDE_2_CONTENT -->", '<a href="#">dead link</a>', 1
+        )
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("anchor is missing a real href", result.stdout)
+
+    def test_unbound_button_still_fails(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            "<!-- SLIDE_2_CONTENT -->",
+            '<button id="orphanAction" type="button">Do the thing</button>',
+            1,
+        )
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("orphanAction", result.stdout)
+        self.assertIn("no detectable action", result.stdout)
+
+    def test_button_mentioned_only_in_a_comment_still_fails(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            "<!-- SLIDE_2_CONTENT -->",
+            '<button id="orphanAction" type="button">Do the thing</button>',
+            1,
+        ).replace(
+            "      addEventListener('resize', fit);",
+            "      // orphanAction.addEventListener('click', () => {});\n"
+            "      addEventListener('resize', fit);",
+            1,
+        )
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("orphanAction", result.stdout)
+
+    def test_button_bound_through_a_binding_helper_passes(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            "<!-- SLIDE_2_CONTENT -->",
+            '<button id="replay" type="button">Replay</button>',
+            1,
+        ).replace(
+            "      addEventListener('resize', fit);",
+            "      const bind = (element, handler) => { element.addEventListener('click', handler); };\n"
+            "      const replayButton = document.getElementById('replay');\n"
+            "      bind(replayButton, () => show(0));\n"
+            "      addEventListener('resize', fit);",
+            1,
+        )
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_button_inside_template_is_not_audited(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            "<!-- SLIDE_2_CONTENT -->",
+            '<template id="rowTemplate"><button class="row-btn">Inert</button></template>',
+            1,
+        )
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def run_browser(self, html: str) -> subprocess.CompletedProcess[str]:
         if shutil.which("node") is None:
             self.skipTest("Node.js is unavailable")

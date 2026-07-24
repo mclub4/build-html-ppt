@@ -70,5 +70,41 @@
     "emphasis_range",
     "deck_rhythm",
     "color_density_balance"
-  ]
+  ],
+  "slide_variety": {
+    "skeleton_similarity_threshold": 0.9,
+    "minimum_structural_elements": 8,
+    "exempt_slide_kinds": ["section", "divider", "chapter", "interstitial", "transition", "quote"],
+    "opt_out_attribute": "data-variety-ok"
+  },
+  "python_dependencies": [
+    {
+      "module": "PIL",
+      "package": "pillow",
+      "minimum_version": "9.0.0",
+      "required": false,
+      "purpose": "fast capture pixel metrics in validate_visual_review.py",
+      "fallback": "built-in PNG decoder producing identical metrics at roughly 3x the cost"
+    }
+  ],
+  "time_budgets": {
+    "slide_range": [20, 25],
+    "full": {
+      "total_minutes": 70,
+      "phases": {
+        "prepare": 15,
+        "primary-review": 25,
+        "verify": 3,
+        "finalize-prepare": 5,
+        "final-review": 18,
+        "finalize-verify": 4
+      }
+    },
+    "quick": {
+      "total_minutes": 15,
+      "phases": {
+        "draft": 15
+      }
+    }
+  }
 }

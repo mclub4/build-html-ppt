@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>layoutgate navigation exclusion fixture</title>
+<style>
+  :root { --stage-width: 1280; --stage-height: 720; --nav-exclusion-width: 280px; --nav-exclusion-height: 84px; --slide-pad-x: 64px; }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #ffffff; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111111; }
+  .stage-wrap { position: fixed; inset: 0; }
+  .stage { position: absolute; width: 1280px; height: 720px; transform-origin: top left; background: #ffffff; }
+  .slide { position: absolute; inset: 0; display: flex; visibility: hidden; overflow: hidden; }
+  .slide.active { visibility: visible; }
+  .slide-media { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  .slide-content { position: relative; z-index: 2; display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; padding: 56px 64px; gap: 20px; }
+  h2 { margin: 0; font-size: 44px; }
+  p { margin: 0; font-size: 18px; line-height: 1.5; }
+
+  .footnote { position: absolute; left: 64px; right: 24px; bottom: 24px; font-size: 12px; color: #555555; }
+  .nav-safe-note {
+    position: absolute;
+    left: var(--slide-pad-x);
+    right: var(--nav-exclusion-width);
+    bottom: 28px;
+    z-index: 4;
+    width: fit-content;
+    max-width: min(760px, calc(100% - var(--nav-exclusion-width)));
+    font-size: 12px;
+    color: #555555;
+  }
+  .corner-shot { position: absolute; right: 40px; bottom: 40px; width: 180px; height: 130px; }
+  .badge { position: absolute; right: 36px; bottom: 36px; width: 120px; height: 44px; border-radius: 22px; background: #1d4ed8; }
+
+  .nav {
+    position: fixed; right: 14px; bottom: 14px; z-index: 30;
+    display: flex; align-items: center; width: 200px; height: 48px; gap: 2px; padding: 5px 6px;
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 18px; background: rgba(17,17,17,0.94); color: #ffffff;
+  }
+  .nav button { width: 36px; height: 36px; border: 0; background: transparent; color: #ffffff; }
+  .count { display: grid; grid-template-columns: 32px 10px 26px; align-items: center; justify-items: center; height: 36px; }
+  .page-input { width: 32px; height: 20px; border: 0; background: transparent; color: #ffffff; text-align: center; font-size: 13px; }
+  .page-separator, .page-total { font-size: 13px; line-height: 20px; height: 20px; }
+</style>
+</head>
+<body>
+<div class="stage-wrap"><div class="stage"><main>
+
+  <section class="slide active" data-title="footer-note-intrudes">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content">
+      <h2>Late events are absorbed</h2>
+      <p>Replay covers seventy-two hours of raw events.</p>
+      <p class="footnote">Idempotency — the property that reprocessing the same event changes the result exactly once, no matter how often the collector redelivers it, which is why the replay window can be reopened without restating any settled figure downstream.</p>
+    </div>
+  </section>
+
+  <section class="slide" data-title="nav-safe-note-clears">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content">
+      <h2>Late events are absorbed</h2>
+      <p>Replay covers seventy-two hours of raw events.</p>
+      <p class="nav-safe-note">Idempotency — the property that reprocessing the same event changes the result exactly once, no matter how often the collector redelivers it, which is why the replay window can be reopened without restating any settled figure downstream.</p>
+    </div>
+  </section>
+
+  <section class="slide" data-title="explicit-opt-out">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content">
+      <h2>Late events are absorbed</h2>
+      <p>Replay covers seventy-two hours of raw events.</p>
+      <p class="footnote" data-nav-exclusion-ok>Idempotency — the property that reprocessing the same event changes the result exactly once, no matter how often the collector redelivers it, which is why the replay window can be reopened without restating any settled figure downstream.</p>
+    </div>
+  </section>
+
+  <section class="slide" data-title="corner-image-intrudes">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content">
+      <h2>Reference stack</h2>
+      <p>Buffer, stateful aggregation, analytical store, response cache.</p>
+    </div>
+    <img class="corner-shot" alt="stack diagram" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFElEQVR42mP4RCJgGNUwqmH4agAA9CnWH7tzTeEAAAAASUVORK5CYII=">
+  </section>
+
+  <section class="slide" data-title="corner-badge-intrudes">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content">
+      <h2>Reference stack</h2>
+      <p>Buffer, stateful aggregation, analytical store, response cache.</p>
+    </div>
+    <div class="badge" aria-hidden="true"></div>
+  </section>
+
+  <section class="slide" data-title="clear-lower-right">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content">
+      <h2>Reference stack</h2>
+      <p>Buffer, stateful aggregation, analytical store, response cache.</p>
+    </div>
+  </section>
+
+</main></div></div>
+<nav class="nav" aria-label="slide navigation">
+  <button id="prev" type="button" aria-label="previous slide">&lsaquo;</button>
+  <div class="count" aria-label="page counter">
+    <input class="page-input" id="pageInput" type="number" min="1" value="1" aria-label="go to slide">
+    <span class="page-separator" aria-hidden="true">/</span>
+    <span class="page-total" id="total">6</span>
+  </div>
+  <button id="next" type="button" aria-label="next slide">&rsaquo;</button>
+</nav>
+</body>
+</html>

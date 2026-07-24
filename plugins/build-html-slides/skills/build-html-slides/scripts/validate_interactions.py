@@ -1,78 +1,30 @@
 #!/usr/bin/env python3
+"""Interaction-semantics gate for a deck's persistent navigation and controls.
+
+Everything here works from the parsed document (deck_html), never from raw HTML
+text. Raw-text scanning could not tell a live control from one inside an HTML
+comment, a <script> string literal, or a <template>, and the old
+80-character proximity window between getElementById and addEventListener
+rejected the most ordinary way to write the deck runtime.
+
+Behavioural proof that prev/next/full actually move the deck lives in
+validate_browser_e2e.js; this file proves the deck is *structurally* wired.
+"""
+
+from __future__ import annotations
+
 import re
 import sys
 from pathlib import Path
 
-
-def fail(message: str) -> None:
-    print(f"ERROR: {message}")
-    raise SystemExit(1)
+import deck_html
 
 
-if len(sys.argv) != 2:
-    fail("usage: validate_interactions.py DECK.html")
-
-path = Path(sys.argv[1]).resolve()
-if not path.is_file():
-    fail(f"deck not found: {path}")
-
-html = path.read_text(encoding="utf-8")
-errors = []
-
-nav_match = re.search(r'<nav\b[^>]*class=["\'][^"\']*\b(?:nav|controls)\b[^"\']*["\'][^>]*>(.*?)</nav>', html, re.I | re.S)
-if not nav_match:
-    errors.append("missing persistent .nav or .controls panel")
-else:
-    nav_body = nav_match.group(1)
-    ordered_ids = ["prev", "pageInput", "total", "next", "full"]
-    positions = []
-    for ident in ordered_ids:
-        match = re.search(rf'\bid=["\']{ident}["\']', nav_body, re.I)
-        if not match:
-            errors.append(f"navigation panel is missing #{ident}")
-        else:
-            positions.append(match.start())
-    if len(positions) == len(ordered_ids) and positions != sorted(positions):
-        errors.append("navigation panel order must be previous, current input, total, next, fullscreen")
-    page_input = re.search(r'<input\b[^>]*\bid=["\']pageInput["\'][^>]*>', nav_body, re.I)
-    if not page_input or not re.search(r'\btype=["\']number["\']', page_input.group(0), re.I):
-        errors.append("#pageInput must be a numeric input")
-    for ident in ("prev", "next", "full"):
-        button = re.search(rf'<button\b[^>]*\bid=["\']{ident}["\'][^>]*>(.*?)</button>', nav_body, re.I | re.S)
-        if not button or not re.search(r'<svg\b', button.group(1), re.I):
-            errors.append(f"#{ident} must use an inline SVG icon")
-
-for match in re.finditer(r"<([a-z][a-z0-9:-]*)\b([^>]*)>", html, re.I):
-    tag = match.group(1).lower()
-    attrs = match.group(2)
-    class_match = re.search(r"\bclass=[\"']([^\"']*)", attrs, re.I)
-    classes = class_match.group(1).lower().split() if class_match else []
-    looks_clickable = any(re.search(r"(?:^|[-_])(cta|btn|button|clickable|link)$", c) for c in classes)
-
-    if looks_clickable and tag not in {"a", "button"}:
-        errors.append(f"<{tag}> with interactive-looking class {classes} must be <a> or <button>")
-
-    if tag == "a":
-        href = re.search(r"\bhref=[\"']([^\"']*)", attrs, re.I)
-        if not href or href.group(1).strip() in {"", "#"}:
-            errors.append("anchor is missing a real href")
-
-    if tag == "button":
-        has_action_data = re.search(r"\b(?:data-goto|data-next|data-prev|onclick)\b", attrs, re.I)
-        ident = re.search(r"\bid=[\"']([^\"']+)", attrs, re.I)
-        bound_by_id = False
-        if ident:
-            token = re.escape(ident.group(1))
-            bound_by_id = bool(re.search(rf"(?:\b{token}\b|getElementById\([\"']{token}[\"']\)).{{0,80}}(?:onclick|addEventListener)", html, re.I | re.S))
-        if not has_action_data and not bound_by_id:
-            errors.append(f"button {ident.group(1) if ident else '(without id)'} has no detectable action")
-
-if re.search(r"\bdata-goto=", html, re.I):
-    has_delegate = re.search(r"(?:dataset\.goto|getAttribute\([\"']data-goto|\[data-goto\])", html, re.I)
-    if not has_delegate:
-        errors.append("data-goto controls exist but no navigation handler was detected")
-
-utility_labels = (
+ORDERED_NAV_IDS = ("prev", "pageInput", "total", "next", "full")
+ICON_BUTTON_IDS = ("prev", "next", "full")
+ACTION_ATTRIBUTES = ("data-goto", "data-next", "data-prev", "onclick")
+CLICKABLE_CLASS = re.compile(r"(?:^|[-_])(?:cta|btn|button|clickable|link)$")
+UTILITY_LABELS = (
     "표지로 돌아",
     "처음으로 돌아",
     "처음부터 다시",
@@ -88,28 +40,124 @@ utility_labels = (
     "last slide",
     "final slide",
 )
-for match in re.finditer(r"<(a|button)\b([^>]*)>(.*?)</\1>", html, re.I | re.S):
-    tag, attrs, body = match.groups()
-    is_internal_jump = bool(
-        re.search(r"\bdata-goto=", attrs, re.I)
-        or re.search(r"\bhref=[\"']#(?:\d+|first|last)[\"']", attrs, re.I)
-    )
-    if not is_internal_jump or re.search(r"\bdata-utility-nav-ok\b", attrs, re.I):
-        continue
-    aria = re.search(r"\baria-label=[\"']([^\"']*)", attrs, re.I)
-    label = f"{aria.group(1) if aria else ''} {re.sub(r'<[^>]+>', ' ', body)}"
-    label = re.sub(r"\s+", " ", label).strip().lower()
-    if any(token in label for token in utility_labels):
-        errors.append(f"redundant utility jump CTA is not allowed while persistent navigation exists: {label!r}")
 
-for match in re.finditer(r"<(a|button)\b([^>]*)\bclass=[\"']([^\"']*\bcta\b[^\"']*)[\"']([^>]*)>(.*?)</\1>", html, re.I | re.S):
-    body = match.group(5)
-    if not re.search(r"\bclass=[\"'][^\"']*\bcta-inner\b", body, re.I):
-        errors.append("CTA content must be wrapped in one .cta-inner group for rendered centering")
 
-if errors:
-    for error in errors:
-        print(f"ERROR: {error}")
+def fail(message: str) -> None:
+    print(f"ERROR: {message}")
     raise SystemExit(1)
 
-print(f"OK: {path} - interactive-looking elements have actionable semantics")
+
+def check_navigation_panel(index: deck_html.DocumentIndex, errors: list[str]) -> None:
+    panels = [
+        element
+        for element in index.by_tag("nav")
+        if element.classes & {"nav", "controls"}
+    ]
+    if not panels:
+        errors.append("missing persistent .nav or .controls panel")
+        return
+    panel = panels[0]
+    children = index.descendants(panel)
+    by_id = {child.identifier: child for child in children if child.identifier}
+
+    positions = []
+    for identifier in ORDERED_NAV_IDS:
+        child = by_id.get(identifier)
+        if child is None:
+            errors.append(f"navigation panel is missing #{identifier}")
+        else:
+            positions.append(child.start)
+    if len(positions) == len(ORDERED_NAV_IDS) and positions != sorted(positions):
+        errors.append("navigation panel order must be previous, current input, total, next, fullscreen")
+
+    page_input = by_id.get("pageInput")
+    if page_input is None or page_input.tag != "input" or page_input.attr("type").lower() != "number":
+        errors.append("#pageInput must be a numeric input")
+
+    for identifier in ICON_BUTTON_IDS:
+        button = by_id.get(identifier)
+        if button is None or button.tag != "button":
+            errors.append(f"#{identifier} must use an inline SVG icon")
+            continue
+        if not index.descendants(button, "svg"):
+            errors.append(f"#{identifier} must use an inline SVG icon")
+
+
+def check_elements(index: deck_html.DocumentIndex, errors: list[str]) -> None:
+    source = index.source
+    bound_ids = deck_html.bound_element_ids(index.inline_scripts())
+    delegated = bool(
+        re.search(
+            r"dataset\s*\.\s*goto|getAttribute\s*\(\s*['\"]data-goto|\[data-goto\]",
+            "\n".join(deck_html.strip_js_comments(script) for script in index.inline_scripts()),
+        )
+    )
+
+    for element in index.elements:
+        if element.inert:
+            continue
+        classes = {value.lower() for value in element.classes}
+        if any(CLICKABLE_CLASS.search(value) for value in classes) and element.tag not in {"a", "button"}:
+            errors.append(
+                f"<{element.tag}> with interactive-looking class {sorted(classes)} must be <a> or <button>"
+            )
+
+        if element.tag == "a" and element.attr("href").strip() in {"", "#"}:
+            errors.append("anchor is missing a real href")
+
+        if element.tag == "button":
+            has_action_data = any(element.has_attr(name) for name in ACTION_ATTRIBUTES)
+            identifier = element.identifier
+            if not has_action_data and identifier not in bound_ids:
+                errors.append(
+                    f"button {identifier if identifier else '(without id)'} has no detectable action"
+                )
+
+        if element.tag in {"a", "button"}:
+            is_internal_jump = element.has_attr("data-goto") or bool(
+                re.fullmatch(r"#(?:\d+|first|last)", element.attr("href").strip(), re.I)
+            )
+            if is_internal_jump and not element.has_attr("data-utility-nav-ok"):
+                label = f"{element.attr('aria-label')} {element.inner_text(source)}"
+                label = re.sub(r"\s+", " ", label).strip().lower()
+                if any(token in label for token in UTILITY_LABELS):
+                    errors.append(
+                        "redundant utility jump CTA is not allowed while persistent navigation exists: "
+                        f"{label!r}"
+                    )
+            if "cta" in classes and not any(
+                "cta-inner" in child.classes for child in index.descendants(element)
+            ):
+                errors.append("CTA content must be wrapped in one .cta-inner group for rendered centering")
+
+    uses_goto = any(
+        element.has_attr("data-goto") for element in index.elements if not element.inert
+    )
+    if uses_goto and not delegated:
+        errors.append("data-goto controls exist but no navigation handler was detected")
+
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        fail("usage: validate_interactions.py DECK.html")
+
+    path = Path(sys.argv[1]).resolve()
+    if not path.is_file():
+        fail(f"deck not found: {path}")
+
+    index = deck_html.parse(path.read_text(encoding="utf-8"))
+    errors: list[str] = []
+    check_navigation_panel(index, errors)
+    check_elements(index, errors)
+
+    if errors:
+        for error in dict.fromkeys(errors):
+            print(f"ERROR: {error}")
+        return 1
+
+    print(f"OK: {path} - interactive-looking elements have actionable semantics")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

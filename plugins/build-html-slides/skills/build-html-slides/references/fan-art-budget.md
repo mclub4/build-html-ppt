@@ -1,20 +1,21 @@
 # Time-Aware Fan-Art Discovery
 
-Use this contract when a request asks for many fan artworks, as many images as possible, character galleries, creator-community imagery, or a fan-art-heavy deck. Full Validation increases assurance; it does not require exhaustive image research.
+Use this contract when a request asks for many fan artworks, as many images as possible, character galleries, creator-community imagery, or a fan-art-heavy deck. Full Validation increases assurance; it does not require exhaustive image research. When the roster reaches the numeric trigger in `high-volume-media-workflow.md`, run the batch contact-sheet accelerator instead of inspecting downloads one by one.
 
 ## Default Targets
 
-These are planning targets, not hard limits:
+An image-heavy deck uses the same envelope as every other Full Validation deck: **70 minutes maximum for 20-25 slides**, as defined in `validation-contract.md`. There is no separate, longer fan-art budget. Discovery is allocated inside it:
 
-- total delivery target: 60-90 minutes for 20-25 slides;
-- fan-art search target: 25-35 minutes;
-- candidate target: 40-50 works;
-- selected fan-art target: 24-30 works;
-- normally one contact-sheet selection pass;
-- normally one replacement pass affecting no more than 20% of selected works;
-- aim to freeze asset selection around minute 35-40 and preserve the final 25-35 minutes for implementation and validation.
+- fan-art search: 20 minutes, hard ceiling;
+- candidates: 40 works;
+- selected works: 24-30;
+- one contact-sheet selection pass;
+- one replacement pass affecting no more than 20% of selected works;
+- asset selection freezes at minute 20 so the validation pipeline keeps its full allowance.
 
-Reaching the upper end of a target does not terminate the task. Use it as a checkpoint: inspect visual-role coverage, candidate quality, diversity, and remaining validation time. Freeze the set when it is already strong. Continue searching when the expected improvement is meaningful and the schedule remains reasonable. If the task is likely to exceed 90 minutes, explain the cause and ask whether to continue discovery or finish with the current candidates; do not abruptly stop.
+Hitting a ceiling is an instruction, not a suggestion. At the 20-minute mark, freeze the set you have and move on; a strong set of 24 works delivered on time beats 30 works delivered late. If coverage is genuinely thin at that point, cut slides rather than extend the search — fewer works presented legibly is the better deck either way.
+
+Apply the autonomous budget checkpoint in `validation-contract.md` when `validate_all.py --status` reports the allowance running short. Do not ask the user whether to continue searching; decide, act, and state what was reduced at delivery.
 
 Interpret "maximum," "as many as possible," and similar superlatives as a request for a strong and varied set, not an automatic instruction to crawl every platform exhaustively. If the requested slide count cannot present the selected works legibly, prefer fewer stronger works over dense galleries. When the user explicitly prioritizes exhaustive coverage, adapt the targets and communicate the expected duration.
 
@@ -32,7 +33,7 @@ Interpret "maximum," "as many as possible," and similar superlatives as a reques
 
 - Use origin-verified, licensed, supplied, official, or original assets.
 - At the research checkpoint, prefer a smaller verified set over presenting uncertain fan art as cleared.
-- If further rights verification would push the task beyond 90 minutes, ask whether to continue verification or replace the affected work.
+- If further rights verification would exceed the discovery ceiling, replace the affected work with a verified alternative or drop it. Do not spend the budget asking.
 
 ## Efficient Collection
 
@@ -52,4 +53,4 @@ Interpret "maximum," "as many as possible," and similar superlatives as a reques
 - Do not create auxiliary fan-art, source, or rights-review agents for an ordinary internal/private entertainment deck. Standard Full Validation uses its two primary reviewers and one final editor only.
 - Low-resolution, failed-load, crop, or attribution problems may replace the affected work once; they do not reopen broad discovery.
 
-If external access, login, rate-limit, download, or rights problems threaten the target duration, checkpoint the work. Reduce the selected quantity when quality remains sufficient, or ask whether to continue when more research is materially useful. Never claim exhaustive coverage without actually performing it.
+If external access, login, rate-limit, download, or rights problems threaten the ceiling, reduce the selected quantity and continue. Deliver on time with a stated limitation rather than asking for more time. Never claim exhaustive coverage without actually performing it.

@@ -1,6 +1,6 @@
 # Slide-By-Slide Review
 
-Read `validation-contract.md` first. That file decides which slides and profiles require AI inspection. This file explains how to inspect them and fill `review.json` without overstating evidence.
+Read `validation-contract.md` first. That file decides which slides and profiles require AI inspection. Read `reviewer-gates.md` second; it owns the check tuples, the deterministic gate thresholds, the navigation exclusion zone, the refute-or-confirm protocol, and the non-negotiable blocking gates. This file explains how to inspect the assigned slides and fill `review.json` without overstating evidence.
 
 Use `validate_all.py OUTPUT.html --status` to list pending batches and the next phase. After inspecting the named current captures, use `record_review.py` with the matching `slide`, `cross-slide`, `quality`, or `squint` subcommand. Supply every requested check and a concrete observation. The recorder only performs schema-safe writes; it cannot see the captures and never creates a verdict.
 
@@ -16,18 +16,19 @@ For each generated batch of at most four slides. Keep the batch intact in one vi
 
 1. Open exactly the full-size PNGs listed in each slide's `required_ai_profiles`. When `identity_required` is true, also open every local `identity_targets[].reference_path`.
 2. Inspect the images, not only HTML source, a contact sheet, or DOM metrics.
-3. Inspect cross-layer relationships: look for imagery crossing dividers, labels, captions, copy, controls, or card edges even when every element remains inside the slide bounds. Check whether the visible subject—not the raster canvas—occupies a useful share of its frame.
-4. At full size, run the mandatory pixel-edge sweep: compare every image edge to its intended frame/divider; inspect translucent overlays and `::before`/`::after` decoration for stale or doubled silhouettes; inspect the first visible glyph of every text block for foreground-image coverage; inspect multiline display copy for a one-character or punctuation-only final line; and inspect the entire lower-right navigation exclusion zone for captions, notes, sources, logos, images, or decoration entering or sitting uncomfortably behind the controls.
-5. Keep one concrete observation and one verdict per slide, even when several profiles were opened. The observation must name the applicable edge, layer, text-start, final-line, and navigation-zone result with visible locations. A generic statement such as “no overlap” is insufficient.
-6. Copy `required_ai_profiles` to `inspected_profiles` only after actual inspection.
-7. Fill only the checks required by `review_scope`. Complete each `identity_review` entry from pixel comparison, never from labels or filenames.
-8. Record a readable reviewer label and stable run-specific `reviewer_ref`.
+3. Inspect cross-layer relationships that no bounding box exposes: imagery crossing a divider, a caption region, or another card's reading area while every element still sits inside the slide. Container escape and subject prominence are measured by `measure_image_geometry.js`; do not spend the turn re-deriving them.
+4. At full size, run the reviewer sweep in `reviewer-gates.md`. It deliberately excludes what the gates already measure — container overflow, glyph-row collision, foreground bite into text ink, navigation-zone intrusion, subject prominence, near-duplicate skeletons — and concentrates the turn on subject truth, generated-versus-authentic media, crop meaning, real sharpness at playback size, finish, focal hierarchy, and any `data-*-ok` escape hatch present on the slide.
+5. If the slide carries any deterministic warning, run the refute-or-confirm pass in `reviewer-gates.md` instead of an ordinary review. Open the boundary overlay capture at `review/<profile>/slide-NN-debug.png` alongside the full-size capture and start the observation with `CONFIRM: ` or `REFUTE: `, naming the element and location. A restatement of the warning, or `looks fine`, `intentional`, `no overlap`, or `everything fits`, leaves the warning open.
+6. Keep one concrete observation and one verdict per slide, even when several profiles were opened.
+7. Copy `required_ai_profiles` to `inspected_profiles` only after actual inspection.
+8. Fill exactly the checks required by `review_scope`, in the order given in `reviewer-gates.md`; `validate_visual_review.py` compares the tuple exactly and order-sensitively. Complete each `identity_review` entry from pixel comparison, never from labels or filenames.
+9. Record a readable reviewer label and stable run-specific `reviewer_ref`.
 
 Use ordinary contact sheets only to notice deck-wide rhythm, repetition, density, or a report-like absence of subject imagery. They do not replace slide-level inspection. In Full Validation, `--phase finalize-prepare` also creates one lightly blurred squint contact sheet from every current `normal` capture. The final quality editor uses it for focal hierarchy, emphasis range, deck rhythm, and color/density balance only. It cannot approve text overlap, awkward line breaks, crop, distortion, overflow, identity, or media appropriateness; open the relevant full-size captures for those checks. The final quality editor must assess whether the deck's overall media mix fits the subject rather than rewarding chart-only rigor by default.
 
 ## Visual Checks
 
-For `all` scope:
+For `all` scope, in contract order — `crop`, `aspect_ratio`, `resolution`, `content_match`, `completion`, `overflow`, `occlusion`, `text`, `text_bounds`, `contrast`, `density`, `controls`:
 
 - `crop`: meaningful content remains fully visible;
 - `aspect_ratio`: images, logos, screenshots, and diagrams are not stretched;
@@ -37,20 +38,25 @@ For `all` scope:
 - `overflow`: text and components remain inside their intended regions;
 - `occlusion`: media and decoration do not obscure copy or controls;
 - `text`: copy is readable and visually coherent, with natural phrase-boundary wrapping and no one- or two-character Korean final line;
-- `text_bounds`: text remains inside its box, cell, button, badge, column, and safe area; rendered rows do not collide with each other or sibling copy, and navigation covers no caption, source, or footer text;
+- `text_bounds`: text remains inside its box, cell, button, badge, column, and safe area;
+- `contrast`: every text run stays legible against what actually sits behind it. `measure_contrast.js` blocks a provable failure on its own; this check exists to close the `UNDECIDABLE contrast` warnings it hands over, which is a refute-or-confirm verdict, never an approval;
 - `density`: cards, panels, and decorative shapes justify their area and do not leave sparse copy stranded in oversized empty boxes;
-- `controls`: navigation and interactive elements are centered, readable, and usable.
+- `controls`: navigation and interactive elements are centered, readable, and usable;
 - `identity`: on explicitly or automatically identity-routed slides, every candidate matches its canonical WebP reference and the intended character/person variant.
 
-Map the mandatory pixel-edge sweep into the existing checks rather than inventing a vague extra verdict: image/frame mismatch is `crop` or `occlusion`; translucent or pseudo-element residue is `occlusion`; a foreground image covering the first glyph is `occlusion` and `text_bounds`; a one-character final line is `text`; navigation-zone intrusion is `controls` plus the affected `text_bounds`, `crop`, or `occlusion` check.
+Map a sweep finding onto an existing check rather than inventing a vague extra verdict: image/frame mismatch is `crop` or `occlusion`; translucent or pseudo-element residue is `occlusion`; a foreground image covering the first glyph is `occlusion` and `text_bounds`; a one-character final line is `text`; an unresolved backdrop under copy is `contrast`; navigation-zone intrusion is `controls` plus the affected `text_bounds`, `crop`, or `occlusion` check.
 
-Text-only changes use `text`, `text_bounds`, and `density`; image-only changes use crop, aspect ratio, resolution, content match, and completion; navigation-only changes use controls. Identity-required `all` and `image` reviews also include `identity` and one cue-based `identity_review` entry per target.
+Text-only changes use `text`, `text_bounds`, `contrast`, and `density`; image-only changes use crop, aspect ratio, resolution, content match, and completion; navigation-only changes use controls. Identity-required `all` and `image` reviews also include `identity` and one cue-based `identity_review` entry per target.
 
 ## Concrete Observations
 
 Write what was visibly checked on that slide. Good observations name the composition and the result, for example:
 
 > The two-line Korean title remains inside the left safe column, while the contained product image keeps all four edges and the bottom-right controls stay clear.
+
+On a warned slide the observation is a verdict on the warning, not a description of the slide:
+
+> REFUTE: the connecting rule ends at x≈612, 78px left of the handset; the warning came from the transparent scrim rectangle that spans the row, and nothing opaque sits under the ₩1,290,000 numeral.
 
 Do not reuse generic approval text across slides. Do not claim a model or person inspected evidence unless that inspection actually occurred.
 
@@ -71,7 +77,9 @@ After all findings are settled:
 5. bind squint and cross-reviews to current capture hashes;
 6. run `validate_all.py --phase finalize-verify`.
 
-The bounded set contains the cover, closing, explicit visual-critical/core slides, automation-warning slides, and identity-sensitive slides. Do not add distributed ordinary-slide samples, and do not expand high-risk cross-review to every slide. This independent pass is not removed as duplicate checking. After a focused repair, reuse a passing independent review only when the slide capture hash and review contract are unchanged; regenerate only the failed or changed slide's review.
+`validate_visual_review.py` generates that set as the union of visual-critical slides, identity-required slides, and automation-warning slides; `required_cross_review_slides()` never reads the review risk. Complete exactly the generated pending batches. Do not infer membership from the risk level, do not add distributed ordinary-slide samples, and do not expand high-risk cross-review to every slide — high risk raises primary reviewer diversity, not cross-review breadth. Enter the pass with the cross-review lens described in `reviewer-gates.md`, not the primary checklist a second time. After a focused repair, reuse a passing independent review only when the slide capture hash and review contract are unchanged; regenerate only the failed or changed slide's review.
+
+Before recording the final score, confirm every non-negotiable gate in `reviewer-gates.md` is clear. One open gate blocks delivery no matter what the 24-point total says.
 
 Image count does not create additional AI calls by itself. Inspect the rendered composition once per required slide/profile set. Do not open every fan-art source as a separate validation step, and do not infer critical status from styling classes such as `logo`, `key-visual`, `title-art`, or `diagram`.
 

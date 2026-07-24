@@ -1,10 +1,65 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ALLOW_RETAG=0
+case "${1:-}" in
+  --allow-existing-tag) ALLOW_RETAG=1 ;;
+  -h|--help)
+    cat <<'EOF'
+Usage: ./scripts/package-release.sh [--allow-existing-tag]
+
+Build the release archives for the version in package.json into dist/.
+
+Refuses to run when a git tag for that version already exists, because dist/ is
+rebuilt from scratch and would otherwise silently produce different bytes under
+an already published version number. Bump package.json instead. Pass
+--allow-existing-tag only to reproduce an existing release locally.
+EOF
+    exit 0
+    ;;
+  "") ;;
+  *) echo "Unknown option: $1" >&2; exit 2 ;;
+esac
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$ROOT/package.json")"
 ARCHIFY_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$ROOT/codex/skills/archify/package.json")"
 DIST="$ROOT/dist"
+
+if [ -z "$VERSION" ] || [ -z "$ARCHIFY_VERSION" ]; then
+  echo "Could not read a version from package.json." >&2
+  exit 1
+fi
+
+# dist/ is deleted below. Prove the target is the intended directory under an
+# absolute repository root at least two segments deep, so a broken ROOT can
+# never expand into rm -rf / or rm -rf /dist.
+if [ "$DIST" != "$ROOT/dist" ]; then
+  echo "Refusing to build: dist path '$DIST' is not '\$ROOT/dist'." >&2
+  exit 1
+fi
+case "$ROOT" in
+  /*) ;;
+  *) echo "Refusing to build: repository root '$ROOT' is not absolute." >&2; exit 1 ;;
+esac
+case "${ROOT%/}" in
+  ""|/) echo "Refusing to build: repository root resolved to the filesystem root." >&2; exit 1 ;;
+esac
+case "${ROOT#/}" in
+  */*) ;;
+  *) echo "Refusing to build: repository root '$ROOT' is a top-level directory." >&2; exit 1 ;;
+esac
+
+# An already tagged version has published bytes. Rebuilding it from a different
+# tree would hand out archives whose checksums no longer match the release.
+if [ "$ALLOW_RETAG" -eq 0 ] && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if git -C "$ROOT" rev-parse --verify --quiet "refs/tags/v$VERSION" >/dev/null; then
+    echo "Refusing to rebuild v$VERSION: the git tag v$VERSION already exists." >&2
+    echo "Bump \"version\" in package.json (and re-run npm run check) before packaging a new release." >&2
+    echo "To reproduce the existing release locally, re-run with --allow-existing-tag." >&2
+    exit 1
+  fi
+fi
 
 python3 "$ROOT/scripts/validate_repository.py"
 rm -rf "$DIST"

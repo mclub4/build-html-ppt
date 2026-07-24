@@ -50,6 +50,25 @@ class ValidateFontsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("1 bundled WOFF2", result.stdout)
 
+    def test_percent_encoded_font_filename_resolves(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "assets").mkdir()
+            shutil.copy2(FIXTURE, root / "assets" / "my font.woff2")
+            deck = root / "deck.html"
+            deck.write_text(
+                "<!doctype html><html><style>"
+                "@font-face{font-family:'Test Inter';src:url('assets/my%20font.woff2') format('woff2')}"
+                ":root{--font-display:'Test Inter',sans-serif;--font-body:'Test Inter',sans-serif}"
+                "</style><body><section class='slide'><h1>Portable text</h1></section></body></html>",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                ["python3", str(VALIDATOR), str(deck)],
+                capture_output=True, text=True, check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_remote_or_non_woff2_font_fails(self) -> None:
         result = self.validate(
             "<!doctype html><html><style>"

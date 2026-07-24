@@ -11,13 +11,20 @@ GEMINI_ARCHIFY_SOURCE="$REPO/.gemini/skills/archify"
 CLAUDE_HOME="${CLAUDE_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 GEMINI_HOME="${GEMINI_HOME:-$HOME/.gemini}"
+# The bundled Archify version is derived, never restated. codex/skills/archify/package.json
+# is the single source of truth and scripts/validate_repository.py asserts it everywhere.
+ARCHIFY_PACKAGE="$REPO/codex/skills/archify/package.json"
 MODE="symlink"
 DO_CLAUDE="auto"
 DO_CODEX="auto"
 DO_GEMINI="auto"
 FORCE=0
 DRY_RUN=0
+SKIP_VALIDATION="${BUILD_HTML_SLIDES_SKIP_VALIDATION:-0}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
+# Backups live outside every skills scan root. A backup kept beside the skill
+# would be discovered as a second skill declaring the same name.
+BACKUP_DIRNAME=".build-html-slides-backups"
 
 usage() {
   cat <<'EOF'
@@ -27,18 +34,28 @@ Install the build-html-slides + Archify skill bundle for detected Claude Code,
 Codex, and Gemini CLIs.
 
 Options:
-  --copy         Copy files instead of linking them to this clone.
-  --claude-only  Install only the Claude Code skills and review agents.
-  --codex-only   Install only the Codex skills.
-  --gemini-only  Install only the Gemini CLI Agent Skills.
-  --force        Back up an unrelated existing installation and replace it.
-  --dry-run      Print actions without changing files.
-  -h, --help     Show this help.
+  --copy             Copy files instead of linking them to this clone.
+  --claude-only      Install only the Claude Code skills and review agents.
+  --codex-only       Install only the Codex skills.
+  --gemini-only      Install only the Gemini CLI Agent Skills.
+  --force            Back up an unrelated existing installation and replace it.
+  --dry-run          Print actions without changing files.
+  --skip-validation  Skip the pre-install repository validation. Use only in an
+                     offline or minimal environment without python3. Installing
+                     with this flag can deliver .claude/ or .gemini/ copies that
+                     have drifted from the canonical codex/ source.
+  -h, --help         Show this help.
 
 Environment:
-  CLAUDE_HOME or CLAUDE_CONFIG_DIR  Claude home directory (default: ~/.claude)
-  CODEX_HOME                       Codex home directory (default: ~/.codex)
-  GEMINI_HOME                      Gemini home directory (default: ~/.gemini)
+  CLAUDE_HOME or CLAUDE_CONFIG_DIR   Claude home directory (default: ~/.claude)
+  CODEX_HOME                        Codex home directory (default: ~/.codex)
+  GEMINI_HOME                       Gemini home directory (default: ~/.gemini)
+  BUILD_HTML_SLIDES_SKIP_VALIDATION Set to 1 for the same effect as --skip-validation.
+
+Before installing, this script runs scripts/validate_repository.py so that the
+derived .claude/ and .gemini/ copies are proven identical to the canonical
+codex/ source. Existing unrelated installations replaced with --force are moved
+to <home>/.build-html-slides-backups/, outside the skills scan root.
 
 Install either a standalone skill or that platform's marketplace plugin, not both.
 EOF
@@ -52,6 +69,7 @@ while [ "$#" -gt 0 ]; do
     --gemini-only) DO_CLAUDE="no"; DO_CODEX="no"; DO_GEMINI="yes" ;;
     --force) FORCE=1 ;;
     --dry-run) DRY_RUN=1 ;;
+    --skip-validation) SKIP_VALIDATION=1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -64,6 +82,68 @@ run() {
   printf '\n'
   [ "$DRY_RUN" -eq 1 ] || "$@"
 }
+
+# Every destructive path in this script flows through here. A destination must
+# be absolute, must not be the filesystem root, and must be at least two levels
+# below it, so an empty or truncated home directory can never expand into a
+# recursive delete of / or of a top-level directory.
+assert_safe_target() {
+  local target="$1" trimmed
+  case "$target" in
+    /*) ;;
+    *) echo "Refusing to operate on a non-absolute path: '$target'" >&2; exit 1 ;;
+  esac
+  trimmed="${target%/}"
+  if [ -z "$trimmed" ] || [ "$trimmed" = "/" ]; then
+    echo "Refusing to operate on the filesystem root: '$target'" >&2
+    exit 1
+  fi
+  # Require at least two path segments, e.g. /home/user/... never /skills.
+  case "${trimmed#/}" in
+    */*) ;;
+    *) echo "Refusing to operate on a top-level path: '$target'" >&2; exit 1 ;;
+  esac
+}
+
+archify_version() {
+  if [ ! -f "$ARCHIFY_PACKAGE" ]; then
+    echo "Bundled Archify package metadata is missing: $ARCHIFY_PACKAGE" >&2
+    exit 1
+  fi
+  sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$ARCHIFY_PACKAGE" | head -n 1
+}
+
+validate_repository() {
+  local validator="$REPO/scripts/validate_repository.py"
+  if [ "$SKIP_VALIDATION" = "1" ]; then
+    echo "Skipping repository validation (--skip-validation)."
+    echo "The .claude/ and .gemini/ copies are installed unverified; run ./scripts/sync-distributions.sh if they drifted." >&2
+    return 0
+  fi
+  if [ ! -f "$validator" ]; then
+    echo "Repository validator is missing: $validator" >&2
+    echo "Re-clone the repository, or rerun with --skip-validation to install unverified." >&2
+    exit 1
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "python3 is required to verify that the Claude and Gemini copies match the canonical codex/ source." >&2
+    echo "Install python3, or rerun with --skip-validation to install unverified." >&2
+    exit 1
+  fi
+  echo "== Verifying distributions against the canonical codex/ source =="
+  if ! python3 "$validator"; then
+    echo "Repository validation failed. The installable copies do not match codex/skills/." >&2
+    echo "Run ./scripts/sync-distributions.sh, or rerun with --skip-validation to install anyway." >&2
+    exit 1
+  fi
+}
+
+validate_repository
+ARCHIFY_VERSION="$(archify_version)"
+if [ -z "$ARCHIFY_VERSION" ]; then
+  echo "Could not read the bundled Archify version from $ARCHIFY_PACKAGE" >&2
+  exit 1
+fi
 
 copy_marker() {
   local dest="$1" kind="$2"
@@ -80,8 +160,22 @@ is_our_copy() {
   [ -f "$marker" ] && [ "$(cat "$marker")" = "$REPO" ]
 }
 
+# Claude Code, Codex, and Gemini all discover skills by scanning every
+# subdirectory of <home>/skills for SKILL.md. A backup left at
+# <home>/skills/<name>.bak.<stamp> therefore registers as a second skill
+# declaring the same name, colliding with the one just installed, and
+# uninstall.sh has no way to recognise it. Backups go to
+# <home>/.build-html-slides-backups/<category>/, one level above the scan root.
+backup_path_for() {
+  local dest="$1" home category name
+  home="$(dirname "$(dirname "$dest")")"
+  category="$(basename "$(dirname "$dest")")"
+  name="$(basename "$dest")"
+  printf '%s\n' "$home/$BACKUP_DIRNAME/$category/$name.bak.$STAMP"
+}
+
 prepare_destination() {
-  local dest="$1" source="$2" kind="$3" marker
+  local dest="$1" source="$2" kind="$3" marker backup
   marker="$(copy_marker "$dest" "$kind")"
 
   if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$source" ]; then
@@ -93,19 +187,45 @@ prepare_destination() {
   fi
 
   if is_our_copy "$dest" "$kind"; then
+    assert_safe_target "$dest"
     run rm -rf "$dest"
     [ "$kind" = "file" ] && run rm -f "$marker"
     return 0
   fi
 
   if [ -e "$dest" ] || [ -L "$dest" ]; then
+    backup="$(backup_path_for "$dest")"
     if [ "$FORCE" -ne 1 ]; then
       echo "Refusing to replace existing installation: $dest" >&2
-      echo "Use --force to move it to $dest.bak.$STAMP first." >&2
+      echo "Use --force to move it to $backup first." >&2
       exit 1
     fi
-    run mv "$dest" "$dest.bak.$STAMP"
+    run mkdir -p "$(dirname "$backup")"
+    run mv "$dest" "$backup"
+    echo "Backed up existing installation to: $backup"
   fi
+}
+
+# cp -R would deliver __pycache__, .pyc, .pytest_cache, and .omc session state
+# into the user's home. tar is used instead of rsync so the installer keeps
+# working on a minimal system that has no rsync.
+COPY_EXCLUDES=(
+  --exclude=__pycache__
+  --exclude=.pytest_cache
+  --exclude=.omc
+  --exclude=.git
+  --exclude='*.pyc'
+  --exclude='*.pyo'
+  --exclude=.DS_Store
+)
+
+copy_tree() {
+  local source="$1" dest="$2"
+  printf '+ copy tree (excluding %s): %q -> %q\n' \
+    "__pycache__, .pytest_cache, .omc, .git, *.pyc, *.pyo, .DS_Store" "$source" "$dest"
+  [ "$DRY_RUN" -eq 1 ] && return 0
+  mkdir -p "$dest"
+  tar -C "$source" "${COPY_EXCLUDES[@]}" -cf - . | tar -C "$dest" -xf -
 }
 
 install_path() {
@@ -119,7 +239,7 @@ install_path() {
   if [ "$MODE" = "symlink" ]; then
     run ln -s "$source" "$dest"
   elif [ "$kind" = "dir" ]; then
-    run cp -R "$source" "$dest"
+    copy_tree "$source" "$dest"
     marker="$(copy_marker "$dest" "$kind")"
     if [ "$DRY_RUN" -eq 1 ]; then
       echo "+ write copy marker: $marker"
@@ -205,7 +325,7 @@ echo
 echo "Post-install guidance:"
 echo "- Optional Korean polish: epoko77-ai/im-not-ai provides humanize-korean for slide copy and presenter notes after facts, numbers, names, and citations are settled. It is not bundled or installed automatically."
 echo "- After installing im-not-ai separately, invoke /humanize-korean in Claude Code or \$humanize-korean in Codex; Codex uses its Fast single-call mode."
-echo "- Bundled technical diagrams: tt-a1i/archify v2.12.0 is included as an independent skill for architecture, topology, sequence, workflow, lifecycle, and data-flow diagrams."
+echo "- Bundled technical diagrams: tt-a1i/archify v$ARCHIFY_VERSION is included as an independent skill for architecture, topology, sequence, workflow, lifecycle, and data-flow diagrams. It ships with the supported distributions and needs no separate consent."
 echo "- The installer preserves an unrelated existing Archify installation unless --force was explicitly supplied."
 echo "- AI installer: ask whether to install im-not-ai only when humanize-korean is missing. Do not install it or any additional dependency without explicit consent."
 echo "- Available humanize-korean and bundled Archify are used automatically when their routing rules match; do not ask again before each deck."

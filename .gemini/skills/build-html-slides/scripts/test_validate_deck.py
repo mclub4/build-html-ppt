@@ -24,7 +24,9 @@ class ValidateDeckTests(unittest.TestCase):
             deck = root / "deck.html"
             deck.write_text(html, encoding="utf-8")
             for asset in assets:
-                (root / asset).touch()
+                target = root / asset
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.touch()
             return subprocess.run(
                 ["python3", str(VALIDATOR), str(deck)],
                 check=False,
@@ -156,6 +158,76 @@ class ValidateDeckTests(unittest.TestCase):
         geometry = GEOMETRY_CHECK.read_text(encoding="utf-8")
         self.assertIn(".page-separator, .pager-separator", geometry)
         self.assertIn("Math.abs(dy) > 1.5", geometry)
+
+    def test_percent_encoded_asset_reference_resolves_to_the_real_file(self) -> None:
+        html = self.template_with(
+            '<div class="slide-media" aria-hidden="true">'
+            '<img src="my%20image.webp" alt="Percent encoded name"></div>'
+        )
+        result = self.validate(html, ("my image.webp",))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_non_ascii_percent_encoded_asset_reference_resolves(self) -> None:
+        html = self.template_with(
+            '<div class="slide-media" aria-hidden="true">'
+            '<img src="assets/%EA%B0%80%EA%B2%A9%ED%91%9C.webp" alt="Korean file name"></div>'
+        )
+        result = self.validate(html, ("assets/가격표.webp",))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_missing_data_title_is_not_masked_by_another_section(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            '<section class="slide" data-title="Slide 3">',
+            '<section class="slide">',
+            1,
+        ).replace(
+            "</main>",
+            '</main><section class="appendix" data-title="Decoy title"></section>',
+            1,
+        )
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("data-title on every slide (2/3)", result.stdout)
+
+    def test_data_title_attribute_order_does_not_matter(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            '<section class="slide" data-title="Slide 3">',
+            '<section data-title="Slide 3" class="slide">',
+            1,
+        )
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_legitimate_hanja_is_not_mojibake(self) -> None:
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            "<!-- SLIDE_2_CONTENT -->",
+            "<p>지식재산(知識財産)과 이두(吏讀) 표기를 함께 설명합니다.</p>",
+            1,
+        )
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_real_cp949_mojibake_is_still_blocking(self) -> None:
+        broken = "경계".encode("utf-8").decode("cp949", errors="replace")
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            "<!-- SLIDE_2_CONTENT -->", f"<p>{broken}</p>", 1
+        )
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("mojibake", result.stdout)
+
+    def test_cleanly_decodable_mojibake_is_blocking(self) -> None:
+        # "기술" misdecoded through CP949 produces valid characters, no U+FFFD and
+        # nothing from the old hardcoded blocklist, so it used to pass the gate.
+        broken = "기술".encode("utf-8").decode("cp949")
+        self.assertNotIn("�", broken)
+        html = TEMPLATE.read_text(encoding="utf-8").replace(
+            "<!-- SLIDE_2_CONTENT -->", f"<p>{broken}</p>", 1
+        )
+        result = self.validate(html)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("mojibake", result.stdout)
+        self.assertIn("기술", result.stdout)
 
     def test_reserved_source_class_cannot_be_reused_as_component_modifier(self) -> None:
         html = TEMPLATE.read_text(encoding="utf-8").replace(

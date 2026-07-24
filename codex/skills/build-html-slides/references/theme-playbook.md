@@ -4,37 +4,60 @@
 
 Read `subject-routing.md` and `design-candidate-search.md` first. Select semantic facets, retrieve three candidates, compare them, and reject at least one before reading `theme-gallery.md` in depth. Then define six decisions before styling: three mood adjectives; display and body typography; palette roles and provenance; shape language; media treatment; and motion character. Write them as a one-line theme contract before coding.
 
-| Direction | Best for | Visual grammar |
-|---|---|---|
-| Destination magazine | consumer travel guides, itineraries, city and food recommendations | destination-derived color, bold cover hierarchy, editorial photo pacing, route maps, neighborhood spreads, compact practical metadata |
-| Paper systems | architecture decisions, standards, platform strategy, technical research | cool paper, deep ink, deliberate serif/sans or width contrast, annotated schematics, margin evidence, open comparisons, and editorial scale shifts; never a pale wall of equal cards |
-| Interface lab | developer tools, testing, APIs, coding workflows | bright neutral or brand-led surfaces, authentic interface crops, code diffs, traces, numbered experiments |
-| Human infrastructure | migrations, incidents, developer experience, hardware ecosystems | documentary photography, paper or steel neutrals, handoff maps, timelines, operational evidence |
-| Technical night | live operations, security response, runtime monitoring, or another brief that benefits from deliberate darkness | near-black/navy, restrained status color, monospace evidence, control states and topology; valid by art direction, never automatic from the topic noun |
-| Minimal corporate | proposals, reports, roadmaps | warm white or navy, restrained blue/green, clean grid, quiet transitions, data-first layouts |
-| Cinematic game | game introductions, lore, entertainment | dark vignette, expressive display type, bold accent, large art crops, chapter cards, spoiler-aware copy |
-| Bright learning | education, onboarding, explainers | light surfaces, friendly saturated accents, simple diagrams, numbered steps, generous whitespace |
-| Product launch | product/feature storytelling | strong hero, benefit cards, product imagery, high contrast, short copy, deliberate negative space |
-| Raw culture | music, community, experimental brands | hard grids or print collage, condensed display type, halftone imagery, limited ink colors, abrupt scale shifts |
-| Scientific atlas | research, medicine, climate, space | specimen plates, labeled scales, sectional diagrams, magnified evidence, uncertainty and source captions |
-| Blueprint build | architecture, robotics, hardware, protocols | measured grids, exploded views, dimensions, revision marks, phased assembly or implementation flows |
-| Documentary essay | field reporting, social impact, case studies | full-frame photography, location/date slugs, testimony, map interludes, quiet evidence captions |
-| Spatial product | AI products, mobility, digital twins, XR | layered depth, isolated objects, anchored labels, restrained translucency, state transitions |
-| Financial trust | banking, fintech, stablecoins, payments | tabular numerals, reserve composition, money movement, fiat/chain boundaries, audit trails, semantic risk color |
-| Idol editorial index | multi-act or multi-member orientation, chronology, comparison, and curation | authentic photo index, bold grotesk hierarchy, serif contrast, mono metadata, act-specific accents, timeline and listening map |
-| Constructive geometry (Bauhaus-inspired) | design systems, education, architecture, and decisive technical or creative proposals | bright paper, disciplined primary geometry, strong typography, modular sequences, asymmetric comparisons |
-| Organic systems (biophilic or biomimetic) | biology, medicine, climate, ecology, food, and sustainable systems | real macro or field imagery, warm scientific surfaces, layered mechanisms, organic process maps, evidence captions |
-| Scholarly review | papers, humanities, history, policy, and rigorous research reviews | citation margins, argument maps, comparative plates, restrained paper surfaces, quiet motion |
-| Archival analog (vintage analog or retro film) | technology history, games, music, film, brand archives, and oral history | dated artifacts, filmstrip sequences, true archive photography, restrained analog texture, provenance labels |
-| Editorial grid (magazine) | industry trends, profiles, comparisons, portfolios, and photo-rich research | issue cover, photo/text spreads, profile index, pull-quote resets, comparison folios |
+This is a routing index only. `theme-gallery.md` is the single home for each direction's type, palette, grammar, signature slides, and failure modes; read the two or three entries this table points you at rather than styling from the job column alone.
 
-These are routing hints, not fixed presets. A topic may support several valid directions depending on audience and communication job, and the best answer may be a bespoke contract not named here. Use the larger gallery for additional vocabulary including Neo Brutalist, Riso Zine, Scientific Atlas, Blueprint Workshop, Documentary Photo Essay, Spatial Interface, Ledger Trust, and Idol Editorial Index. Mix only compatible attributes, and do not turn signature-slide lists into mandatory checklists. E-Ink/Paper is a treatment that can strengthen Paper Systems or Scholarly Review; it is not a reason to make every slide imitate a device screen.
+| Communication job | Candidate directions in `theme-gallery.md` |
+|---|---|
+| Consumer travel guides, itineraries, city and food recommendations | Destination Magazine; Soft Kinetic or Museum Catalog for premium stays |
+| Architecture decisions, standards, platform strategy, technical research | Paper Systems, Swiss Signal, Scholarly Review |
+| Developer tools, testing, APIs, coding workflows | Interface Lab, Playful Modular |
+| Migrations, incidents, developer experience, hardware ecosystems | Human Infrastructure, Documentary Photo Essay |
+| Live operations, security response, runtime monitoring, or any brief that earns deliberate darkness | Mission Control, Cinematic Noir, Retro Future |
+| Proposals, reports, roadmaps | Swiss Signal, Data Newsroom, Editorial Grid |
+| Game introductions, lore, entertainment | Cinematic Noir, Retro Future, Archival Analog |
+| Education, onboarding, explainers | Playful Modular, Constructive Geometry |
+| Product and feature storytelling | Product Keynote, Spatial Interface |
+| Music, community, experimental brands | Riso Zine, Constructivist Impact, Neo Brutalist |
+| Research, medicine, climate, space | Scientific Atlas, Organic Systems |
+| Architecture, robotics, hardware, protocols | Blueprint Workshop, Human Infrastructure |
+| Field reporting, social impact, case studies | Documentary Photo Essay, Editorial Culture |
+| AI products, mobility, digital twins, XR | Spatial Interface, Product Keynote |
+| Banking, fintech, stablecoins, payments | Ledger Trust; Data Newsroom when the job is market evidence |
+| Multi-act or multi-member orientation, chronology, curation | Idol Editorial Index; route single-act stories by their actual job |
+| Design systems, decisive technical or creative proposals | Constructive Geometry, Neo Brutalist |
+| Papers, humanities, history, policy | Scholarly Review, Museum Catalog |
+| Technology history, brand archives, oral history | Archival Analog, Museum Catalog |
+| Industry trends, profiles, comparisons, portfolios | Editorial Grid, Editorial Culture |
 
-### Technology concept routing
+The best answer is often a bespoke contract not named here. Mix only compatible attributes, and never turn a signature-slide list into a checklist. E-Ink/Paper is a treatment that can strengthen Paper Systems or Scholarly Review; it is not a reason to make every slide imitate a device screen.
 
-Technology is a subject, not a visual genre. For an educational concept such as CQRS, do not treat "avoid dark console" as "select pale paper." Compare at least one contemporary editorial or constructive-geometric direction with the evidence-led technical candidate. Use real interfaces, product or company evidence, diagrams, and typography according to the actual claim.
+### Technology routing — one rule, stated once
 
-If Paper Systems wins, it must behave like a designed technical publication: strong display/body contrast, open comparisons, annotated diagrams, margin evidence, controlled dark or saturated resets, and a recognizable motif. Repeated white rectangles under a large heading, long empty card bottoms, muted green rules on every slide, and a single rounded sans for every role are failure patterns.
+Technology is a subject domain, not a visual theme. There is no banned luminosity and no preferred one. A dark-led system, a paper-led system, and an image-led system are equally valid; the failure is selecting any of them without deciding.
+
+The only defect is the reflex: reaching for `near-black or navy + cyan or acid green + mono micro-labels + glowing nodes + diagonal panel` because the title contains AI, cloud, CNI, MSA, testing, agent, RAG, architecture, or code — and the equal-and-opposite reflex of reading "avoid dark console" as "select pale paper," which produces the generic report deck. Both are the same mistake: a palette chosen from a topic noun instead of a brief.
+
+So: compare three materially different directions before styling, name the reason in the theme contract, then commit hard. A committed dark deck with real contrast, real evidence, and varied composition beats a hedged light one every time.
+
+| Communication job | Strong starting directions |
+|---|---|
+| Executive decision, ADR, platform strategy | Paper Systems, Swiss Signal, Minimal Corporate, Data Newsroom |
+| Developer education, testing, API, coding workflow | Interface Lab, Bright Learning, Playful Modular, Product Keynote |
+| Migration, developer experience, incident learning, operating model | Human Infrastructure, Documentary Photo Essay, Data Newsroom |
+| Hardware, semiconductor, robotics, manufacturing | Human Infrastructure, Blueprint Workshop, Scientific Atlas |
+| Benchmark, research, performance evidence | Data Newsroom, Scientific Atlas, Paper Systems |
+| Live operations, security response, runtime monitoring | Mission Control or Technical Night |
+| Developer-tool launch or product promotion | Product Keynote, Interface Lab, Spatial Interface |
+| Educational concept with no product to show | Constructive Geometry, Editorial Grid, Bright Learning, Paper Systems |
+
+Whichever wins must behave like a designed publication rather than a background swap. If Paper Systems wins, that means strong display/body contrast, open comparisons, annotated diagrams, margin evidence, controlled dark or saturated resets, and a recognizable motif — not repeated white rectangles under a large heading, muted rules on every slide, and one rounded sans for every role. If Technical Night wins, that means real luminosity range, evidence that is legible in a lit room, and composition variety — not one console skeleton recoloured twelve times.
+
+Extend the theme contract with:
+
+```text
+Luminosity: paper-led / mixed / dark-led - reason
+Distinctive evidence: the real media or information shape that prevents a generic look
+```
 
 ### Treatment grammars, not full-deck themes
 
@@ -56,7 +79,7 @@ Treat idol presentations as different editorial jobs rather than one visual genr
 | Premium comeback, concept launch, or sales promotion | Editorial Culture, Product Keynote, Cinematic Noir, or a bespoke brand direction | official key art, campaign hierarchy, dramatic reveal, concise benefit or concept claims |
 | History, legacy, archive, or industry analysis | Museum Catalog, Documentary Photo Essay, Data Newsroom, or a bespoke research direction | chronology, archival evidence, dated captions, comparisons, restrained interpretation |
 
-Do not select Idol Editorial Index merely because an idol appears. Preserve the act's own visual identity and let the audience, purpose, evidence, and available photography determine the final system.
+For idol decks, use Idol Editorial Index only when the job is multi-subject orientation, comparison, chronology, or curation; do not select it merely because an idol appears. Preserve the act's own visual identity and let the audience, purpose, evidence, and available photography determine the final system.
 
 ### Travel routing
 
@@ -70,7 +93,7 @@ Treat travel as a set of editorial jobs, not one visual theme:
 | Reportage, oral history, heritage, community story | Documentary Photo Essay | full-frame documentary photography, place/date slugs, testimony, map interludes |
 | Tourism campaign or destination launch | Destination Magazine with Product Keynote accents | aspirational hero imagery, memorable claims, seasonal reasons to visit, decisive closing |
 
-For an ordinary Tokyo, Kyoto, Osaka, or regional Japan guide, start from Destination Magazine unless the brief clearly asks for luxury hospitality, documentary reporting, or field research. Infer the palette from the actual season and photographs. A contemporary city guide may use bold grotesk display type, while a heritage-focused guide may use a serif/sans contrast; Japanese travel does not automatically mean dark green, off-white, or a serif headline.
+Do not select Field Notes merely because the subject is travel. For an ordinary Tokyo, Kyoto, Osaka, or regional Japan guide, start from Destination Magazine unless the brief clearly asks for luxury hospitality, documentary reporting, or field research. Infer the palette from the actual season and photographs. A contemporary city guide may use bold grotesk display type, while a heritage-focused guide may use a serif/sans contrast; Japanese travel does not automatically mean dark green, off-white, or a serif headline.
 
 ## Theme contract
 
@@ -97,33 +120,6 @@ Assign a reason to every color that occupies a large surface:
 - **editorial pacing:** a deliberate chapter or emotional shift that belongs to the established story.
 
 An unsupported high-chroma color may still work as a small label, line, number, mark, or navigation accent. It must not become a full-slide background merely because the sequence needs variety. A one-off dominant color should either recur in smaller roles elsewhere, be anchored by the slide's imagery, or have a clear narrative reason. Record this reasoning in the theme contract rather than choosing a memorable hex value in isolation.
-
-### Technology routing
-
-Technology is a subject domain, not a visual theme. Before styling a technology deck, compare three materially different directions:
-
-1. a light or paper-led editorial system;
-2. an authentic-media system built around real interfaces, equipment, facilities, products, or people when relevant;
-3. a schematic or operational system, using a dark command-room surface only when the communication job benefits from it.
-
-| Communication job | Strong starting directions |
-|---|---|
-| Executive decision, ADR, platform strategy | Paper Systems, Swiss Signal, Minimal Corporate, Data Newsroom |
-| Developer education, testing, API, coding workflow | Interface Lab, Bright Learning, Playful Modular, Product Keynote |
-| Migration, developer experience, incident learning, operating model | Human Infrastructure, Documentary Photo Essay, Data Newsroom |
-| Hardware, semiconductor, robotics, manufacturing | Human Infrastructure, Blueprint Workshop, Scientific Atlas |
-| Benchmark, research, performance evidence | Data Newsroom, Scientific Atlas, Paper Systems |
-| Live operations, security response, runtime monitoring | Mission Control or Technical Night |
-| Developer-tool launch or product promotion | Product Keynote, Interface Lab, Spatial Interface |
-
-Do not infer the recurring fingerprint `near-black or navy + cyan or acid green + mono micro-labels + glowing nodes + diagonal panel` merely because the title contains AI, cloud, CNI, MSA, testing, agent, RAG, architecture, or code. A dark-led presentation is fully valid when the audience, emotional tone, pacing, evidence contrast, venue, or subject identity benefits from it, including outside operations and security. Choose it from the whole brief, then vary composition and evidence instead of repeating one console skeleton.
-
-For technology decks, extend the theme contract with:
-
-```text
-Luminosity: paper-led / mixed / dark-led - reason
-Distinctive evidence: the real media or information shape that prevents a generic tech-console look
-```
 
 ## Visual rhythm
 
@@ -156,18 +152,6 @@ For banking, payments, stablecoins, treasury, reserve, or settlement topics:
 
 Extract the stage and margin proportions, typography contrast, color roles, layout families, line weights, radii, texture, image treatment, transition behavior, and control placement. Rebuild cleanly in UTF-8. Do not inherit malformed HTML, mojibake, inaccessible controls, overflowing absolute layouts, or brittle paths.
 
-## Editorial mixed-surface pattern
-
-For a theme like the trust-boundary reference:
-
-- Use a 1920×1080 logical stage only when poster-like typography benefits from the scale, and always fit it with the visualViewport-based scaling rules in `style-presets.md`.
-- Alternate paper, dark, forest, and tinted wash surfaces.
-- Pair an elegant serif display face with strong sans-serif utility text.
-- Use mint for safe/approved states and orange/coral for gates or warnings.
-- Favor thin borders, large statements, matrices, numbered annotations, and full-width flow diagrams.
-- Add subtle CSS grain only when it remains legible and cheap to render.
-- Include print CSS that reveals slides sequentially and hides navigation.
-
 ## Image composition
 
 - Hero image: reserve 35–55% negative space for HTML title copy.
@@ -182,14 +166,11 @@ For a theme like the trust-boundary reference:
 
 Before the first render, confirm that `assets/runtime-shell.html` supplied only the runtime and did not become the deck's art direction.
 
-- No demo copy remains.
-- The demo dark-blue/purple palette is gone unless the topic independently calls for it.
-- The three-card sample is not the dominant layout.
-- No large sparse card or placeholder-like empty shape remains; every large surface carries proportionate information or a deliberate visual role.
-- No `PLACE NOTE`, image-here label, temporary/dummy media, empty frame, or generic replacement graphic remains. If a promised factual image is unavailable, redesign the composition instead of styling the missing slot.
+- No demo copy, demo palette, or three-card sample layout remains.
 - Display and body fonts were deliberately selected for this subject and writing system; the neutral runtime-shell font stack is no longer the art direction.
 - Quick Draft has at least four shared composition families; Full Validation or a longer presentation normally has at least five.
-- Every large-area non-neutral color has palette provenance, and no unsupported high-chroma color is used as a one-off full-slide reset.
+- Every large-area non-neutral color has palette provenance.
 - The cover and closing are designed for this subject.
-- The deck's visual identity is recognizable with the text blurred.
-- The body has a contemporary, topic-specific fingerprint beyond "paper background + clean cards" or "dark background + glowing nodes."
+- The deck's visual identity is recognizable with the text blurred, and its fingerprint goes beyond "paper background + clean cards" or "dark background + glowing nodes."
+
+Placeholder media, empty frames, and underfilled surfaces are caught deterministically by `validate_placeholders.py` and `measure_container_density.js`; this checklist is about art direction, not defect hunting.

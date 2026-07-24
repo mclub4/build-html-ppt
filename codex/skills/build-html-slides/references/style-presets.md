@@ -145,6 +145,17 @@ Safe mixed pattern:
 
 Never use `cover` for transparent logos, posters, product shots, UI screenshots, diagrams, game/anime title art, or character compositions unless every cropped edge is deliberately disposable.
 
+### Declare the role, then size the subject
+
+`measure_image_geometry.js` classifies from declared metadata, never from DOM position: an image inside `.slide-media` is not decorative if it says it is meaningful. Declare `data-media-purpose` on every image — `atmosphere`, `concept`, `scenario`, or `decorative` for decorative work; `subject`, `evidence`, or `identity` for meaningful work — and `data-image-role` when the image is the slide's `hero`, `cover`, `key-visual`, `primary`, or `lead`. An undocumented purpose value warns. An undeclared image defaults to meaningful, and a declared `subject|evidence|identity` overrides `aria-hidden` with a warning that a meaningful image is sitting in a hidden layer.
+
+Two measurements follow from that declaration and are the reason a shipped deck can no longer contain an unreadable product photo:
+
+- **Containment.** The image is compared against its resolved container's padding box — the nearest `.card, .panel, .tile, .box, [data-density-container]`, else the nearest ancestor that establishes a containing block or paints a surface, else `.slide-content`. More than `2px` past any edge of a non-clipping container is a blocking issue naming both rectangles and the per-edge overflow. A clipping container downgrades it to a warning for meaningful images. A deliberate bleed declares `data-image-bleed-ok`.
+- **Prominence.** Rendered area is normalised to the 1280×720 stage and discounted for transparent padding by a 64px alpha probe, so a small product on a large transparent canvas is judged on its body rather than its canvas. A hero subject under `15%` of the stage, an ordinary subject under `2%`, or any subject whose short edge falls under `96` stage pixels is a blocking issue; under `5%` is a warning, as is rendering below a quarter of intrinsic size. `data-subject-scale-ok` waives the size checks and still requires a visual verdict.
+
+Effective pixel density is a separate check and does not substitute for either: the shipped 100×100 defect passed resolution at 2.6× while occupying 1.1% of the stage.
+
 ## Logical Canvas Typography
 
 ### Automatic type direction
@@ -189,11 +200,10 @@ Check Korean glyph quality, punctuation, numerals, and Latin/Korean mixing. Avoi
 Validate settled browser lines after local fonts finish loading. Element width and `scrollWidth` are insufficient because broken line composition can remain inside its box.
 
 - Do not leave only one or two Korean characters, a sentence ending such as `다.`, or closing punctuation on the last line of a display title or quote. Rephrase, rebalance the text box, reduce the display size, or add a phrase-boundary break.
-- Set Korean display line-height from the actual face and weight. Start with enough separation for the font's glyph metrics; never tighten multiline copy below `0.9` without rendered proof, and reject any visible row collision regardless of the declared CSS value.
-- Keep footer copy, credits, and captions outside the persistent navigation rectangle at every retained profile.
-- Treat the lower-right `280×84px` of the logical stage as the default navigation exclusion zone. Do not place notes, citations, logos, captions, or meaningful image details there unless the runtime controls are intentionally relocated and revalidated.
-- Mark visible audience definitions with `data-term-note` and source lines with `data-source-citation`. Keep term notes content-sized and visually subordinate; do not give them card-scale width, tall padding, or a large opaque background. Maintain a visible gap between notes, citations, and navigation. Prefer inline placement; for a footer note use the shell's `.nav-safe-note` helper, which terminates before the exclusion zone.
-- `measure_text_bounds.js` reconstructs Chromium lines, checks Korean final-line fragments, line advance, sibling text intersections, navigation occlusion, unsupported local font weights, and no-op emphasis under the existing `text_bounds` automation gate.
+- Set Korean display line-height from the actual face and weight. Start with enough separation for the font's glyph metrics; never tighten multiline copy below `0.9` without rendered proof.
+- Mark visible audience definitions with `data-term-note` and source lines with `data-source-citation`. Keep term notes content-sized and visually subordinate; do not give them card-scale width, tall padding, or a large opaque background. Prefer inline placement; for a footer note use the shell's `.nav-safe-note` helper, which is anchored at `right: var(--nav-exclusion-width)` and therefore clears the navigation exclusion zone by construction.
+- Keep footer copy, credits, and captions clear of the navigation exclusion zone: the lower-right `var(--nav-exclusion-width) × var(--nav-exclusion-height)` of the logical stage, `280×84px` in the shell. Redeclare the variables if you relocate the controls. `reviewer-gates.md` describes how `measure_geometry.js` enforces the zone and the one exemption attribute that waives it.
+- `measure_text_bounds.js` reconstructs Chromium line boxes and then measures the painted glyph ink inside them. It fails Korean final-line fragments, glyph-ink row collision beyond `1px`, opaque foreground biting more than `1.5px` into glyph ink, sibling text intersections, navigation occlusion, computed weights outside the matching local `@font-face` declarations, and no-op `<strong>`/`<b>` emphasis, all under the existing `text_bounds` automation gate. Element width and `scrollWidth` never enter the decision.
 - `data-line-break-ok` is limited to an intentional one- or two-character poster/chapter treatment that remains visibly balanced. It bypasses only the orphan-line heuristic, never collision or bounds checks. `data-text-overlap-ok` is limited to deliberate legible overprint and still requires AI inspection; do not use either attribute to silence an accidental layout defect.
 
 ## Density
@@ -220,7 +230,7 @@ Whitespace and empty boxes are not interchangeable. Whitespace can connect a foc
 - Large surfaces must earn their area through comparison, grouping, interaction, a chart, a diagram, an image, an annotated object, or a deliberate hero/chapter composition.
 - Do not use a tall card merely to occupy an empty grid track. Change the composition: open typography, editorial split, dominant image, metric cluster, timeline, rule-based list, or asymmetric evidence layout.
 - Do not add low-contrast rectangles, outlines, empty slots, or decorative boxes that resemble missing content.
-- A large surface discovered from its rendered background, border, or shadow is still a container even when its class is not named `.card` or `.panel`.
+- `measure_container_density.js` measures every genuine layout region — explicit `.card, .panel, .tile, .box, [data-density-container]`, painted surfaces, grid and flex items, and `.slide-content` subdivisions — by union ink coverage on a 96×54 raster. A region at least 7% of the slide and at least 200×110px with low ink is reported as `oversized low-information region`. Escaping the frame does not escape the gate: an editorial spread with an empty half is measured exactly like an empty card, so choose the container that serves the content rather than the one that hides from the check.
 - `data-density-ignore` is reserved for intentional hero/chapter whitespace or fixed-format UI mockups. The rendered slide must still look complete, and the visual reviewer must explain why the empty area is intentional.
 
 ## Navigation Panel

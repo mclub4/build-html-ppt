@@ -30,7 +30,7 @@ Before selecting an asset, assign the slide's primary visual job:
 
 For every candidate, state what the audience learns from it that the headline and body do not already provide. Reject or demote it when that answer is vague.
 
-Apply the **stock substitution test**: if an unrelated image from the same broad stock category could replace the candidate without weakening or changing the slide's meaning, the image is generic atmosphere rather than evidence, identity, mechanism, or concept. Do not use such an image as the main explanatory visual. Keep it only when atmosphere is the deliberate job, usually on a cover, chapter transition, or closing, and when it strengthens the presentation's art direction.
+Then apply the stock substitution test defined under **Review failure** below. An image that fails it stays only where atmosphere is the deliberate job — usually a cover, chapter transition, or closing — and only when it strengthens the art direction.
 
 Compare media types before committing:
 
@@ -78,10 +78,16 @@ Use real interfaces, payment devices, institutions, or customer settings when th
 - Prefer official corporate or institutional media, government or public archives, open-license scientific repositories, and source publications whose reuse terms fit the distribution context.
 - Citation alone does not grant reuse rights. For public or commercial decks, verify the applicable license or use a safer official, licensed, supplied, or original alternative.
 - Separate factual evidence from conceptual illustration in captions and presenter notes.
-- Generated imagery may establish atmosphere or explain an abstract concept, but it cannot impersonate a real facility, product, experiment, pathology image, scan, patient, or measured result.
-- For every generated raster, declare `data-media-purpose` as `atmosphere`, `concept`, `scenario`, or `decorative`. Existing named subjects and documentary evidence remain sourced even when a generated alternative would be faster or more stylistically uniform.
+- Declare `data-media-purpose` on **every** image, not only generated ones: `atmosphere`, `concept`, `scenario`, or `decorative` for decorative work, `subject`, `evidence`, or `identity` for meaningful work, plus `data-image-role` when the image is the slide's hero. `measure_image_geometry.js` classifies from these attributes and from nothing else — an image inside `.slide-media` is not decorative if it declares a meaningful purpose, an undeclared image defaults to meaningful, and an undocumented purpose value warns. The prominence and containment gates only protect the images you declare.
+- Existing named subjects and documentary evidence remain sourced even when a generated alternative would be faster or more stylistically uniform.
 - Cache selected assets in `sources.json`; reuse unchanged verified assets on later revisions.
 
 ## Review failure
 
-Treat subject-media fit and claim contribution as visual quality issues. A deck about a materially observable industry, product chain, place, person, experiment, or biological phenomenon should fail review when it is represented almost entirely by text, tables, charts, or generic SVGs despite suitable subject imagery being reasonably available. It should also fail when generic stock photographs occupy explanatory space but do not identify the subject, prove the claim, explain the mechanism, or provide a deliberate atmospheric role. Do not fail a deliberately abstract or confidential deck when the authoring rationale is sound and the chosen media answer the communication job.
+This file is the single home for the three media rules; other references cite it rather than restating it.
+
+1. **Visual contribution.** Every candidate must answer what the audience learns from it that the headline and body do not already provide.
+2. **Stock substitution.** If an unrelated image from the same broad stock category could replace it without changing the slide's meaning, it is atmosphere and may not carry an evidence, identity, mechanism, or concept slide.
+3. **Authenticity.** Generated media may establish atmosphere or explain an abstract mechanism when it cannot be mistaken for the real thing. It may never occupy the subject, evidence, or identity role of an existing named person, group, product, place, event, released work, interface, institution, or measured result — the pixels looking plausible is exactly the failure mode, not a defence.
+
+Fail review when a deck about a materially observable industry, product chain, place, person, experiment, or biological phenomenon is represented almost entirely by text, tables, charts, or generic SVGs despite suitable subject imagery being reasonably available. Fail it when generic stock occupies explanatory space without identifying the subject, proving the claim, or explaining the mechanism. Do not fail a deliberately abstract or confidential deck when the authoring rationale is sound and the chosen media answer the communication job.

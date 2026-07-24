@@ -1,6 +1,8 @@
 # Quick Draft Authoring
 
-Quick Draft is the speed-first creation path. For an ordinary 10-15 slide presentation, aim for roughly 10-20 minutes under normal local conditions. This is a planning target, not a timeout or a quality claim.
+Quick Draft is the speed-first creation path. **15 minutes maximum** for an ordinary 10-15 slide presentation. That is a ceiling, not a quality claim: when the work will not fit, cut scope — fewer images, fewer bespoke slides, shorter notes — rather than running long.
+
+A workable split of the 15 minutes: 3 for storyboard and theme contract, 5 for image discovery, 5 for build, 2 for notes and the Korean polishing pass.
 
 ## Reuse Before Custom Work
 
@@ -18,9 +20,10 @@ Quick Draft is the speed-first creation path. For an ordinary 10-15 slide presen
 
 ## Bound The Expensive Passes
 
-- For an ordinary 10-15 slide presentation, seek roughly 6-10 strong factual or atmospheric images when imagery helps. Stop once identity, evidence, context, and rhythm needs are covered.
+- **Image discovery is capped at 5 minutes.** Place 6-10 images. Download at most 12 originals. Full-size-inspect only the ones you intend to place; judge the rest from the source page listing and its reported dimensions. `asset-discovery.md` describes strict-mode discovery for Full Validation — its "collect more candidates than the deck needs and inspect every downloaded original at full size" instruction does not apply here and will not fit in this budget.
+- One search pass per visual role. Take the first candidate that clears the lightweight gate in `high-volume-media-workflow.md` step 2 — correct subject, recorded source page, enough pixels for the slot, no obvious disqualifier — and move on. Do not compare alternatives you already have a usable answer for.
 - Count only images that pass the visual-contribution and stock-substitution tests in `media-strategy.md`. Do not fill the image target with interchangeable stock photography.
-- Explicit media-heavy, catalog, portfolio, artwork, or fan-art requests may require more discovery. Keep that research intentional instead of widening every query indefinitely.
+- Explicit media-heavy, catalog, portfolio, artwork, or fan-art requests raise the roster, not the clock: use the batch contact-sheet accelerator once the numeric trigger in `high-volume-media-workflow.md` is met, and state at delivery that discovery was bounded.
 - Settle visible copy and notes before running `humanize-korean`, then perform one combined pass and inspect the semantic diff.
 - Write concise notes for roughly 30-60 seconds of delivery: purpose, natural talk track, emphasis, transition, and only necessary source or caveat guidance.
 - Keep production-language fragments out of visible slides. Validation mode, slide count, requested workflow, and phrases such as `개념 강의 + 팀 활동` remain private unless the audience needs them as logistics.
@@ -30,4 +33,4 @@ Quick Draft is the speed-first creation path. For an ordinary 10-15 slide presen
 
 Deliver the HTML, notes, sources cache, and local assets immediately after authoring. Do not render, open a browser, run validators, create review evidence, calculate a score, or request another reviewer. State clearly that Quick Draft was not rendered or validated.
 
-If the user explicitly requests every slide to have unique art direction, a very large image collection, or exhaustive research, explain that the turnaround may approach Full Validation authoring time even though validation remains disabled.
+If the user explicitly requests every slide to have unique art direction, a very large image collection, or exhaustive research, say up front that this exceeds the 15-minute ceiling, name the expected duration, and let the user decide before starting. Do not silently overrun.

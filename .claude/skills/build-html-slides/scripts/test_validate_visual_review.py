@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import struct
@@ -92,6 +93,153 @@ def dimensions(profile: str) -> tuple[int, int]:
 
 def evidence_bytes(profile: str) -> bytes:
     return png_bytes(*dimensions(profile))
+
+
+def load_validator():
+    spec = importlib.util.spec_from_file_location("validate_visual_review", VALIDATOR)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def filtered_png(width: int, height: int, filter_type: int) -> bytes:
+    """Encode a PNG whose every scanline uses one specific filter type."""
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    compressor = zlib.compressobj(6)
+    chunks = []
+    previous = bytearray(width * 3)
+    for row in range(height):
+        raw = bytearray()
+        for column in range(width):
+            level = (row * 7 + column * 3) % 256
+            raw += bytes((level, (level * 5) % 256, 255 - level))
+        if filter_type == 0:
+            encoded = bytes(raw)
+        elif filter_type == 1:
+            encoded = bytes(
+                (raw[index] - (raw[index - 3] if index >= 3 else 0)) & 0xFF for index in range(len(raw))
+            )
+        elif filter_type == 2:
+            encoded = bytes((raw[index] - previous[index]) & 0xFF for index in range(len(raw)))
+        elif filter_type == 3:
+            encoded = bytes(
+                (raw[index] - (((raw[index - 3] if index >= 3 else 0) + previous[index]) >> 1)) & 0xFF
+                for index in range(len(raw))
+            )
+        else:
+            encoded = bytearray()
+            for index in range(len(raw)):
+                left = raw[index - 3] if index >= 3 else 0
+                up = previous[index]
+                corner = previous[index - 3] if index >= 3 else 0
+                estimate = left + up - corner
+                distances = (abs(estimate - left), abs(estimate - up), abs(estimate - corner))
+                predictor = (left, up, corner)[distances.index(min(distances))]
+                encoded.append((raw[index] - predictor) & 0xFF)
+            encoded = bytes(encoded)
+        chunks.append(compressor.compress(bytes([filter_type]) + encoded))
+        previous = raw
+    chunks.append(compressor.flush())
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + png_chunk(b"IHDR", header)
+        + png_chunk(b"IDAT", b"".join(chunks))
+        + png_chunk(b"IEND", b"")
+    )
+
+
+class CaptureMetricTests(unittest.TestCase):
+    """A gate input must never depend on which PNG backend the machine happened to have."""
+
+    module = load_validator()
+
+    def test_both_decoders_agree_on_every_row_filter(self) -> None:
+        self.assertIsNotNone(self.module.Image, "Pillow must be installed to compare both backends")
+        with tempfile.TemporaryDirectory() as directory:
+            for filter_type in range(5):
+                path = Path(directory) / f"filter-{filter_type}.png"
+                path.write_bytes(filtered_png(97, 61, filter_type))
+                pillow = self.module.png_info(path, decoder="pillow")
+                fallback = self.module.png_info(path, decoder="fallback")
+                self.assertEqual(pillow, fallback, f"row filter {filter_type} metrics diverged")
+
+    def test_both_decoders_agree_on_blank_and_alpha_captures(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            blank = Path(directory) / "blank.png"
+            blank.write_bytes(png_bytes(320, 180, blank=True))
+            self.assertEqual(
+                self.module.png_info(blank, decoder="pillow"),
+                self.module.png_info(blank, decoder="fallback"),
+            )
+            dimensions, color_count, luma_range, _ = self.module.png_info(blank, decoder="fallback")
+            self.assertEqual(dimensions, (320, 180))
+            self.assertEqual(color_count, 1)
+            self.assertEqual(luma_range, 0)
+
+    def test_color_count_saturates_at_the_tracked_maximum(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            busy = Path(directory) / "busy.png"
+            busy.write_bytes(filtered_png(400, 300, 4))
+            _, color_count, _, _ = self.module.png_info(busy, decoder="pillow")
+            self.assertEqual(color_count, self.module.MAX_TRACKED_COLORS)
+
+    def test_sample_grid_is_deterministic_and_in_bounds(self) -> None:
+        self.assertEqual(self.module.sample_positions(4, 64), (0, 1, 2, 3))
+        for size in (1, 2, 63, 64, 65, 129, 390, 650, 768, 1024, 1080, 1366, 1920):
+            positions = self.module.sample_positions(size, 64)
+            self.assertEqual(len(positions), min(size, 64), size)
+            self.assertEqual(len(set(positions)), len(positions), size)
+            self.assertEqual(list(positions), sorted(positions), size)
+            self.assertGreaterEqual(positions[0], 0, size)
+            self.assertLess(positions[-1], size, size)
+
+    def test_sample_grid_does_not_alias_with_striped_content(self) -> None:
+        # A frame striped on an 8-row period must not read as near-solid.
+        rows = self.module.sample_positions(768, 64)
+        self.assertGreater(len({row % 8 for row in rows}), 4)
+
+
+class LocalFileIntegrityTests(unittest.TestCase):
+    module = load_validator()
+
+    def entry(self, path: Path) -> dict:
+        stat = path.stat()
+        return {
+            "path": str(path),
+            "size": stat.st_size,
+            "mtime_ns": stat.st_mtime_ns,
+            "ctime_ns": stat.st_ctime_ns,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+
+    def test_timestamp_drift_alone_is_advisory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            asset = Path(directory) / "photo.webp"
+            asset.write_bytes(b"image-bytes")
+            entry = self.entry(asset)
+            os.chmod(asset, 0o600)
+            os.utime(asset, ns=(entry["mtime_ns"] + 5_000_000_000,) * 2)
+            errors: list[str] = []
+            notices: list[str] = []
+            self.module.validate_local_file_metadata({"local_files": [entry]}, errors, notices)
+            self.assertEqual(errors, [])
+            self.assertEqual(len(notices), 1)
+            self.assertIn("kept identical bytes", notices[0])
+
+    def test_changed_content_fails_even_when_timestamps_are_restored(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            asset = Path(directory) / "photo.webp"
+            asset.write_bytes(b"image-bytes")
+            entry = self.entry(asset)
+            asset.write_bytes(b"image-bytez")
+            os.utime(asset, ns=(entry["mtime_ns"], entry["mtime_ns"]))
+            errors: list[str] = []
+            notices: list[str] = []
+            self.module.validate_local_file_metadata({"local_files": [entry]}, errors, notices)
+            self.assertEqual(notices, [])
+            self.assertEqual(len(errors), 1)
+            self.assertIn("local fingerprint entry 1 changed after rendering", errors[0])
+            self.assertIn("recorded sha256 does not match the bytes on disk", errors[0])
 
 
 class VisualReviewTests(unittest.TestCase):
@@ -227,18 +375,15 @@ class VisualReviewTests(unittest.TestCase):
         for record in records:
             number = record["slide"]
             is_critical = number in {1, count} or number == critical
-            identity_review = number == identity and record["review_scope"] in {"all", "image"}
-            required = list(profiles) if is_critical else (["normal"] if mode == "full" or identity_review else [])
+            # Non-critical slides still carry the normal-profile review in both modes. The old
+            # expression here was `["normal"] if mode == "full" or identity_review else []`, which
+            # mirrored routing the validator no longer implements: an empty set means the slide is
+            # in no review batch, and nothing in the pipeline would ever fill in its reviewer or
+            # check verdicts. Keep this unconditional.
+            required = list(profiles) if is_critical else ["normal"]
             record["visual_critical"] = is_critical
             record["required_ai_profiles"] = required
             record["inspected_profiles"] = required
-            if mode == "quick" and not required:
-                record["reviewer"] = ""
-                record["reviewer_ref"] = ""
-                record["review_method"] = "automated-geometry-only"
-                record["observation"] = ""
-                record["checks"] = {}
-                record["status"] = "automation-pass"
         slide_hashes = {str(record["slide"]): record["source_sha256"] for record in records}
         global_hash = hashlib.sha256(b"global").hexdigest()
         score_value = 2 if mode == "quick" else 3
@@ -558,7 +703,49 @@ class VisualReviewTests(unittest.TestCase):
         manifest["slides"][2]["checks"]["crop"] = "pass"
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("automation-only record must carry automation-pass status", result.stdout)
+        self.assertIn('unexpected ["crop"]', result.stdout)
+
+    def test_missing_check_key_is_named_in_the_error(self) -> None:
+        deck = deck_for(2)
+        manifest = self.manifest(deck)
+        del manifest["slides"][0]["checks"]["contrast"]
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('missing ["contrast"]', result.stdout)
+        self.assertIn('"contrast"', result.stdout)
+        self.assertIn("required exactly, in order", result.stdout)
+
+    def test_reordered_check_keys_report_ordering_not_membership(self) -> None:
+        deck = deck_for(2)
+        manifest = self.manifest(deck)
+        checks = manifest["slides"][0]["checks"]
+        manifest["slides"][0]["checks"] = dict(reversed(list(checks.items())))
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("keys out of order", result.stdout)
+
+    def test_automation_only_review_shape_is_rejected(self) -> None:
+        deck = deck_for(5)
+        manifest = self.manifest(deck, count=5)
+        record = manifest["slides"][2]
+        record["reviewer"] = ""
+        record["reviewer_ref"] = ""
+        record["review_method"] = "automated-geometry-only"
+        record["observation"] = ""
+        record["checks"] = {}
+        record["status"] = "automation-pass"
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("removed automation-only review shape", result.stdout)
+        self.assertIn("slide 3 overall status must be pass", result.stdout)
+
+    def test_every_slide_records_its_full_check_tuple(self) -> None:
+        deck = deck_for(5)
+        manifest = self.manifest(deck, count=5)
+        manifest["slides"][2]["checks"] = {}
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("slide 3 (all review scope) checks are wrong", result.stdout)
 
     def test_manifest_cannot_downscope_a_detected_image_change_to_text(self) -> None:
         deck = deck_for(5)
@@ -569,12 +756,50 @@ class VisualReviewTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("change_type improperly narrows the detected source change", result.stdout)
 
-    def test_quick_routes_only_critical_slides_to_ai(self) -> None:
+    def test_quick_routes_every_slide_to_ai_and_escalates_critical_ones(self) -> None:
+        # Replaces test_quick_routes_only_critical_slides_to_ai. Do not "restore" that test: the
+        # contract it asserted was unsatisfiable, not merely stricter. render_slides.js emits
+        # reviewer "" / status "pending" / a full check tuple for every slide, and this validator
+        # unconditionally requires reviewer + vision-batched-full-size + all checks pass for every
+        # slide. Only batched slides ever receive a reviewer, so a slide left out of the review set
+        # could reach "pass" only by fabricating a reviewer name and check verdicts for a capture
+        # nobody opened - the exact defect (5 of 7 slides shipped unreviewed) this suite guards.
         deck = deck_for(5)
         manifest = self.manifest(deck, count=5)
-        self.assertEqual([batch["slides"] for batch in manifest["review_batches"]], [[1, 5]])
+        # Quick mode reviews every slide at the normal profile; there is no automation-only
+        # escape hatch, so no slide can reach a passing status without a real vision review.
+        self.assertEqual([batch["slides"] for batch in manifest["review_batches"]], [[1, 2, 3, 4], [5]])
+        self.assertEqual(manifest["render_run"]["review_slides"], [1, 2, 3, 4, 5])
+        # Cover and closing escalate to every profile; the interior slides stay at normal only.
+        self.assertEqual(manifest["slides"][0]["required_ai_profiles"], list(BASE_PROFILES))
+        self.assertEqual(manifest["slides"][4]["required_ai_profiles"], list(BASE_PROFILES))
+        for index in (1, 2, 3):
+            self.assertEqual(manifest["slides"][index]["required_ai_profiles"], ["normal"])
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_quick_slide_cannot_pass_without_being_routed_to_a_reviewer(self) -> None:
+        # This is the regression the removed quick-mode routing allowed: an interior slide that
+        # ships with no vision review at all. Kept as a positive assertion so that reinstating the
+        # old "only critical slides are routed" behaviour fails loudly here.
+        deck = deck_for(5)
+        manifest = self.manifest(deck, count=5)
+        manifest["render_run"]["review_slides"] = [1, 2, 4, 5]
+        manifest["review_batches"] = [{
+            "id": "batch-01",
+            "slides": [1, 2, 4, 5],
+            "capture_profiles": {
+                str(number): manifest["slides"][number - 1]["required_ai_profiles"]
+                for number in (1, 2, 4, 5)
+            },
+            "status": "pending",
+        }]
+        for number in (1, 2, 4, 5):
+            manifest["slides"][number - 1]["review_batch_id"] = "batch-01"
+        manifest["slides"][2]["review_batch_id"] = ""
+        result = self.validate(deck, manifest)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("every refreshed AI-routed slide must appear in render_run review_slides", result.stdout)
 
     def test_full_review_cannot_pass_with_failed_completion(self) -> None:
         deck = deck_for(4)
@@ -587,7 +812,11 @@ class VisualReviewTests(unittest.TestCase):
     def test_quick_routes_identity_slide_and_accepts_grounded_review(self) -> None:
         deck = deck_for(5, identity=3)
         manifest = self.manifest(deck, count=5, identity=3)
-        self.assertEqual([batch["slides"] for batch in manifest["review_batches"]], [[1, 3, 5]])
+        # Batching covers all five slides, not just [1, 3, 5]: every slide is routed now, so the
+        # identity slide is no longer distinguished by *whether* it is reviewed, only by the extra
+        # identity check it carries. Reverting this to [[1, 3, 5]] would require the unsatisfiable
+        # routing described on test_quick_routes_every_slide_to_ai_and_escalates_critical_ones.
+        self.assertEqual([batch["slides"] for batch in manifest["review_batches"]], [[1, 2, 3, 4], [5]])
         self.assertEqual(manifest["slides"][2]["required_ai_profiles"], ["normal"])
         self.assertIn("identity", manifest["slides"][2]["checks"])
         result = self.validate(deck, manifest)
@@ -604,13 +833,19 @@ class VisualReviewTests(unittest.TestCase):
             scope="text",
             identity=3,
         )
-        manifest["render_run"]["review_slides"] = [3]
+        # Slide 2 is the refreshed slide and must be reviewed; slide 3 is pulled in because its
+        # identity review is still pending, and it keeps its original image-scoped identity work
+        # even though this run only changed text. Slide 2 was absent from this review set before
+        # the routing fix, which was only legal while a refreshed slide could opt out of vision
+        # review entirely - see test_quick_routes_every_slide_to_ai_and_escalates_critical_ones.
+        manifest["render_run"]["review_slides"] = [2, 3]
         manifest["review_batches"] = [{
             "id": "batch-01",
-            "slides": [3],
-            "capture_profiles": {"3": ["normal"]},
+            "slides": [2, 3],
+            "capture_profiles": {"2": ["normal"], "3": ["normal"]},
             "status": "pending",
         }]
+        manifest["slides"][1]["review_batch_id"] = "batch-01"
         manifest["slides"][2]["review_batch_id"] = "batch-01"
         result = self.validate(deck, manifest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

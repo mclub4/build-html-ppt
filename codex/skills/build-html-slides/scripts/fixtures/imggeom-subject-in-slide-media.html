@@ -1,0 +1,31 @@
+<meta charset="utf-8">
+<title>Subject photo inside slide-media</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #10131a; }
+  .stage { position: relative; width: 1280px; height: 720px; overflow: hidden; }
+  .slide {
+    position: absolute; inset: 0; display: flex; visibility: hidden;
+    overflow: hidden; isolation: isolate; background: #10131a;
+  }
+  .slide.active { visibility: visible; }
+  .slide-media { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+  .slide-content {
+    position: relative; z-index: 2; display: flex; flex: 1;
+    min-width: 0; min-height: 0; padding: 56px 64px; gap: 40px;
+  }
+  .card {
+    position: relative; border: 1px solid #2c3444; border-radius: 18px;
+    background: #171c26; display: flex; align-items: center; justify-content: center;
+  }
+</style>
+<div class="stage">
+  <section class="slide active" data-title="Subject photo inside slide-media">
+    <div class="slide-media">
+      <img src="imggeom-subject-900x900.png" alt="Flagship handset" data-media-purpose="subject"
+           style="position:absolute;left:80px;top:80px;width:120px;height:120px;object-fit:contain">
+    </div>
+    <div class="slide-content">
+      <h1 style="color:#e8eef8;font:600 44px/1.2 sans-serif">Product overview</h1>
+    </div>
+  </section>
+</div>

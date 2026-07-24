@@ -7,6 +7,8 @@ from collections import defaultdict
 from pathlib import Path
 from urllib.parse import unquote, urlsplit, urlunsplit
 
+import deck_html
+
 
 def fail(message: str) -> None:
     print(f"ERROR: {message}")
@@ -21,8 +23,11 @@ if not deck_path.is_file():
     fail(f"deck not found: {deck_path}")
 
 html = deck_path.read_text(encoding="utf-8")
-slides = re.findall(r'<section\b[^>]*class=["\'][^"\']*\bslide\b[^"\']*["\'][^>]*>[\s\S]*?</section>', html, re.I)
-if not slides:
+# Slide bodies come from the parser: a non-greedy `</section>` regex stops at the
+# first nested close tag, which quietly hid every asset after a nested <section>.
+index = deck_html.parse(html)
+slide_elements = index.slides()
+if not slide_elements:
     fail("no slides found")
 
 URL_RE = re.compile(r'url\(\s*(?:"([^"]*)"|\'([^\']*)\'|([^\)"\']+))\s*\)', re.I)
@@ -75,28 +80,24 @@ def record(asset: str, slide_number: int, repeat_token: str, role: str, origin: 
     labels[key].add(label)
 
 
-for index, slide in enumerate(slides, 1):
-    opening = slide.split(">", 1)[0] + ">"
-    for tag in re.findall(r'<(?:img|source|image|video)\b[^>]+>', slide, re.I):
-        repeat_match = re.search(r'\bdata-repeat-ok=["\']([^"\']+)["\']', tag, re.I)
-        role_match = re.search(r'\bdata-image-role=["\']([^"\']+)["\']', tag, re.I)
-        repeat_token = repeat_match.group(1) if repeat_match else ""
-        role = role_match.group(1) if role_match else ""
-        for attribute in ("src", "href", "poster"):
-            match = re.search(rf'\b{attribute}=["\']([^"\']+)', tag, re.I)
-            if match:
-                record(match.group(1), index, repeat_token, role, f"<{attribute}> element")
-        srcset = re.search(r'\bsrcset=["\']([^"\']+)', tag, re.I)
-        if srcset:
-            for candidate in srcset.group(1).split(","):
-                asset = candidate.strip().split()[0]
+for slide_number, slide in enumerate(slide_elements, 1):
+    for element in [slide, *index.descendants(slide)]:
+        if element.inert:
+            continue
+        if element.tag in {"img", "source", "image", "video"}:
+            repeat_token = element.attr("data-repeat-ok")
+            role = element.attr("data-image-role")
+            for attribute in ("src", "href", "poster"):
+                value = element.attr(attribute).strip()
+                if value:
+                    record(value, slide_number, repeat_token, role, f"<{attribute}> element")
+            for candidate in element.attr("srcset").split(","):
+                asset = candidate.strip().split(" ")[0].strip()
                 if asset:
-                    record(asset, index, repeat_token, role, "srcset")
+                    record(asset, slide_number, repeat_token, role, "srcset")
 
-    for style_match in re.finditer(r'<[^>]+\bstyle=(["\'])(.*?)\1[^>]*>', slide, re.I | re.S):
-        tag = style_match.group(0)
-        for asset in css_urls(style_match.group(2)):
-            record(asset, index, "", "background", "inline style")
+        for asset in css_urls(element.attr("style")):
+            record(asset, slide_number, "", "background", "inline style")
 
 # Raster slide imagery in global CSS is prohibited because ownership, layering, alt text,
 # and cross-slide reuse cannot be determined reliably without a full browser CSS engine.

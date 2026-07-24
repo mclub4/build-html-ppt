@@ -401,7 +401,7 @@ claude plugin validate .claude-plugin/marketplace.json --strict
 ./scripts/package-release.sh
 ```
 
-생성 파일:
+생성 파일입니다. `dist/`는 `.gitignore` 대상이라 저장소에는 포함되지 않으며, 아래 파일을 직접 만들지 않고 받으려면 [GitHub Releases](https://github.com/mclub4/build-html-ppt/releases)의 첨부 파일을 내려받으세요.
 
 - `BUILD-HTML-SLIDES-CODEX-BUNDLE-vX.Y.Z.zip`
 - `BUILD-HTML-SLIDES-CODEX-PLUGIN-vX.Y.Z.zip`

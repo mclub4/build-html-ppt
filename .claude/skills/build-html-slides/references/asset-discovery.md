@@ -1,6 +1,6 @@
 # Asset Discovery
 
-Use this reference when a deck needs photographs, illustrations, screenshots, wallpapers, historical material, fan work, memes, or visual evidence. Official assets remain the first pass, not the final boundary of discovery. For fan-art-heavy or "as many as possible" requests, read `fan-art-budget.md` first; its planning targets guide the breadth of discovery without acting as forced limits.
+Use this reference when a deck needs photographs, illustrations, screenshots, wallpapers, historical material, fan work, memes, or visual evidence. Official assets remain the first pass, not the final boundary of discovery. For fan-art-heavy or "as many as possible" requests, read `fan-art-budget.md` first; its ceilings are binding.
 
 ## Search Broadly By Topic
 
@@ -29,7 +29,7 @@ Use general web and image search as routing layers. Add site-specific searches w
 
 ## Selection And Provenance
 
-1. Collect more candidates than the deck needs, then select for narrative role, crop safety, resolution, visual distinction, and consistency. Inspect the downloaded original at full size; do not select search thumbnails or assume that a WebP extension, large canvas, or successful download implies sharp source detail.
+1. Collect a bounded surplus of candidates — roughly 1.5× the number of slots, never an open-ended crawl — then select for narrative role, crop safety, resolution, visual distinction, and consistency. Inspect at full size the originals you intend to place; do not select search thumbnails or assume that a WebP extension, large canvas, or successful download implies sharp source detail. Once the roster crosses the numeric trigger in `high-volume-media-workflow.md`, stop inspecting downloads individually and switch to the batch contact sheet. In Quick Draft, the caps in `quick-draft-authoring.md` override this step: at most 12 downloads, full-size inspection only of the images being placed.
 2. Prefer the original downloadable file over screenshots, thumbnails, or hotlinked derivatives.
 3. In strict mode, record the original item URL, creator/account, source kind, verification time, local hash, and required credit. In bounded internal/private fan-art mode, the discovery URL, visible creator/account, `origin_status: discovery-only`, verification time, local hash, and visible credit are sufficient.
 4. Preserve signatures and watermarks. Do not remove creator marks to make a slide cleaner.
@@ -40,4 +40,4 @@ Use general web and image search as routing layers. Add site-specific searches w
 
 Never turn an unsuccessful search into a finished-looking placeholder card. `PLACE NOTE`, image-here labels, empty frames, dummy thumbnails, and generic geometric stand-ins are authoring artifacts and cannot appear in either delivered mode. When no suitable asset is available, choose one of three honest outcomes: continue within the agreed discovery budget, generate an appropriate non-factual illustration when allowed, or redesign the slide so it no longer promises a real image. If the requested factual subject image is essential and none can be secured, disclose that limitation before delivery instead of concealing it with decorative fallback art.
 
-Normally stop searching when each important visual role has at least one strong candidate and the selected set is varied enough that one image is not carrying the whole deck. At the upper planning target, assess coverage, quality, and the time still needed for implementation and validation. Continue when more discovery would materially improve the result and the schedule remains reasonable. If total work is likely to exceed 90 minutes for a 20-25 slide deck, ask whether to keep searching or finish with the current set.
+Stop searching when each important visual role has at least one strong candidate and the selected set is varied enough that one image is not carrying the whole deck. Discovery is bounded by the delivery ceiling in `validation-contract.md` — 70 minutes for a 20-25 slide Full Validation deck, 15 for Quick Draft — with `fan-art-budget.md` allocating 20 of those minutes to search on image-heavy work. When the ceiling approaches, freeze the set and deliver with a stated limitation instead of asking for more time.

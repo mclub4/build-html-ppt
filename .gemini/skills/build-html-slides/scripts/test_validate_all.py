@@ -201,6 +201,111 @@ class ValidateAllTests(unittest.TestCase):
             self.assertIn("presenter notes", structure_labels)
             self.assertNotIn("source locality", structure_labels)
             self.assertNotIn("browser interaction and print E2E", structure_labels)
+            for labels in (text_labels, image_labels, structure_labels):
+                self.assertIn("slide variety", labels)
+            self.assertNotIn("slide variety", style_labels)
+            self.assertNotIn("slide variety", navigation_labels)
+
+    def test_slide_variety_runs_once_per_deck_not_once_per_slide(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            deck.write_text("<!doctype html><html><body></body></html>", encoding="utf-8")
+            commands = deterministic_commands(
+                deck, root / "deck-notes.md", root / "sources.json", "all"
+            )
+            variety = [command for label, command in commands if label == "slide variety"]
+            self.assertEqual(len(variety), 1)
+            self.assertEqual(variety[0][-1], str(deck))
+
+    def test_quick_mode_exits_before_every_phase_not_only_prepare(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            deck.write_text(TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+            review = root / "review"
+            for phase in ("prepare", "verify", "finalize-prepare", "finalize-verify"):
+                result = subprocess.run(
+                    [
+                        "python3", str(ENTRYPOINT), str(deck), "--phase", phase, "--mode", "quick",
+                        "--review-dir", str(review),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, phase + result.stdout + result.stderr)
+                self.assertIn("Quick Draft is creation-only", result.stdout)
+                self.assertNotIn("RUN:", result.stdout)
+                self.assertFalse(review.exists(), phase)
+
+    def test_status_reports_a_corrupt_manifest_without_a_traceback(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            deck.write_text(TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+            review = root / "review"
+            review.mkdir()
+            (review / "review.json").write_text('{"mode": "full", "slides": [', encoding="utf-8")
+            result = subprocess.run(
+                ["python3", str(ENTRYPOINT), str(deck), "--status", "--review-dir", str(review)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+            self.assertIn("review manifest is unusable", result.stdout)
+            self.assertIn("not valid JSON", result.stdout)
+            self.assertIn("--phase prepare --mode full", result.stdout)
+
+    def test_status_reports_budget_and_exact_check_keys_for_pending_slides(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = self.portable_deck(root, "<h2>Portable validation</h2>")
+            notes_path = root / "deck-notes.md"
+            notes_path.write_text(notes(), encoding="utf-8")
+            review = root / "review"
+            prepare = subprocess.run(
+                [
+                    "python3", str(ENTRYPOINT), str(deck), "--phase", "prepare", "--mode", "full",
+                    "--notes", str(notes_path), "--review-dir", str(review),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(prepare.returncode, 0, prepare.stdout + prepare.stderr)
+            status = subprocess.run(
+                ["python3", str(ENTRYPOINT), str(deck), "--status", "--review-dir", str(review)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+            self.assertIn("CHECKS: slide 1 requires exactly", status.stdout)
+            self.assertIn('"contrast"', status.stdout)
+            self.assertIn("BUDGET: full validation elapsed", status.stdout)
+            self.assertIn("of 70 min", status.stdout)
+            self.assertIn("BUDGET: next step 'primary-review' is budgeted at 25 min", status.stdout)
+
+    def test_status_without_a_workspace_still_states_the_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            deck.write_text(TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+            result = subprocess.run(
+                [
+                    "python3", str(ENTRYPOINT), str(deck), "--status",
+                    "--review-dir", str(root / "review"),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("STATUS: no review manifest", result.stdout)
+            self.assertIn("budgeted at 70 min", result.stdout)
 
     def test_failed_slide_scope_uses_only_slide_specific_failures(self) -> None:
         manifest = {

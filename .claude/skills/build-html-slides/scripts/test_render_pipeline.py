@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -40,10 +42,10 @@ class RenderPipelineTests(unittest.TestCase):
         for slide in manifest["slides"]:
             if slide["slide"] not in reviewed:
                 continue
-            if not slide["required_ai_profiles"]:
-                self.assertEqual(slide["review_method"], "automated-geometry-only")
-                self.assertEqual(slide["status"], "automation-pass")
-                continue
+            self.assertTrue(
+                slide["required_ai_profiles"],
+                f"slide {slide['slide']} was rendered without any recorded visual review",
+            )
             group = min((slide["slide"] - 1) // group_size, reviewer_count - 1)
             slide["reviewer"] = f"render-smoke-{group + 1}"
             slide["reviewer_ref"] = f"agent-render-smoke-{group + 1:03}"
@@ -63,6 +65,17 @@ class RenderPipelineTests(unittest.TestCase):
             ]
             slide["status"] = "pass"
 
+    @staticmethod
+    def png_size(path: Path) -> str:
+        header = path.read_bytes()[:24]
+        if header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
+            raise AssertionError(f"not a PNG: {path}")
+        return f"{int.from_bytes(header[16:20], 'big')}x{int.from_bytes(header[20:24], 'big')}"
+
+    @staticmethod
+    def sha256(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
     def validate(self, deck: Path, manifest_path: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             ["python3", str(VALIDATOR), str(deck), str(manifest_path)],
@@ -71,7 +84,7 @@ class RenderPipelineTests(unittest.TestCase):
             check=False,
         )
 
-    def create_webps(self, *targets: tuple[Path, str] | tuple[Path, str, int]) -> None:
+    def create_webps(self, *targets: tuple[Path, str] | tuple[Path, str, int], split: bool = False) -> None:
         script = r"""
 const fs = require('fs');
 const { loadPlaywright } = require(process.argv[2]);
@@ -81,17 +94,24 @@ const { chromium } = loadPlaywright();
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   for (const target of targets) {
-    const data = await page.evaluate(({ color, size }) => {
+    const data = await page.evaluate(({ color, size, split }) => {
       const canvas = document.createElement('canvas');
       canvas.width = size || 800;
       canvas.height = size || 800;
       const context = canvas.getContext('2d');
       context.fillStyle = color;
       context.fillRect(0, 0, canvas.width, canvas.height);
-      context.fillStyle = '#fff';
-      context.fillRect(280, 280, 240, 240);
+      if (split) {
+        // Half the frame is the flat colour and half is white, so text laid across the seam
+        // samples both passing and failing backdrops: the undecidable case that must defer.
+        context.fillStyle = '#ffffff';
+        context.fillRect(canvas.width * 0.25, 0, canvas.width * 0.75, canvas.height);
+      } else {
+        context.fillStyle = '#fff';
+        context.fillRect(280, 280, 240, 240);
+      }
       return canvas.toDataURL('image/webp', 0.82).split(',')[1];
-    }, { color: target.color, size: target.size });
+    }, { color: target.color, size: target.size, split: target.split });
     fs.writeFileSync(target.path, Buffer.from(data, 'base64'));
   }
   await browser.close();
@@ -102,6 +122,7 @@ const { chromium } = loadPlaywright();
                 "path": str(target[0]),
                 "color": target[1],
                 "size": target[2] if len(target) == 3 else 800,
+                "split": split,
             }
             for target in targets
         ]
@@ -163,7 +184,7 @@ const { chromium } = loadPlaywright();
             root = Path(temporary)
             assets = root / "assets"
             assets.mkdir()
-            self.create_webps((assets / "background.webp", "#888888", 2400))
+            self.create_webps((assets / "background.webp", "#888888", 2400), split=True)
             deck = root / "deck.html"
             html = TEMPLATE.read_text(encoding="utf-8").replace(
                 '<div class="slide-media" aria-hidden="true"></div>',
@@ -187,6 +208,14 @@ const { chromium } = loadPlaywright();
             manifest = json.loads((review / "review.json").read_text(encoding="utf-8"))
             warnings = manifest["automation_gate"]["warnings"]
             self.assertTrue(any(warning["check"] == "contrast" for warning in warnings), warnings)
+            # A warning is enough to earn a boundary overlay capture, not only a hard failure.
+            warned = {warning["slide"] for warning in warnings}
+            for record in manifest["slides"]:
+                if record["slide"] not in warned:
+                    continue
+                self.assertTrue(record["debug_captures"], record["slide"])
+                for relative in record["debug_captures"].values():
+                    self.assertTrue((review / relative).is_file(), relative)
 
     def test_manifest_records_actual_bundled_font_usage(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -639,7 +668,7 @@ const { chromium } = loadPlaywright();
             )
             review_dir = root / "review"
             render = subprocess.run(
-                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "quick"],
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "full"],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -649,7 +678,8 @@ const { chromium } = loadPlaywright();
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.complete_rendered_reviews(manifest)
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-            self.assertEqual(self.validate(deck, manifest_path).returncode, 0)
+            first = self.validate(deck, manifest_path)
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
 
             self.create_webps((image, "#882255"))
             stale = self.validate(deck, manifest_path)
@@ -1197,8 +1227,9 @@ const { chromium } = loadPlaywright();
             self.assertEqual(fixed.returncode, 0, fixed.stderr)
             manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["render_run"]["rendered_slides"], [2])
-            self.assertEqual(manifest["render_run"]["review_slides"], [1, 3])
-            self.assertEqual([batch["slides"] for batch in manifest["review_batches"]], [[1, 3]])
+            # The re-rendered slide is reviewed as well: a rendered slide never ships unreviewed.
+            self.assertEqual(manifest["render_run"]["review_slides"], [1, 2, 3])
+            self.assertEqual([batch["slides"] for batch in manifest["review_batches"]], [[1, 2, 3]])
             self.complete_rendered_reviews(manifest)
             manifest_path = review_dir / "review.json"
             manifest_path.write_text(f"{json.dumps(manifest, indent=2)}\n", encoding="utf-8")
@@ -1509,6 +1540,215 @@ const { chromium } = loadPlaywright();
             self.assertTrue(record["identity_required"])
             self.assertEqual(record["identity_detection"], "semantic-markup")
 
+    def test_debug_overlay_capture_accompanies_every_flagged_slide(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            assets = root / "assets"
+            assets.mkdir()
+            self.create_webps((assets / "plate.webp", "#3d5a80", 1600))
+            html = TEMPLATE.read_text(encoding="utf-8").replace(
+                "<!-- SLIDE_2_CONTENT -->",
+                '<div style="padding:80px 110px">'
+                '<h2 style="font-size:46px;margin:0 0 26px;color:#101010">Collage or overflow?</h2>'
+                '<div style="position:relative;width:520px;height:260px;border:2px solid #101010;'
+                'border-radius:14px;background:#f3f3ef;overflow:visible">'
+                '<img src="assets/plate.webp" alt="" style="position:absolute;left:-140px;top:-90px;'
+                'width:520px;height:340px;object-fit:cover;display:block"></div></div>',
+                1,
+            )
+            deck = root / "deck.html"
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "full"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 1, render.stdout + render.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            self.assertTrue(any(
+                failure["slide"] == 2 for failure in manifest["automation_gate"]["failures"]
+            ))
+
+            flagged = manifest["slides"][1]
+            self.assertEqual(sorted(flagged["debug_captures"]), sorted(manifest["viewports"]))
+            for profile, relative in flagged["debug_captures"].items():
+                self.assertEqual(relative, f"{profile}/slide-02-debug.png")
+                overlay_path = review_dir / relative
+                self.assertTrue(overlay_path.is_file(), overlay_path)
+                expected = manifest["viewports"][profile]["screenshot"]
+                self.assertEqual(self.png_size(overlay_path), expected)
+                overlay = flagged["captures"][profile]["debug_overlay"]
+                self.assertEqual(overlay["path"], relative)
+                self.assertEqual(overlay["sha256"], self.sha256(overlay_path))
+                self.assertGreater(overlay["measured_issues"], 0)
+                self.assertIn(f"slide 2 · {profile}", overlay["caption"])
+                # The reviewer must be able to see who owns what: card frames, image frames,
+                # per-line text ink, the reserved nav zone, and the escaping region itself.
+                for kind in ("container", "image", "text-line", "nav-zone", "overflow"):
+                    self.assertIn(kind, overlay["region_counts"], overlay["region_counts"])
+
+            clean = manifest["slides"][0]
+            self.assertEqual(clean["debug_captures"], {})
+            self.assertNotIn("debug_overlay", clean["captures"]["normal"])
+            self.assertFalse(list((review_dir / "normal").glob("slide-01-debug.png")))
+
+    def test_content_security_policy_deck_still_renders_with_motion_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            template = TEMPLATE.read_text(encoding="utf-8")
+            start = template.index("<style>")
+            end = template.index("</style>") + len("</style>")
+            stylesheet = template[start + len("<style>"):end - len("</style>")]
+            stylesheet += (
+                "\n.pad{padding:110px 120px;color:#101010}"
+                "\n.pad h1{font-size:70px;margin:0}"
+                "\n.pad h2{font-size:48px;margin:0 0 20px}"
+                "\n.pad p{font-size:24px;margin:0}\n"
+            )
+            (root / "deck.css").write_text(stylesheet, encoding="utf-8")
+            html = template[:start] + '<link rel="stylesheet" href="deck.css">' + template[end:]
+            html = html.replace(
+                "<head>",
+                '<head>\n  <meta http-equiv="Content-Security-Policy" content="default-src \'self\' '
+                "data:; script-src 'unsafe-inline'; style-src 'self'\">",
+                1,
+            )
+            for number, body in (
+                (1, '<div class="pad"><h1>Policy deck cover</h1></div>'),
+                (2, '<div class="pad"><h2>Second slide</h2><p>Body copy under a strict policy.</p></div>'),
+                (3, '<div class="pad"><h2>Closing</h2></div>'),
+            ):
+                html = html.replace(f"<!-- SLIDE_{number}_CONTENT -->", body, 1)
+            deck = root / "deck.html"
+            deck.write_text(html, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "full"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            # An inline <style> is refused by this policy, so the renderer must fall back to a
+            # constructed stylesheet instead of claiming motion_disabled it never applied.
+            self.assertEqual(render.returncode, 0, render.stdout + render.stderr)
+            self.assertIn("constructed-stylesheet", render.stderr)
+            manifest = json.loads((review_dir / "review.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["automation_gate"]["failures"], [])
+            for record in manifest["slides"]:
+                for capture in record["captures"].values():
+                    self.assertIs(capture["motion_disabled"], True)
+                self.assertTrue(record["required_ai_profiles"])
+
+    def test_change_scope_attribution_matches_the_edited_material(self) -> None:
+        scoped_marker = '<style data-slide-scope="3"></style>'
+        base = TEMPLATE.read_text(encoding="utf-8").replace("</head>", f"  {scoped_marker}\n</head>", 1)
+        base = base.replace(
+            "<!-- SLIDE_1_CONTENT -->",
+            '<div class="pad"><h1 class="hero">Cover story</h1></div>',
+            1,
+        ).replace(
+            "<!-- SLIDE_2_CONTENT -->",
+            '<div class="pad"><h2 class="metric">Baseline</h2><p class="note">Second slide body.</p></div>',
+            1,
+        ).replace(
+            "<!-- SLIDE_3_CONTENT -->",
+            '<div class="pad"><h2 class="closing">Closing</h2></div>',
+            1,
+        )
+
+        def with_rule(source: str, rule: str) -> str:
+            return source.replace("  </style>", f"  {rule}\n  </style>", 1)
+
+        def reorder(source: str) -> str:
+            blocks = re.findall(r'<section class="slide[^"]*"[^>]*>.*?</section>', source, re.DOTALL)
+            self.assertEqual(len(blocks), 3, blocks)
+            swapped = source.replace(blocks[1], "\x00", 1).replace(blocks[2], blocks[1], 1)
+            return swapped.replace("\x00", blocks[2], 1)
+
+        cases = [
+            (
+                "copy-only edit",
+                lambda source: source.replace("Second slide body.", "Second slide body, revised."),
+                {"detected": "text", "impact": "direct", "navigation_changed": False, "changed_slides": [2]},
+            ),
+            (
+                "slide-local CSS",
+                lambda source: with_rule(source, ".metric{letter-spacing:0.4px}"),
+                {"detected": "all", "impact": "direct", "navigation_changed": False, "changed_slides": [2]},
+            ),
+            (
+                "data-slide-scope CSS",
+                lambda source: source.replace(scoped_marker, '<style data-slide-scope="3">.closing{opacity:0.99}</style>'),
+                {"detected": "all", "impact": "direct", "navigation_changed": False, "changed_slides": [3]},
+            ),
+            (
+                "multi-slide CSS rule",
+                lambda source: with_rule(source, ".metric,.closing{text-transform:none}"),
+                {"detected": "all", "impact": "direct", "navigation_changed": False, "changed_slides": [2, 3]},
+            ),
+            (
+                # A rule matching nothing today must still be attributed somewhere. Dropping it
+                # from every fingerprint reports a real edit as "no change" and reuses stale
+                # captures as PASS evidence.
+                "inert CSS rule",
+                lambda source: with_rule(source, ".not-in-this-deck{color:#ff0000}"),
+                {"detected": "all", "impact": "full", "navigation_changed": False, "changed_slides": []},
+            ),
+            (
+                "shared theme CSS",
+                lambda source: with_rule(source, ".slide-content{letter-spacing:0.1px}"),
+                {"detected": "all", "impact": "full", "navigation_changed": False, "changed_slides": []},
+            ),
+            (
+                "structural reorder",
+                reorder,
+                {"detected": "all", "impact": "neighbors", "navigation_changed": False, "changed_slides": [2, 3]},
+            ),
+            (
+                "runtime change",
+                lambda source: source.replace("const STAGE_WIDTH = 1280;", "const STAGE_WIDTH = 1280; /* revised */"),
+                {"detected": "all", "impact": "full", "navigation_changed": True, "changed_slides": []},
+            ),
+        ]
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "deck.html"
+            deck.write_text(base, encoding="utf-8")
+            review_dir = root / "review"
+            render = subprocess.run(
+                ["node", str(RENDERER), str(deck), str(review_dir), "--mode", "full"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(render.returncode, 0, render.stdout + render.stderr)
+
+            for name, mutate, expected in cases:
+                with self.subTest(change=name):
+                    mutated = mutate(base)
+                    self.assertNotEqual(mutated, base, name)
+                    deck.write_text(mutated, encoding="utf-8")
+                    classify = subprocess.run(
+                        [
+                            "node", str(RENDERER), "--classify-change", str(deck), str(review_dir),
+                            "all", "full", "standard", "false",
+                        ],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(classify.returncode, 0, classify.stderr)
+                    report = json.loads(classify.stdout)
+                    self.assertEqual(
+                        {key: report[key] for key in expected},
+                        expected,
+                        f"{name}: {classify.stdout}",
+                    )
+                    deck.write_text(base, encoding="utf-8")
+
     def test_default_workspace_stays_under_agent_home_and_can_be_cleaned(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -1518,8 +1758,12 @@ const { chromium } = loadPlaywright();
             deck.write_text(TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
             deck_alias = root / "deck-alias.html"
             deck_alias.symlink_to(deck)
-            codex_home = root / "codex-home"
-            env = {**os.environ, "CODEX_HOME": str(codex_home)}
+            # BUILD_HTML_SLIDES_AGENT_HOME is the agent-neutral override, so this assertion holds
+            # identically in codex/, .claude/, .gemini/ and plugins/ copies of the suite. Asserting
+            # CODEX_HOME instead made the mirrored suites fail purely because of their own path.
+            agent_home = root / "agent-home"
+            env = {**os.environ, "BUILD_HTML_SLIDES_AGENT_HOME": str(agent_home)}
+            env.pop("BUILD_HTML_SLIDES_WORKSPACE_ROOT", None)
 
             review_lookup = subprocess.run(
                 ["node", str(RENDERER), "--review-dir", str(deck)],
@@ -1530,7 +1774,7 @@ const { chromium } = loadPlaywright();
             )
             self.assertEqual(review_lookup.returncode, 0, review_lookup.stderr)
             review_dir = Path(review_lookup.stdout.strip())
-            self.assertTrue(str(review_dir).startswith(str(codex_home)))
+            self.assertTrue(review_dir.is_relative_to(agent_home), review_dir)
             self.assertEqual(review_dir.name, "review")
             alias_lookup = subprocess.run(
                 ["node", str(RENDERER), "--review-dir", str(deck_alias)],
@@ -1543,7 +1787,7 @@ const { chromium } = loadPlaywright();
             self.assertEqual(Path(alias_lookup.stdout.strip()), review_dir)
 
             render = subprocess.run(
-                ["node", str(RENDERER), str(deck), "--mode", "quick"],
+                ["node", str(RENDERER), str(deck), "--mode", "full"],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -1585,7 +1829,14 @@ const { chromium } = loadPlaywright();
             deck = root / "claude-deck.html"
             deck.write_text(TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
             claude_home = root / "claude-home"
-            env = {key: value for key, value in os.environ.items() if key != "CODEX_HOME"}
+            env = {
+                key: value for key, value in os.environ.items()
+                if key not in {
+                    "CODEX_HOME",
+                    "BUILD_HTML_SLIDES_AGENT_HOME",
+                    "BUILD_HTML_SLIDES_WORKSPACE_ROOT",
+                }
+            }
             env["CLAUDE_CONFIG_DIR"] = str(claude_home)
 
             lookup = subprocess.run(
@@ -1606,7 +1857,13 @@ const { chromium } = loadPlaywright();
             gemini_home = root / "gemini-home"
             env = {
                 key: value for key, value in os.environ.items()
-                if key not in {"CODEX_HOME", "CLAUDE_CONFIG_DIR", "CLAUDE_HOME"}
+                if key not in {
+                    "CODEX_HOME",
+                    "CLAUDE_CONFIG_DIR",
+                    "CLAUDE_HOME",
+                    "BUILD_HTML_SLIDES_AGENT_HOME",
+                    "BUILD_HTML_SLIDES_WORKSPACE_ROOT",
+                }
             }
             env["GEMINI_HOME"] = str(gemini_home)
 

@@ -42,6 +42,49 @@ const MOTION_OVERRIDE = `
     transition: none !important;
   }
 `;
+// Measurement scripts are compiled once per page (CSP-safe, see installPageRuntime) and then
+// invoked per slide/profile by manifest field name.
+const MEASURE_NAMESPACE = '__buildHtmlSlidesMeasure';
+const MEASURE_SCRIPTS = {
+  text_geometry: 'measure_text_bounds.js',
+  contrast_geometry: 'measure_contrast.js',
+  container_density: 'measure_container_density.js',
+  control_geometry: 'measure_geometry.js',
+  image_geometry: 'measure_image_geometry.js',
+};
+const MEASURE_FIELD_BY_CHECK = {
+  text_bounds: 'text_geometry',
+  contrast: 'contrast_geometry',
+  container_density: 'container_density',
+  controls: 'control_geometry',
+  image_geometry: 'image_geometry',
+  font_integrity: 'font_integrity',
+};
+// Debug overlay geometry thresholds. Every value is a deterministic measurement input, never a
+// reviewer judgement call.
+const DEBUG_OVERLAY_CONFIG = {
+  minContainerAreaRatio: 0.012,
+  maxContainers: 48,
+  maxTextLines: 320,
+  maxEntries: 900,
+  overflowTolerance: 1.5,
+  minOverflowArea: 24,
+  minCollisionArea: 24,
+  backdropAreaRatio: 0.85,
+  navPadding: 14,
+  navExclusion: { width: 280, height: 84 },
+  palette: {
+    slide: { stroke: '#ffffff', fill: 'transparent', width: 1, style: 'dashed', ink: '#101010' },
+    container: { stroke: '#00e5ff', fill: 'rgba(0,229,255,0.06)', width: 2, style: 'solid', ink: '#00181c' },
+    image: { stroke: '#ff2fd0', fill: 'rgba(255,47,208,0.06)', width: 2, style: 'solid', ink: '#1c0016' },
+    'text-line': { stroke: '#76ff03', fill: 'transparent', width: 1, style: 'solid', ink: '#0d1a00' },
+    'nav-zone': { stroke: '#ffab00', fill: 'rgba(255,171,0,0.12)', width: 2, style: 'dashed', ink: '#1a1100' },
+    'nav-controls': { stroke: '#ffab00', fill: 'transparent', width: 2, style: 'solid', ink: '#1a1100' },
+    warning: { stroke: '#ffab00', fill: 'rgba(255,171,0,0.30)', width: 2, style: 'solid', ink: '#1a1100' },
+    issue: { stroke: '#ff1744', fill: 'rgba(255,23,68,0.38)', width: 3, style: 'solid', ink: '#ffffff' },
+    default: { stroke: '#d0d0d0', fill: 'transparent', width: 1, style: 'solid', ink: '#101010' },
+  },
+};
 
 function usage(message) {
   if (message) process.stderr.write(`ERROR: ${message}\n`);
@@ -449,16 +492,502 @@ async function waitForFrames(page) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
+/* eslint-disable */
+// Runs inside the page, never in Node. Installs window[namespace].debugOverlay, which draws
+// labelled, colour-coded boundary rectangles over the live pixels so a visual reviewer can see
+// which card owns which image, where each text line's ink box sits, and where the reserved
+// navigation zone is. Overflow and intersection regions are filled in a warning colour.
+//
+// Overlay entry interface (also accepted from any measure_*.js result under an `overlay` key):
+//   { kind: string, rect: {x, y, width, height} | DOMRect-like, label: string,
+//     severity: 'info' | 'warning' | 'issue' }
+// Coordinates are CSS pixels in viewport space, exactly as getBoundingClientRect() reports them.
+function debugOverlayRuntime(namespace, config) {
+  const OVERLAY_ID = '__build-html-slides-debug-overlay';
+  const round = value => Math.round(value * 10) / 10;
+  const boxOf = rect => ({
+    x: round(rect.x ?? rect.left ?? 0),
+    y: round(rect.y ?? rect.top ?? 0),
+    width: round(rect.width ?? 0),
+    height: round(rect.height ?? 0),
+  });
+  const areaOf = rect => Math.max(0, rect.width) * Math.max(0, rect.height);
+  const intersect = (left, right) => {
+    const x = Math.max(left.x, right.x);
+    const y = Math.max(left.y, right.y);
+    return {
+      x: round(x),
+      y: round(y),
+      width: round(Math.min(left.x + left.width, right.x + right.width) - x),
+      height: round(Math.min(left.y + left.height, right.y + right.height) - y),
+    };
+  };
+  const union = (left, right) => {
+    const x = Math.min(left.x, right.x);
+    const y = Math.min(left.y, right.y);
+    return {
+      x: round(x),
+      y: round(y),
+      width: round(Math.max(left.x + left.width, right.x + right.width) - x),
+      height: round(Math.max(left.y + left.height, right.y + right.height) - y),
+    };
+  };
+  // Strips of `inner` that fall outside `outer`; empty when inner is contained.
+  const outsideStrips = (inner, outer, tolerance) => {
+    const strips = [];
+    const add = (x, y, width, height) => {
+      if (width > tolerance && height > tolerance) {
+        strips.push({ x: round(x), y: round(y), width: round(width), height: round(height) });
+      }
+    };
+    const innerRight = inner.x + inner.width;
+    const innerBottom = inner.y + inner.height;
+    const outerRight = outer.x + outer.width;
+    const outerBottom = outer.y + outer.height;
+    add(inner.x, inner.y, Math.min(innerRight, outer.x) - inner.x, inner.height);
+    add(Math.max(inner.x, outerRight), inner.y, innerRight - Math.max(inner.x, outerRight), inner.height);
+    const bandLeft = Math.max(inner.x, outer.x);
+    const bandRight = Math.min(innerRight, outerRight);
+    add(bandLeft, inner.y, bandRight - bandLeft, Math.min(innerBottom, outer.y) - inner.y);
+    add(bandLeft, Math.max(inner.y, outerBottom), bandRight - bandLeft, innerBottom - Math.max(inner.y, outerBottom));
+    return strips;
+  };
+  const describe = element => {
+    if (!element || !element.tagName) return 'node';
+    const classes = (element.getAttribute('class') || '').trim().split(/\s+/).filter(Boolean).slice(0, 2);
+    return [
+      element.tagName.toLowerCase(),
+      element.id ? `#${element.id}` : '',
+      classes.length ? `.${classes.join('.')}` : '',
+    ].join('');
+  };
+  const opaqueBackground = value => {
+    const match = /^rgba?\(([^)]+)\)/.exec(value || '');
+    if (!match) return false;
+    const parts = match[1].split(',').map(part => Number.parseFloat(part));
+    return parts.length < 4 || parts[3] > 0.02;
+  };
+  const visible = element => {
+    const style = getComputedStyle(element);
+    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  };
+
+  const collect = () => {
+    const active = document.querySelector('.slide.active');
+    if (!active) return [];
+    const entries = [];
+    const slideRect = boxOf(active.getBoundingClientRect());
+    entries.push({ kind: 'slide', rect: slideRect, label: 'active slide', severity: 'info' });
+    const slideArea = Math.max(1, slideRect.width * slideRect.height);
+
+    const containerCandidates = [];
+    const imageNodes = [];
+    const mediaTags = new Set(['IMG', 'VIDEO', 'CANVAS', 'SVG', 'PICTURE', 'IMAGE']);
+    for (const element of active.querySelectorAll('*')) {
+      if (element.id === OVERLAY_ID || element.closest(`#${OVERLAY_ID}`)) continue;
+      if (!visible(element)) continue;
+      const rect = boxOf(element.getBoundingClientRect());
+      const style = getComputedStyle(element);
+      const media = mediaTags.has(element.tagName);
+      const backgroundImage = (style.backgroundImage || 'none').includes('url(');
+      if (media || backgroundImage) {
+        imageNodes.push({
+          element,
+          rect,
+          label: `${media ? 'image' : 'background'} ${describe(element)}`,
+        });
+      }
+      if (media) continue;
+      if (areaOf(rect) < slideArea * config.minContainerAreaRatio) continue;
+      const clipped = ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowX)
+        || ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowY);
+      const framed = ['Top', 'Right', 'Bottom', 'Left']
+        .some(side => Number.parseFloat(style[`border${side}Width`]) > 0)
+        || opaqueBackground(style.backgroundColor)
+        || Number.parseFloat(style.borderTopLeftRadius) > 0
+        || (style.boxShadow && style.boxShadow !== 'none')
+        || clipped;
+      if (!framed) continue;
+      containerCandidates.push({ element, rect, clipped, label: describe(element) });
+    }
+    containerCandidates.sort((left, right) => areaOf(right.rect) - areaOf(left.rect));
+    const containers = containerCandidates.slice(0, config.maxContainers);
+    const containerByElement = new Map(containers.map(item => [item.element, item]));
+    containers.forEach(item => entries.push({
+      kind: 'container', rect: item.rect, label: `card ${item.label}`, severity: 'info',
+    }));
+
+    const slideOwner = { element: active, rect: slideRect, clipped: false, label: 'active slide' };
+    const ownerOf = element => {
+      let node = element.parentElement;
+      while (node && node !== active) {
+        if (containerByElement.has(node)) return containerByElement.get(node);
+        node = node.parentElement;
+      }
+      return slideOwner;
+    };
+    for (const image of imageNodes) {
+      entries.push({ kind: 'image', rect: image.rect, label: image.label, severity: 'info' });
+      const owner = ownerOf(image.element);
+      const strips = outsideStrips(image.rect, owner.rect, config.overflowTolerance);
+      const escaped = strips.reduce((total, strip) => total + areaOf(strip), 0);
+      if (escaped < config.minOverflowArea) continue;
+      const worst = Math.round(Math.max(...strips.map(strip => Math.max(strip.width, strip.height))));
+      const label = owner.clipped
+        ? `${image.label} is cropped by ${owner.label} (${worst}px hidden)`
+        : `${image.label} escapes ${owner.label} by ${worst}px`;
+      strips.forEach((strip, index) => entries.push({
+        kind: owner.clipped ? 'clipped' : 'overflow',
+        rect: strip,
+        label: index === 0 ? label : '',
+        severity: owner.clipped ? 'warning' : 'issue',
+      }));
+    }
+
+    const textLines = [];
+    const walker = document.createTreeWalker(active, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode() && textLines.length < config.maxTextLines) {
+      const node = walker.currentNode;
+      if (!node.nodeValue || !node.nodeValue.trim()) continue;
+      const parent = node.parentElement;
+      if (!parent || parent.closest(`#${OVERLAY_ID}`) || !visible(parent)) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      let first = true;
+      for (const raw of range.getClientRects()) {
+        if (raw.width < 1 || raw.height < 1) continue;
+        const entry = {
+          kind: 'text-line',
+          rect: boxOf(raw),
+          label: first ? describe(parent) : '',
+          severity: 'info',
+        };
+        first = false;
+        textLines.push({ rect: entry.rect, element: parent });
+        entries.push(entry);
+        if (textLines.length >= config.maxTextLines) break;
+      }
+    }
+
+    // Text ink sitting on top of a discrete photo is the "price over the product shot" defect.
+    // A near-full-bleed backdrop is excluded: that is a deliberate art-direction pattern and the
+    // contrast measurement already governs it.
+    for (const image of imageNodes) {
+      if (areaOf(image.rect) >= slideArea * config.backdropAreaRatio) continue;
+      let flagged = false;
+      for (const line of textLines) {
+        if (image.element.contains(line.element)) continue;
+        const overlap = intersect(line.rect, image.rect);
+        if (areaOf(overlap) < config.minCollisionArea) continue;
+        entries.push({
+          kind: 'text-over-image',
+          rect: overlap,
+          label: flagged ? '' : `text ink over ${image.label}`,
+          severity: 'warning',
+        });
+        flagged = true;
+      }
+    }
+
+    const rootStyle = getComputedStyle(document.documentElement);
+    const declared = (name, fallback) => {
+      const value = Number.parseFloat(rootStyle.getPropertyValue(name));
+      return Number.isFinite(value) && value > 0 ? value : fallback;
+    };
+    const stageScale = active.offsetWidth ? slideRect.width / active.offsetWidth : 1;
+    const zoneWidth = declared('--nav-exclusion-width', config.navExclusion.width) * stageScale;
+    const zoneHeight = declared('--nav-exclusion-height', config.navExclusion.height) * stageScale;
+    let zone = {
+      x: round(slideRect.x + slideRect.width - zoneWidth),
+      y: round(slideRect.y + slideRect.height - zoneHeight),
+      width: round(zoneWidth),
+      height: round(zoneHeight),
+    };
+    const nav = document.querySelector('.controls, .nav');
+    const navRect = nav && visible(nav) ? boxOf(nav.getBoundingClientRect()) : null;
+    if (navRect) {
+      zone = union(zone, {
+        x: navRect.x - config.navPadding,
+        y: navRect.y - config.navPadding,
+        width: navRect.width + config.navPadding * 2,
+        height: navRect.height + config.navPadding * 2,
+      });
+      entries.push({ kind: 'nav-controls', rect: navRect, label: 'navigation controls', severity: 'info' });
+    }
+    entries.push({ kind: 'nav-zone', rect: zone, label: 'navigation exclusion zone', severity: 'info' });
+    for (const line of textLines) {
+      const overlap = intersect(line.rect, zone);
+      if (areaOf(overlap) < config.minCollisionArea) continue;
+      const onControls = navRect && areaOf(intersect(line.rect, navRect)) >= config.minCollisionArea;
+      entries.push({
+        kind: 'collision',
+        rect: overlap,
+        label: onControls ? 'text under navigation controls' : 'text inside nav exclusion zone',
+        severity: onControls ? 'issue' : 'warning',
+      });
+    }
+    return entries;
+  };
+
+  const normalize = entries => (Array.isArray(entries) ? entries : []).flatMap(entry => {
+    const rect = entry && entry.rect;
+    if (!rect) return [];
+    const box = boxOf(rect);
+    if (!Number.isFinite(box.x) || !Number.isFinite(box.y) || box.width <= 0 || box.height <= 0) return [];
+    const severity = ['info', 'warning', 'issue'].includes(entry.severity) ? entry.severity : 'info';
+    return [{
+      kind: String(entry.kind || 'measurement'),
+      rect: box,
+      label: String(entry.label || ''),
+      severity,
+    }];
+  });
+
+  const clear = () => {
+    const existing = document.getElementById(OVERLAY_ID);
+    if (existing) existing.remove();
+  };
+
+  const paletteFor = entry => {
+    if (entry.severity === 'issue') return config.palette.issue;
+    if (entry.severity === 'warning') return config.palette.warning;
+    return config.palette[entry.kind] || config.palette.default;
+  };
+
+  const render = options => {
+    clear();
+    const settings = options || {};
+    const entries = [...collect(), ...normalize(settings.entries)].slice(0, config.maxEntries);
+    const layer = document.createElement('div');
+    layer.id = OVERLAY_ID;
+    layer.setAttribute('aria-hidden', 'true');
+    layer.setAttribute('data-text-bounds-ignore', '');
+    layer.setAttribute('data-contrast-ignore', '');
+    Object.assign(layer.style, {
+      position: 'fixed',
+      left: '0px',
+      top: '0px',
+      width: '100%',
+      height: '100%',
+      margin: '0px',
+      pointerEvents: 'none',
+      zIndex: '2147483647',
+    });
+    const counts = {};
+    const chips = [];
+    for (const entry of entries) {
+      counts[entry.kind] = (counts[entry.kind] || 0) + 1;
+      const palette = paletteFor(entry);
+      const box = document.createElement('div');
+      Object.assign(box.style, {
+        position: 'absolute',
+        left: `${entry.rect.x}px`,
+        top: `${entry.rect.y}px`,
+        width: `${Math.max(0, entry.rect.width)}px`,
+        height: `${Math.max(0, entry.rect.height)}px`,
+        boxSizing: 'border-box',
+        borderWidth: `${palette.width}px`,
+        borderStyle: palette.style,
+        borderColor: palette.stroke,
+        backgroundColor: palette.fill,
+        pointerEvents: 'none',
+      });
+      if (entry.label) {
+        const chip = document.createElement('span');
+        chip.textContent = entry.label;
+        Object.assign(chip.style, {
+          position: 'absolute',
+          left: '0px',
+          top: entry.rect.y > 16 ? '-15px' : '0px',
+          maxWidth: '440px',
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          textOverflow: 'ellipsis',
+          font: '700 11px/14px ui-monospace, Menlo, Consolas, monospace',
+          letterSpacing: '0px',
+          padding: '0px 4px',
+          color: palette.ink,
+          backgroundColor: palette.stroke,
+        });
+        box.appendChild(chip);
+        chips.push({ chip, entry });
+      }
+      layer.appendChild(box);
+    }
+    const legend = document.createElement('div');
+    // The legend must sit at the top-left: under the zoom150 profile the browser page scale
+    // shrinks the visual viewport, so only the top-left corner of the layout viewport is
+    // guaranteed to be inside every captured frame.
+    Object.assign(legend.style, {
+      position: 'absolute',
+      left: '10px',
+      top: '10px',
+      padding: '8px 10px',
+      backgroundColor: 'rgba(8,8,10,0.86)',
+      color: '#f4f4f2',
+      font: '600 12px/17px ui-monospace, Menlo, Consolas, monospace',
+      borderRadius: '4px',
+      maxWidth: '460px',
+    });
+    const caption = document.createElement('div');
+    caption.textContent = String(settings.caption || 'debug overlay');
+    Object.assign(caption.style, { marginBottom: '4px', color: '#ffffff' });
+    legend.appendChild(caption);
+    for (const [kind, total] of Object.entries(counts).sort()) {
+      const row = document.createElement('div');
+      const swatch = document.createElement('span');
+      const sample = paletteFor({
+        kind,
+        severity: ['overflow', 'collision'].includes(kind)
+          ? 'issue'
+          : (['clipped', 'text-over-image'].includes(kind) ? 'warning' : 'info'),
+      });
+      Object.assign(swatch.style, {
+        display: 'inline-block',
+        width: '10px',
+        height: '10px',
+        marginRight: '6px',
+        backgroundColor: sample.stroke,
+      });
+      row.appendChild(swatch);
+      row.appendChild(document.createTextNode(`${kind} x${total}`));
+      legend.appendChild(row);
+    }
+    layer.appendChild(legend);
+    (document.body || document.documentElement).appendChild(layer);
+    // Never let the legend hide a finding label: nudge colliding chips clear of it.
+    const legendRect = legend.getBoundingClientRect();
+    let nudged = 0;
+    for (const { chip, entry } of chips) {
+      const chipRect = chip.getBoundingClientRect();
+      if (areaOf(intersect(boxOf(chipRect), boxOf(legendRect))) <= 0) continue;
+      chip.style.left = `${Math.round(legendRect.right + 6 - entry.rect.x)}px`;
+      chip.style.top = `${Math.round(legendRect.bottom + 4 + nudged * 16 - entry.rect.y)}px`;
+      nudged += 1;
+    }
+    return { entries: entries.length, counts };
+  };
+
+  const api = window[namespace] || {};
+  api.debugOverlay = { collect, render, clear };
+  window[namespace] = api;
+}
+/* eslint-enable */
+
+function measureRuntimeSource(sources) {
+  const namespace = JSON.stringify(MEASURE_NAMESPACE);
+  const registrations = Object.entries(sources).map(([field, source]) => (
+    `  api[${JSON.stringify(field)}] = function () { return (\n${source}\n); };`
+  )).join('\n');
+  return [
+    '(function () {',
+    `  var api = window[${namespace}] || {};`,
+    registrations,
+    `  window[${namespace}] = api;`,
+    '})();',
+    `(${debugOverlayRuntime.toString()})(${namespace}, ${JSON.stringify(DEBUG_OVERLAY_CONFIG)});`,
+  ].join('\n');
+}
+
+// Compiling the measurement sources once per page instead of eval-ing them for every
+// slide x profile keeps Full Validation inside its time budget, and keeps the page free of
+// author-originated eval() so a deck with a Content-Security-Policy still measures. CDP
+// Runtime.evaluate is a debugger-privileged compile and is not subject to the page CSP.
+async function installPageRuntime(cdp, source) {
+  const result = await cdp.send('Runtime.evaluate', {
+    expression: source,
+    returnByValue: true,
+    awaitPromise: false,
+  });
+  if (result.exceptionDetails) {
+    throw new Error(`measurement runtime injection failed: ${result.exceptionDetails.text}`);
+  }
+}
+
+async function runMeasurement(page, field) {
+  return page.evaluate(([namespace, key]) => {
+    const api = window[namespace];
+    if (!api || typeof api[key] !== 'function') {
+      throw new Error(`measurement runtime is not installed for ${key}`);
+    }
+    return api[key]();
+  }, [MEASURE_NAMESPACE, field]);
+}
+
+function overlayEntriesFrom(measurements) {
+  const entries = [];
+  for (const [field, result] of Object.entries(measurements)) {
+    for (const entry of result?.overlay || []) {
+      entries.push({ ...entry, label: entry?.label || field });
+    }
+  }
+  return entries;
+}
+
+function measurementCounts(measurements) {
+  let issues = 0;
+  let warnings = 0;
+  for (const result of Object.values(measurements)) {
+    issues += result?.issues?.length || 0;
+    warnings += result?.warnings?.length || 0;
+  }
+  return { issues, warnings };
+}
+
+async function captureDebugOverlay(page, { entries, caption, path: imagePath }) {
+  const summary = await page.evaluate(([namespace, options]) => (
+    window[namespace].debugOverlay.render(options)
+  ), [MEASURE_NAMESPACE, { entries, caption }]);
+  try {
+    await page.screenshot({ path: imagePath, fullPage: false });
+  } finally {
+    await page.evaluate(namespace => window[namespace].debugOverlay.clear(), MEASURE_NAMESPACE);
+  }
+  return summary;
+}
+
+// A deck may ship a Content-Security-Policy without 'unsafe-inline'; a dynamically appended
+// <style> element is then parsed but never applied (style.sheet stays null). Constructed
+// stylesheets are not subject to the inline-style directive, so they are the CSP-safe fallback.
+// They also stay out of document.styleSheets, which keeps them invisible to collectFingerprints.
+async function applyMotionOverride(page) {
+  const applied = await page.evaluate(css => {
+    const style = document.createElement('style');
+    style.setAttribute('data-slide-validation-motion', 'off');
+    style.textContent = css;
+    (document.head || document.documentElement).appendChild(style);
+    if (style.sheet) return 'style-element';
+    style.remove();
+    try {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(css);
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+      return 'constructed-stylesheet';
+    } catch (_error) {
+      return 'unavailable';
+    }
+  }, MOTION_OVERRIDE);
+  if (applied === 'unavailable') {
+    throw new Error('validation could not disable animations in this document');
+  }
+  if (applied !== 'style-element') {
+    process.stderr.write(`NOTE: deck CSP blocked inline styles; motion disabled via ${applied}\n`);
+  }
+  return applied;
+}
+
 async function preparePage(page, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
-  await page.addStyleTag({ content: MOTION_OVERRIDE, attributes: { 'data-slide-validation-motion': 'off' } });
+  await applyMotionOverride(page);
   await waitForStyles(page);
   await waitForMedia(page);
 }
 
 async function prepareFingerprintPage(page, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
-  await page.addStyleTag({ content: MOTION_OVERRIDE, attributes: { 'data-slide-validation-motion': 'off' } });
+  await applyMotionOverride(page);
   await waitForStyles(page);
   await waitForFrames(page);
 }
@@ -908,6 +1437,7 @@ function emptyRecord(number, title, sourceHash, changeType) {
     review_batch_id: '',
     review_method: 'vision-batched-full-size',
     captures: {},
+    debug_captures: {},
     required_ai_profiles: [],
     inspected_profiles: [],
     observation: '',
@@ -1222,11 +1752,10 @@ async function main() {
   }
   const playwright = loadPlaywright();
   const scriptPath = path.resolve(__filename);
-  const textBoundsScript = fs.readFileSync(path.join(__dirname, 'measure_text_bounds.js'), 'utf8');
-  const contrastScript = fs.readFileSync(path.join(__dirname, 'measure_contrast.js'), 'utf8');
-  const controlGeometryScript = fs.readFileSync(path.join(__dirname, 'measure_geometry.js'), 'utf8');
-  const imageGeometryScript = fs.readFileSync(path.join(__dirname, 'measure_image_geometry.js'), 'utf8');
-  const containerDensityScript = fs.readFileSync(path.join(__dirname, 'measure_container_density.js'), 'utf8');
+  const measureSources = Object.fromEntries(Object.entries(MEASURE_SCRIPTS).map(([field, file]) => [
+    field, fs.readFileSync(path.join(__dirname, file), 'utf8'),
+  ]));
+  const pageRuntimeSource = measureRuntimeSource(measureSources);
   const deckBytes = fs.readFileSync(args.deck);
   const deckHash = sha256(deckBytes);
   const runId = crypto.randomUUID();
@@ -1420,6 +1949,7 @@ async function main() {
     const page = await context.newPage();
     await preparePage(page, `${fileUrl}#1`);
     const cdp = await context.newCDPSession(page);
+    await installPageRuntime(cdp, pageRuntimeSource);
     for (const profileName of profiles) {
       const profile = PROFILES[profileName];
       await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
@@ -1461,28 +1991,48 @@ async function main() {
           throw new Error(`active slide mismatch for ${profileName} slide ${slideNumber}`);
         }
         const measurements = {};
-        if (measuredChecks.has('text_bounds')) {
-          measurements.text_geometry = await page.evaluate(source => (0, eval)(source), textBoundsScript);
+        for (const check of ['text_bounds', 'contrast', 'container_density', 'controls', 'image_geometry']) {
+          if (!measuredChecks.has(check)) continue;
+          const field = MEASURE_FIELD_BY_CHECK[check];
+          measurements[field] = await runMeasurement(page, field);
         }
         if (measuredChecks.has('font_integrity') && profileName === profiles[0]) {
           measurements.font_integrity = await measureFontIntegrity(page, cdp);
-        }
-        if (measuredChecks.has('contrast')) {
-          measurements.contrast_geometry = await page.evaluate(source => (0, eval)(source), contrastScript);
-        }
-        if (measuredChecks.has('container_density')) {
-          measurements.container_density = await page.evaluate(source => (0, eval)(source), containerDensityScript);
-        }
-        if (measuredChecks.has('controls')) {
-          measurements.control_geometry = await page.evaluate(source => (0, eval)(source), controlGeometryScript);
-        }
-        if (measuredChecks.has('image_geometry')) {
-          measurements.image_geometry = await page.evaluate(source => (0, eval)(source), imageGeometryScript);
         }
         const filename = `slide-${String(slideNumber).padStart(2, '0')}.png`;
         const capturePath = path.join(profileDir, filename);
         await page.screenshot({ path: capturePath, fullPage: false });
         const captureBytes = fs.readFileSync(capturePath);
+        // Any measured issue or warning earns a boundary overlay capture: the reviewer must never
+        // have to guess which card owns an image or where the reserved nav zone is.
+        const counts = measurementCounts(measurements);
+        let debugOverlay = null;
+        if (counts.issues || counts.warnings) {
+          const debugFilename = `slide-${String(slideNumber).padStart(2, '0')}-debug.png`;
+          const debugPath = path.join(profileDir, debugFilename);
+          const caption = `slide ${slideNumber} · ${profileName} · `
+            + `${counts.issues} issue(s), ${counts.warnings} warning(s)`;
+          try {
+            const summary = await captureDebugOverlay(page, {
+              entries: overlayEntriesFrom(measurements),
+              caption,
+              path: debugPath,
+            });
+            debugOverlay = {
+              path: `${profileName}/${debugFilename}`,
+              sha256: sha256(fs.readFileSync(debugPath)),
+              caption,
+              measured_issues: counts.issues,
+              measured_warnings: counts.warnings,
+              drawn_regions: summary.entries,
+              region_counts: summary.counts,
+            };
+            records[slideNumber - 1].debug_captures[profileName] = debugOverlay.path;
+          } catch (error) {
+            debugOverlay = { path: '', error: `debug overlay capture failed: ${error.message}` };
+            records[slideNumber - 1].notes.push(debugOverlay.error);
+          }
+        }
         records[slideNumber - 1].captures[profileName] = {
           path: `${profileName}/${filename}`,
           sha256: sha256(captureBytes),
@@ -1497,6 +2047,7 @@ async function main() {
           source_sha256: fingerprints.slides[String(slideNumber)],
           render_run_id: runId,
           motion_disabled: true,
+          ...(debugOverlay ? { debug_overlay: debugOverlay } : {}),
           ...measurements,
         };
       }
@@ -1527,14 +2078,7 @@ async function main() {
   const automationWarnings = strategy === 'incremental'
     ? (existing?.automation_gate?.warnings || []).filter(warning => !renderedSet.has(warning?.slide))
     : [];
-  const geometryField = {
-    text_bounds: 'text_geometry',
-    font_integrity: 'font_integrity',
-    contrast: 'contrast_geometry',
-    container_density: 'container_density',
-    controls: 'control_geometry',
-    image_geometry: 'image_geometry',
-  };
+  const geometryField = MEASURE_FIELD_BY_CHECK;
   for (const number of renderedSlides) {
     const record = records[number - 1];
     for (const profile of profiles) {
@@ -1554,22 +2098,16 @@ async function main() {
   for (const number of renderedSlides) {
     const record = records[number - 1];
     const slideWarnings = automationWarnings.filter(warning => warning.slide === number);
-    const required = new Set();
-    if (args.mode === 'full') {
-      required.add('normal');
-    }
+    // Every rendered slide is reviewed at full size. There is no automated-geometry-only escape
+    // hatch: a rendered slide that carries no recorded review is exactly how a defective deck
+    // shipped with 5 of 7 slides unreviewed.
+    const required = new Set(['normal']);
     if (record.visual_critical) profiles.forEach(profile => required.add(profile));
     if (record.identity_required && ['all', 'image'].includes(record.review_scope)) required.add('normal');
     if (slideWarnings.length) {
-      required.add('normal');
       slideWarnings.forEach(warning => required.add(warning.profile));
     }
     record.required_ai_profiles = profiles.filter(profile => required.has(profile));
-    if (args.mode === 'quick' && !record.required_ai_profiles.length) {
-      record.review_method = 'automated-geometry-only';
-      record.checks = {};
-      record.status = 'automation-pass';
-    }
   }
 
   const reviewBatches = [];

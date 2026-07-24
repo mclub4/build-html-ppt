@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="README.ko.md">한국어</a> · <a href="README.en.md">English</a> · <strong>日本語</strong>
+  <a href="README.md">한국어</a> · <a href="README.en.md">English</a> · <strong>日本語</strong>
 </p>
 
 <h1 align="center">Build HTML Slides</h1>
@@ -116,6 +116,8 @@ codex plugin add build-html-slides@build-html-slides
 ```
 
 ### Gemini CLI Agent Skill
+
+`.skill`ファイルは[GitHub Releases](https://github.com/mclub4/build-html-ppt/releases)の添付ファイルです。`dist/`はgitignore対象でリポジトリには含まれないため、まずReleasesから取得するか、`./scripts/package-release.sh`でローカル生成してください。
 
 ```bash
 gemini skills install ./BUILD-HTML-SLIDES-GEMINI-vX.Y.Z.skill

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>layoutgate density fixture</title>
+<style>
+  :root { --stage-width: 1280; --stage-height: 720; --nav-exclusion-width: 280px; --nav-exclusion-height: 84px; }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #ffffff; }
+  .stage-wrap { position: fixed; inset: 0; }
+  .stage { position: absolute; width: 1280px; height: 720px; transform-origin: top left; background: #ffffff; }
+  .slide { position: absolute; inset: 0; display: flex; visibility: hidden; overflow: hidden; }
+  .slide.active { visibility: visible; }
+  .slide-media { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  .slide-content { position: relative; z-index: 2; display: flex; flex: 1; min-width: 0; min-height: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111111; }
+
+  /* No card, no panel, no border, no background: a bare editorial spread. */
+  .spread { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; padding: 56px 64px; }
+  .spread p { margin: 0; font-size: 16px; line-height: 1.5; }
+
+  .poster { align-items: center; padding: 56px 64px; }
+  .poster h1 { margin: 0; font-size: 96px; line-height: 1.05; font-weight: 700; }
+
+  .blocks { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .blocks > div { padding: 56px 64px; }
+  .blocks .fill-a { background: #eceae4; }
+  .blocks .fill-b { background: #d8dfe6; }
+  .blocks h2 { margin: 0 0 20px; font-size: 44px; line-height: 1.1; }
+  .blocks p { margin: 0 0 14px; font-size: 19px; line-height: 1.55; }
+
+  .rail { padding: 56px 64px; }
+  .rail > div { width: 100%; height: 100%; }
+  .rail p { margin: 0 0 6px; font-size: 15px; line-height: 1.4; }
+</style>
+</head>
+<body>
+<div class="stage-wrap"><div class="stage"><main>
+
+  <section class="slide active" data-title="editorial-spread-underfilled">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content spread">
+      <div><p>Ingestion is buffered.</p></div>
+      <div><p>Aggregation is incremental.</p></div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="statement-poster">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content poster">
+      <div><h1>Decide the number<br>before the database.</h1></div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="flat-colour-blocks-filled">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content blocks">
+      <div class="fill-a">
+        <h2>Operational counts</h2>
+        <p>Visible within five seconds, and still correctable for several minutes while late events arrive from the edge collectors.</p>
+        <p>Dashboards read this stream and never bill from it, because the value is expected to move after publication.</p>
+        <p>Every correction is written with the watermark that produced it, so a later reader can reconstruct the state.</p>
+      </div>
+      <div class="fill-b">
+        <h2>Settled counts</h2>
+        <p>Frozen at a published cutoff, reprocessed only through an approved replay, and audited against the raw event log.</p>
+        <p>Finance reads this stream exclusively, so the cutoff rule is a contract rather than an implementation detail.</p>
+        <p>Any restatement carries an approver, a reason, and the replay window that produced the corrected figure.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="empty-colour-block">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content blocks">
+      <div class="fill-a">
+        <h2>Operational counts</h2>
+        <p>Visible within five seconds, and still correctable for several minutes while late events arrive from the edge collectors.</p>
+        <p>Dashboards read this stream and never bill from it, because the value is expected to move after publication.</p>
+        <p>Every correction is written with the watermark that produced it, so a later reader can reconstruct the state.</p>
+      </div>
+      <div class="fill-b"></div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="thin-band-rail">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content rail">
+      <div>
+        <p>Collect at the edge, validate the schema, deduplicate on the event identifier, and only then aggregate.</p>
+        <p>Every stage keeps the watermark that produced it so a replay can rebuild the same figure from raw events.</p>
+        <p>The serving layer never recomputes; it reads the aggregate that the pipeline already committed for that window.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="whole-slide-region-is-not-a-container">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content"></div>
+  </section>
+
+</main></div></div>
+</body>
+</html>

@@ -10,6 +10,38 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+import deck_html
+
+
+# A run of Hangul/CJK long enough that a text-encoding round trip is meaningful.
+CJK_RUN = re.compile("[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3\u4e00-\u9fff\uf900-\ufaff]{2,}")
+# C1 controls never appear in legitimate deck copy; they are decode debris.
+C1_CONTROLS = re.compile("[\u0080-\u009f]")
+
+
+def repairable_mojibake(text: str) -> tuple[str, str] | None:
+    """Return (broken, repaired) when a run is provably a UTF-8 -> CP949 misdecode.
+
+    A hardcoded blocklist of garbled syllables both misses most real mojibake and
+    rejects legitimate hanja such as 吏. Re-encoding a run to CP949/EUC-KR and
+    decoding the bytes as UTF-8 is a decision, not a guess: if the bytes decode
+    to different Hangul, the run really is mojibake and the repaired text can be
+    printed for the author.
+    """
+    for run in CJK_RUN.findall(text):
+        for encoding in ("cp949", "euc-kr"):
+            try:
+                raw = run.encode(encoding)
+            except UnicodeEncodeError:
+                continue
+            try:
+                repaired = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+            if repaired != run and re.search(r"[가-힣]", repaired):
+                return run, repaired
+    return None
+
 
 REQUIRED = {
     "HTML doctype": r"<!doctype\s+html",
@@ -113,12 +145,16 @@ def main() -> int:
     if re.search(r"<(?:img|image)\b[^>]*class=[\"'][^\"']*(?:key-visual|logo|title-art|safe-media)[^\"']*[\"'][^>]*style=[\"'][^\"']*object-fit\s*:\s*cover", text, re.I | re.S):
         errors.append("meaningful foreground media must not use inline object-fit: cover")
     slides = len(re.findall(r"<section[^>]+class=[\"'][^\"']*\bslide\b", text, re.I))
-    titles = len(re.findall(r"<section[^>]+data-title=[\"'][^\"']+[\"']", text, re.I))
+    # data-title must be counted on slide sections only. Counting it across any
+    # <section> let a titleless slide pass whenever an unrelated section carried
+    # one, which silently broke validate_speaker_notes.py and render_slides.js.
+    slide_titles = deck_html.slide_titles(text)
+    titles = sum(1 for title in slide_titles if title)
 
     if slides < 2:
         errors.append("at least two slides")
-    if titles != slides:
-        errors.append(f"data-title on every slide ({titles}/{slides})")
+    if titles != len(slide_titles):
+        errors.append(f"data-title on every slide ({titles}/{len(slide_titles)})")
     layer_parser = LayerParser()
     layer_parser.feed(text)
     if len(layer_parser.slides) != slides:
@@ -128,8 +164,14 @@ def main() -> int:
             errors.append(f"slide {index} requires exactly one direct slide-media and slide-content ({record['media']}/{record['content']})")
         if record["bad_images"]:
             errors.append(f"slide {index} has raster/image elements outside slide-media: {', '.join(record['bad_images'])}")
-    if "\ufffd" in text or re.search(r"(?:\?쒖|\?먮|吏|寃쎄)", text):
+    mojibake = repairable_mojibake(text)
+    if "\ufffd" in text or C1_CONTROLS.search(text):
         errors.append("likely mojibake or replacement characters")
+    elif mojibake:
+        errors.append(
+            "likely mojibake or replacement characters: "
+            f"{mojibake[0]!r} decodes back to {mojibake[1]!r}"
+        )
 
     bundle_root = args.deck.parent.resolve()
 
@@ -157,7 +199,14 @@ def main() -> int:
         if re.match(r"https?://", src, re.I):
             errors.append(f"remote runtime dependency is not offline-portable ({kind}): {src}")
             return
-        local_path = (args.deck.parent / src.split("#", 1)[0].split("?", 1)[0]).resolve()
+        # A reference is a URL, so it must be percent-decoded before it is used as a
+        # filesystem path. Without this, the correct pair ("my image.webp" on disk,
+        # "my%20image.webp" in the markup) was reported as a missing resource and no
+        # deck with a space or non-ASCII asset name could pass.
+        relative = unquote(urlsplit(src).path)
+        if not relative:
+            return
+        local_path = (args.deck.parent / relative).resolve()
         if not local_path.is_relative_to(bundle_root):
             errors.append(f"resource escapes deck bundle ({kind}): {src}")
         elif not local_path.is_file():

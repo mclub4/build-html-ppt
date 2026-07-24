@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>layoutgate contrast fixture</title>
+<style>
+  :root { --stage-width: 1280; --stage-height: 720; }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #ffffff; }
+  body { font-family: Arial, Helvetica, sans-serif; }
+  .stage-wrap { position: fixed; inset: 0; }
+  .stage { position: absolute; width: 1280px; height: 720px; transform-origin: top left; background: #ffffff; }
+  .slide { position: absolute; inset: 0; display: flex; visibility: hidden; overflow: hidden; background: #ffffff; }
+  .slide.active { visibility: visible; }
+  .slide-media { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .slide-media img, .slide-media canvas { width: 100%; height: 100%; display: block; }
+  .slide-content { position: relative; z-index: 2; display: flex; flex: 1; min-width: 0; min-height: 0; align-items: center; padding: 56px 64px; }
+  .line { margin: 0; width: 100%; font-size: 16px; line-height: 1.5; }
+  .scrim { position: absolute; left: 64px; right: 64px; top: 300px; padding: 24px 28px; background: rgba(0, 0, 0, 0.85); z-index: 3; }
+  .scrim p { margin: 0; font-size: 16px; line-height: 1.5; color: #ffffff; }
+  .gradient { width: 100%; padding: 40px; background: linear-gradient(180deg, #ffffff 0%, #eeeeee 100%); }
+  .gradient p { margin: 0; font-size: 16px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="stage-wrap"><div class="stage"><main>
+
+  <section class="slide active" data-title="image-backdrop-provable-fail">
+    <div class="slide-media" aria-hidden="true">
+      <img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFElEQVR42mP4RCJgGNUwqmH4agAA9CnWH7tzTeEAAAAASUVORK5CYII=">
+    </div>
+    <div class="slide-content">
+      <p class="line" style="color:#ffffff">White copy laid directly over a pale photograph without any scrim behind it.</p>
+    </div>
+  </section>
+
+  <section class="slide" data-title="image-backdrop-provable-pass">
+    <div class="slide-media" aria-hidden="true">
+      <img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFElEQVR42mP4RCJgGNUwqmH4agAA9CnWH7tzTeEAAAAASUVORK5CYII=">
+    </div>
+    <div class="slide-content">
+      <p class="line" style="color:#111111">Dark copy laid directly over the same pale photograph, which is legible everywhere.</p>
+    </div>
+  </section>
+
+  <section class="slide" data-title="image-backdrop-undecidable">
+    <div class="slide-media" aria-hidden="true">
+      <img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mP4hQNw4QAMoxpGNQxfDQA3CoYQPLapRAAAAABJRU5ErkJggg==">
+    </div>
+    <div class="slide-content">
+      <p class="line" style="color:#ffffff">White copy crossing a photograph that is bright on one side and almost black on the other side of the frame.</p>
+    </div>
+  </section>
+
+  <section class="slide" data-title="scrim-over-image-pass">
+    <div class="slide-media" aria-hidden="true">
+      <img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mP4hQNw4QAMoxpGNQxfDQA3CoYQPLapRAAAAABJRU5ErkJggg==">
+    </div>
+    <div class="slide-content"></div>
+    <div class="scrim"><p>White copy on an opaque enough scrim stays legible over every pixel the photograph can supply.</p></div>
+  </section>
+
+  <section class="slide" data-title="gradient-bounds-pass">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content">
+      <div class="gradient"><p style="color:#111111">Dark copy on a pale vertical gradient, bounded by both gradient stops.</p></div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="gradient-bounds-fail">
+    <div class="slide-media" aria-hidden="true"></div>
+    <div class="slide-content">
+      <div class="gradient"><p style="color:#dddddd">Pale copy on a pale vertical gradient, which cannot reach the required ratio at any stop.</p></div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="canvas-backdrop-undecidable">
+    <div class="slide-media" aria-hidden="true">
+      <canvas width="16" height="16"></canvas>
+    </div>
+    <div class="slide-content">
+      <p class="line" style="color:#ffffff">White copy over a canvas whose pixels the gate is not allowed to assume anything about.</p>
+    </div>
+  </section>
+
+</main></div></div>
+</body>
+</html>

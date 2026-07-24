@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import tempfile
 from pathlib import Path
 
@@ -18,6 +19,24 @@ CONTRACT = json.loads(
     Path(__file__).with_name("validation_contract.json").read_text(encoding="utf-8")
 )
 SQUINT_REVIEW_CHECKS = tuple(CONTRACT["squint_review_checks"])
+
+# references/reviewer-gates.md, "Refute-or-confirm": a slide carrying a
+# deterministic warning may not be closed with a general approval. The reviewer
+# must open the boundary overlay and answer the warning with one of these two
+# verdicts as the first token of the observation.
+VERDICT_PREFIXES = ("CONFIRM:", "REFUTE:")
+
+# The verdict body has to name something a later run can be compared against.
+# These are deterministic proxies for "names an element and a location", chosen
+# so the exact approvals that let the shipped defects through are rejected:
+# "an intentional connecting rule that does not cover the product" carries no
+# number, and "no overlap" carries neither number nor distinct vocabulary.
+VERDICT_BODY_MIN_CHARS = 40
+VERDICT_BODY_MIN_WORDS = 6
+
+
+def normalized(value: str) -> str:
+    return " ".join(value.lower().split())
 
 
 def fail(parser: argparse.ArgumentParser, message: str) -> None:
@@ -43,6 +62,88 @@ def require_observation(parser: argparse.ArgumentParser, value: str) -> str:
     if len(observation) < 24:
         fail(parser, "observation must contain a concrete visual finding of at least 24 characters")
     return observation
+
+
+def slide_warnings(manifest: dict, slide: int) -> list[str]:
+    """Deterministic warnings raised against one slide by --phase prepare."""
+    gate = manifest.get("automation_gate")
+    if not isinstance(gate, dict):
+        return []
+    entries = gate.get("warnings")
+    if not isinstance(entries, list):
+        return []
+    return [
+        str(entry.get("warning", "")).strip()
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("slide") == slide and str(entry.get("warning", "")).strip()
+    ]
+
+
+def require_warning_verdict(
+    parser: argparse.ArgumentParser,
+    warnings: list[str],
+    observation: str,
+    checks: dict[str, str],
+    status: str,
+) -> str:
+    """Enforce the refute-or-confirm pass for a slide that carries a warning."""
+    if not warnings:
+        if observation.startswith(VERDICT_PREFIXES):
+            fail(
+                parser,
+                "CONFIRM/REFUTE is reserved for slides carrying a deterministic warning; "
+                "this slide has none in automation_gate.warnings",
+            )
+        return observation
+    prefix = next((item for item in VERDICT_PREFIXES if observation.startswith(item)), "")
+    if not prefix:
+        fail(
+            parser,
+            "this slide carries a deterministic warning and enters the refute-or-confirm pass: "
+            "the observation must begin with 'CONFIRM: ' or 'REFUTE: ' "
+            f"({len(warnings)} warning(s): {' | '.join(warnings)})",
+        )
+    body = observation[len(prefix):].strip()
+    if len(body) < VERDICT_BODY_MIN_CHARS or len(set(body.split())) < VERDICT_BODY_MIN_WORDS:
+        fail(
+            parser,
+            f"a {prefix} verdict needs at least {VERDICT_BODY_MIN_CHARS} characters and "
+            f"{VERDICT_BODY_MIN_WORDS} distinct words naming the element and where it sits",
+        )
+    if not any(character.isdigit() for character in body):
+        fail(
+            parser,
+            f"a {prefix} verdict must name a coordinate, size, or distance the next run can be "
+            "compared against; a generic approval does not close a warning",
+        )
+    compact = normalized(body)
+    for warning in warnings:
+        if compact and compact in normalized(warning):
+            fail(parser, f"a {prefix} verdict must not restate the warning text back to the recorder")
+    if prefix == "CONFIRM:":
+        if status != "fail" or all(value == "pass" for value in checks.values()):
+            fail(parser, "CONFIRM means the warning is real: record --status fail with the mapped check failed")
+    return observation
+
+
+def require_debug_inspection(
+    parser: argparse.ArgumentParser,
+    record: dict,
+    supplied: list[str],
+) -> list[str]:
+    """A warned or failed slide has a boundary overlay; the reviewer must open it."""
+    available = record.get("debug_captures")
+    available = sorted(available) if isinstance(available, dict) else []
+    inspected = sorted({item.strip() for item in supplied if item.strip()})
+    if inspected and not available:
+        fail(parser, "--inspected-debug was supplied but this slide has no debug_captures")
+    if available and inspected != available:
+        fail(
+            parser,
+            "--inspected-debug must exactly match this slide's boundary overlay captures: "
+            f"{','.join(available)}",
+        )
+    return inspected
 
 
 def atomic_write(path: Path, data: dict) -> None:
@@ -104,10 +205,17 @@ def record_slide(
     if args.status == "fail" and all(value == "pass" for value in checks.values()):
         fail(parser, "status=fail requires at least one explicit failed check")
 
+    observation = require_observation(parser, args.observation)
+    observation = require_warning_verdict(
+        parser, slide_warnings(manifest, args.slide), observation, checks, args.status
+    )
+    inspected_debug = require_debug_inspection(parser, record, args.inspected_debug)
+
     record["reviewer"] = args.reviewer.strip()
     record["reviewer_ref"] = args.reviewer_ref.strip()
     record["inspected_profiles"] = inspected
-    record["observation"] = require_observation(parser, args.observation)
+    record["inspected_debug_captures"] = inspected_debug
+    record["observation"] = observation
     record["checks"] = checks
     record["status"] = args.status
     if args.note:
@@ -207,6 +315,7 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--status", choices=("pass", "fail"), required=True)
         command.add_argument("--observation", required=True)
         command.add_argument("--inspected", required=True)
+        command.add_argument("--inspected-debug", action="append", default=[])
         command.add_argument("--check", action="append", default=[], required=True)
         command.add_argument("--note", action="append", default=[])
     quality = subparsers.add_parser("quality")
@@ -222,7 +331,92 @@ def build_parser() -> argparse.ArgumentParser:
     squint.add_argument("--status", choices=("pass", "fail"), required=True)
     squint.add_argument("--observation", required=True)
     squint.add_argument("--check", action="append", default=[], required=True)
+    template = subparsers.add_parser(
+        "template",
+        help="print copy-pasteable record_review.py invocations for every pending record",
+    )
+    template.add_argument("--slide", type=int, default=None)
     return parser
+
+
+def quote(value: str) -> str:
+    return shlex.quote(value)
+
+
+def slide_template(manifest_path: Path, record: dict, manifest: dict, *, cross: bool) -> str:
+    """Build one runnable invocation with this slide's real tuple and profiles."""
+    number = record.get("slide")
+    profiles = ",".join(record.get("required_ai_profiles") or record.get("inspected_profiles") or [])
+    checks = list(record.get("checks", {}))
+    warnings = slide_warnings(manifest, number if isinstance(number, int) else -1)
+    debug = sorted(record.get("debug_captures") or {}) if isinstance(record.get("debug_captures"), dict) else []
+    parts = [
+        f"python3 {quote(str(Path(__file__).resolve()))} {quote(str(manifest_path))}",
+        "cross-slide" if cross else "slide",
+        f"--slide {number}",
+        "--reviewer build-html-slides-visual-reviewer --reviewer-ref REVIEWER_REF",
+        "--status pass",
+        f"--inspected {quote(profiles)}" if profiles else "--inspected PROFILES",
+    ]
+    parts.extend(f"--inspected-debug {quote(name)}" for name in debug)
+    parts.extend(f"--check {quote(name)}=pass" for name in checks)
+    if warnings:
+        parts.append("--observation 'CONFIRM: NAME THE ELEMENT AND ITS COORDINATE'")
+    else:
+        parts.append("--observation 'REPLACE WITH ONE CONCRETE VISUAL FINDING'")
+    return " \\\n  ".join(parts)
+
+
+def print_templates(manifest_path: Path, manifest: dict, only: int | None) -> int:
+    """Emit runnable commands for every record --status reports as pending."""
+    emitted = 0
+    for records_key, batch_key, cross in (
+        ("slides", "review_batches", False),
+        ("cross_reviews", "cross_review_batches", True),
+    ):
+        pending_batches = {
+            batch.get("id")
+            for batch in manifest.get(batch_key, []) or []
+            if isinstance(batch, dict) and batch.get("status") != "complete"
+        }
+        for record in manifest.get(records_key, []) or []:
+            if not isinstance(record, dict) or record.get("status") in {"pass", "fail"}:
+                continue
+            if record.get("review_batch_id") not in pending_batches:
+                continue
+            if only is not None and record.get("slide") != only:
+                continue
+            for warning in slide_warnings(manifest, record.get("slide")):
+                print(f"# WARNING slide {record.get('slide')}: {warning}")
+            print(slide_template(manifest_path, record, manifest, cross=cross))
+            print()
+            emitted += 1
+    if only is None:
+        score = manifest.get("quality_score")
+        if isinstance(score, dict) and score.get("status") != "pass":
+            dimensions = " ".join(f"--dimension {name}=3" for name in QUALITY_DIMENSIONS)
+            slide_count = len(manifest.get("slides") or [])
+            weakest = ",".join(str(number) for number in range(1, min(3, slide_count) + 1)) or "1"
+            print(
+                f"python3 {quote(str(Path(__file__).resolve()))} {quote(str(manifest_path))} quality \\\n"
+                "  --reviewer build-html-slides-quality-editor --reviewer-ref REVIEWER_REF \\\n"
+                f"  --status pass {dimensions} --weakest {weakest} \\\n"
+                "  --observation 'REPLACE WITH ONE CONCRETE DECK-LEVEL FINDING'\n"
+            )
+            emitted += 1
+        squint = manifest.get("squint_review")
+        if isinstance(squint, dict) and squint.get("status") != "pass":
+            checks = " ".join(f"--check {name}=pass" for name in SQUINT_REVIEW_CHECKS)
+            print(
+                f"python3 {quote(str(Path(__file__).resolve()))} {quote(str(manifest_path))} squint \\\n"
+                "  --reviewer build-html-slides-quality-editor --reviewer-ref REVIEWER_REF \\\n"
+                f"  --status pass {checks} \\\n"
+                "  --observation 'REPLACE WITH ONE CONCRETE DECK-WIDE HIERARCHY FINDING'\n"
+            )
+            emitted += 1
+    if not emitted:
+        print("OK: no pending review records")
+    return 0
 
 
 def main() -> int:
@@ -235,6 +429,8 @@ def main() -> int:
         manifest = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         parser.error(f"manifest is invalid JSON: {exc}")
+    if args.kind == "template":
+        return print_templates(path, manifest, args.slide)
     if args.kind == "slide":
         record_slide(parser, manifest, args, cross=False)
     elif args.kind == "cross-slide":

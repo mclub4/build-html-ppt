@@ -25,7 +25,13 @@ SCRIPTS = Path(__file__).resolve().parent
 CONTRACT = json.loads((SCRIPTS / "validation_contract.json").read_text(encoding="utf-8"))
 IMPACT_SCOPES = set(CONTRACT["impact_scopes"])
 CONTENT_CHANGE_CATEGORIES = set(CONTRACT["content_change_categories"])
+CHECKS_BY_CHANGE = {name: tuple(checks) for name, checks in CONTRACT["checks_by_change"].items()}
+TIME_BUDGETS = CONTRACT["time_budgets"]
 COMMAND_TIMEOUT_SECONDS = int(os.environ.get("BUILD_HTML_SLIDES_COMMAND_TIMEOUT", "900"))
+QUICK_SKIP_MESSAGE = (
+    "SKIP: Quick Draft is creation-only. validate_all.py performs no preflight, "
+    "deterministic checks, Chromium render, timing file, or review-workspace writes in quick mode."
+)
 
 
 def default_notes(deck: Path) -> Path:
@@ -149,6 +155,10 @@ def deterministic_commands(
             [python, str(SCRIPTS / "validate_placeholders.py"), str(deck)],
         ),
     ]
+    if changed & {"text", "image", "structure"}:
+        commands.append(
+            ("slide variety", [python, str(SCRIPTS / "validate_slide_variety.py"), str(deck)])
+        )
     if changed & {"text", "structure"}:
         commands.append(
             ("portable WOFF2 fonts", [python, str(SCRIPTS / "validate_fonts.py"), str(deck)])
@@ -266,6 +276,175 @@ def classify_change_scope(
     return classification
 
 
+def load_json(path: Path) -> tuple[object, str]:
+    """Read JSON without ever tracebacking on a partial or corrupt artifact."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8")), ""
+    except FileNotFoundError:
+        return None, f"{path} does not exist"
+    except (OSError, UnicodeDecodeError) as exc:
+        return None, f"{path} could not be read: {exc}"
+    except json.JSONDecodeError as exc:
+        return None, f"{path} is not valid JSON (line {exc.lineno}, column {exc.colno}): {exc.msg}"
+
+
+def required_check_keys(record: dict) -> list[str]:
+    scope = record.get("review_scope")
+    checks = list(CHECKS_BY_CHANGE.get(scope, CHECKS_BY_CHANGE["all"]))
+    if record.get("identity_required") is True and scope in {"all", "image"}:
+        checks.append("identity")
+    return checks
+
+
+def elapsed_seconds(timings: dict) -> float | None:
+    """Wall clock from the first recorded invocation, which is what the budget measures."""
+    invocations = timings.get("invocations")
+    if not isinstance(invocations, list):
+        return None
+    for entry in invocations:
+        if not isinstance(entry, dict):
+            continue
+        started = str(entry.get("started_at", ""))
+        try:
+            begin = datetime.fromisoformat(started.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        return max(0.0, (datetime.now(timezone.utc) - begin).total_seconds())
+    return None
+
+
+def report_budget(mode: str, slide_count: int | None, timings: dict, next_step: str) -> None:
+    budget = TIME_BUDGETS.get(mode)
+    if not isinstance(budget, dict):
+        return
+    total = float(budget["total_minutes"])
+    low, high = TIME_BUDGETS["slide_range"]
+    scale = 1.0
+    if isinstance(slide_count, int) and slide_count > high:
+        scale = slide_count / high
+    allowance = total * scale
+    scope = f"{slide_count} slides" if isinstance(slide_count, int) else f"{low}-{high} slides"
+    seconds = elapsed_seconds(timings)
+    if seconds is None:
+        print(f"BUDGET: {mode} validation is budgeted at {allowance:.0f} min for {scope}; no timing data yet")
+    else:
+        used = seconds / 60
+        remaining = allowance - used
+        state = f"{remaining:.1f} min remaining" if remaining >= 0 else f"OVER by {-remaining:.1f} min"
+        print(
+            f"BUDGET: {mode} validation elapsed {used:.1f} min of {allowance:.0f} min "
+            f"for {scope} - {state}"
+        )
+        if remaining < 0:
+            print(
+                "BUDGET: over budget - stop widening scope, finish the pending step, "
+                "and reduce optional profiles or cross-review sampling on the next deck"
+            )
+    phases = budget.get("phases", {})
+    if next_step in phases:
+        print(f"BUDGET: next step '{next_step}' is budgeted at {phases[next_step]} min")
+
+
+def report_status(deck: Path, args: argparse.Namespace) -> int:
+    entrypoint = Path(__file__).resolve()
+    try:
+        review = review_directory(deck, args.review_dir)
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    manifest = review / "review.json"
+    if not manifest.is_file():
+        print("STATUS: no review manifest")
+        print(f"NEXT: {sys.executable} {entrypoint} {deck} --phase prepare --mode full --review-dir {review}")
+        report_budget("full", None, {}, "prepare")
+        return 0
+    data, problem = load_json(manifest)
+    timings, timing_problem = load_json(review / "timings.json")
+    if not isinstance(timings, dict):
+        timings = {}
+        if timing_problem and (review / "timings.json").exists():
+            print(f"STATUS: timing history is unusable - {timing_problem}")
+    if not isinstance(data, dict):
+        print(f"STATUS: review manifest is unusable - {problem or 'root must be a JSON object'}")
+        print("STATUS: no review state can be trusted; regenerate the workspace from prepare")
+        print(f"NEXT: {sys.executable} {entrypoint} {deck} --phase prepare --mode full --review-dir {review}")
+        report_budget("full", None, timings, "prepare")
+        return 1
+
+    records = {
+        record.get("slide"): record
+        for record in (data.get("slides") if isinstance(data.get("slides"), list) else [])
+        if isinstance(record, dict)
+    }
+    mode = data.get("mode") if data.get("mode") in TIME_BUDGETS else "full"
+    slide_count = len(records) or None
+
+    def pending(key: str) -> list[dict]:
+        batches = data.get(key)
+        if not isinstance(batches, list):
+            return []
+        return [
+            batch for batch in batches
+            if isinstance(batch, dict) and batch.get("status") != "complete"
+        ]
+
+    def announce(batches: list[dict], label: str) -> None:
+        for batch in batches:
+            slides = batch.get("slides") if isinstance(batch.get("slides"), list) else []
+            print(f"STATUS: pending {label} review batch {batch.get('id')}: slides {slides}")
+            for number in slides:
+                record = records.get(number)
+                if not isinstance(record, dict):
+                    print(f"CHECKS: slide {number} has no review record; rerun prepare")
+                    continue
+                print(f"CHECKS: slide {number} requires exactly {json.dumps(required_check_keys(record))}")
+
+    pending_primary = pending("review_batches")
+    pending_cross = pending("cross_review_batches")
+    announce(pending_primary, "primary")
+    announce(pending_cross, "cross")
+    if pending_primary:
+        print(f"RECORD: {sys.executable} {SCRIPTS / 'record_review.py'} {manifest} slide ...")
+    if pending_cross:
+        print(f"RECORD: {sys.executable} {SCRIPTS / 'record_review.py'} {manifest} cross-slide ...")
+
+    invocations = timings.get("invocations")
+    latest = invocations[-1] if isinstance(invocations, list) and invocations and isinstance(invocations[-1], dict) else {}
+    if latest:
+        print(
+            f"TIMING: latest {latest.get('phase', 'unknown')} {latest.get('status', 'unknown')} "
+            f"in {latest.get('total_seconds', '?')}s"
+        )
+
+    next_step = "prepare"
+    if data.get("phase") == "final":
+        score = data.get("quality_score")
+        squint = data.get("squint_review")
+        score_pending = not isinstance(score, dict) or score.get("status") != "pass"
+        squint_pending = not isinstance(squint, dict) or squint.get("status") != "pass"
+        if score_pending:
+            print("STATUS: final quality score is pending")
+            print(f"RECORD: {sys.executable} {SCRIPTS / 'record_review.py'} {manifest} quality ...")
+        if squint_pending:
+            print("STATUS: squint review is pending")
+            print(f"RECORD: {sys.executable} {SCRIPTS / 'record_review.py'} {manifest} squint ...")
+        if pending_cross or score_pending or squint_pending:
+            next_step = "final-review"
+        else:
+            next_step = "finalize-verify"
+            print(f"NEXT: {sys.executable} {entrypoint} {deck} --phase finalize-verify --review-dir {review}")
+    elif pending_primary:
+        next_step = "primary-review"
+    else:
+        next_phase = "finalize-prepare" if (
+            latest.get("phase") == "verify" and latest.get("status") == "pass"
+        ) else "verify"
+        next_step = next_phase
+        print(f"NEXT: {sys.executable} {entrypoint} {deck} --phase {next_phase} --review-dir {review}")
+    report_budget(str(mode), slide_count, timings, next_step)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("deck", type=Path)
@@ -291,77 +470,16 @@ def main() -> int:
     deck = args.deck.resolve()
     if not deck.is_file():
         parser.error(f"deck not found: {deck}")
-    if args.status:
-        try:
-            review = review_directory(deck, args.review_dir)
-        except RuntimeError as exc:
-            print(f"ERROR: {exc}", file=sys.stderr)
-            return 1
-        manifest = review / "review.json"
-        if not manifest.is_file():
-            print("STATUS: no review manifest")
-            print(
-                f"NEXT: {sys.executable} {Path(__file__).resolve()} {deck} "
-                f"--phase prepare --mode full --review-dir {review}"
-            )
-            return 0
-        data = json.loads(manifest.read_text(encoding="utf-8"))
-        pending_primary = [
-            batch for batch in data.get("review_batches", [])
-            if batch.get("status") != "complete"
-        ]
-        pending_cross = [
-            batch for batch in data.get("cross_review_batches", [])
-            if batch.get("status") != "complete"
-        ]
-        for batch in pending_primary:
-            print(f"STATUS: pending primary review batch {batch.get('id')}: slides {batch.get('slides')}")
-        for batch in pending_cross:
-            print(f"STATUS: pending cross review batch {batch.get('id')}: slides {batch.get('slides')}")
-        if pending_primary:
-            print(f"RECORD: {sys.executable} {SCRIPTS / 'record_review.py'} {manifest} slide ...")
-        if pending_cross:
-            print(f"RECORD: {sys.executable} {SCRIPTS / 'record_review.py'} {manifest} cross-slide ...")
-        timings_path = review / "timings.json"
-        latest = {}
-        if timings_path.is_file():
-            timing_data = json.loads(timings_path.read_text(encoding="utf-8"))
-            latest = (timing_data.get("invocations") or [{}])[-1]
-            print(
-                f"TIMING: latest {latest.get('phase', 'unknown')} {latest.get('status', 'unknown')} "
-                f"in {latest.get('total_seconds', '?')}s"
-            )
-        if data.get("phase") == "final":
-            score_pending = (data.get("quality_score") or {}).get("status") != "pass"
-            squint_pending = (data.get("squint_review") or {}).get("status") != "pass"
-            if score_pending:
-                print("STATUS: final quality score is pending")
-                print(f"RECORD: {sys.executable} {SCRIPTS / 'record_review.py'} {manifest} quality ...")
-            if squint_pending:
-                print("STATUS: squint review is pending")
-                print(f"RECORD: {sys.executable} {SCRIPTS / 'record_review.py'} {manifest} squint ...")
-            if not pending_cross and not score_pending and not squint_pending:
-                print(
-                    f"NEXT: {sys.executable} {Path(__file__).resolve()} {deck} "
-                    f"--phase finalize-verify --review-dir {review}"
-                )
-        elif not pending_primary:
-            next_phase = "finalize-prepare" if (
-                latest.get("phase") == "verify" and latest.get("status") == "pass"
-            ) else "verify"
-            print(
-                f"NEXT: {sys.executable} {Path(__file__).resolve()} {deck} "
-                f"--phase {next_phase} --review-dir {review}"
-            )
+    # The quick-mode guard sits above every phase, not just prepare: the documented
+    # contract is that Quick Draft touches nothing - no preflight, no render, no
+    # validator, no timings.json, no review workspace - regardless of --phase.
+    if args.mode == "quick" and not args.status:
+        print(QUICK_SKIP_MESSAGE)
         return 0
+    if args.status:
+        return report_status(deck, args)
     if args.phase == "prepare" and args.mode is None:
         parser.error("--mode quick|full is required for prepare")
-    if args.phase == "prepare" and args.mode == "quick":
-        print(
-            "SKIP: Quick Draft is creation-only. validate_all.py performs no preflight, "
-            "deterministic checks, Chromium render, or review-workspace writes in quick mode."
-        )
-        return 0
     if args.phase != "prepare" and args.slides:
         parser.error("--slides is only valid during prepare")
 

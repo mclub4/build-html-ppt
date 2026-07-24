@@ -30,7 +30,7 @@ Do not annotate common language, every acronym, incidental source names, or term
 
 Use a short form such as `용어 — 이 발표에서 뜻하는 역할` and mark it with `data-term-note`. Place it beside the first meaningful use or in a compact micro-note rail. It should look like a quiet caption, not another content block: no large white card, tall padding, full-width glossary band, or oversized border. Keep it inside the content-safe area, visually subordinate but readable, and physically separate from `data-source-citation` and navigation. One or two notes on a slide is normally enough. When more are necessary, simplify the slide, stage the concepts across several slides, or move secondary definitions to presenter notes. A dense glossary footer is a failure, not thoroughness.
 
-Do not place a term note in the persistent navigation exclusion zone at the lower right. Prefer an inline note beside the term. When a footer rail is necessary, use the runtime shell's `.nav-safe-note` helper or reserve at least the documented navigation width and height manually. A long note must wrap or move upward inside the content composition; it must never continue behind the controls.
+Prefer an inline note beside the term. When a footer rail is necessary, use the runtime shell's `.nav-safe-note` helper, which clears the navigation exclusion zone by construction. A long note must wrap or move upward inside the content composition.
 
 ## Separate authoring instructions from audience copy
 

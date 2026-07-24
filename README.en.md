@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="README.ko.md">한국어</a> · <strong>English</strong> · <a href="README.ja.md">日本語</a>
+  <a href="README.md">한국어</a> · <strong>English</strong> · <a href="README.ja.md">日本語</a>
 </p>
 
 <h1 align="center">Build HTML Slides</h1>
@@ -116,6 +116,8 @@ codex plugin add build-html-slides@build-html-slides
 ```
 
 ### Gemini CLI Agent Skill
+
+Download the `.skill` files from [GitHub Releases](https://github.com/mclub4/build-html-ppt/releases) first. They are release assets, not repository files: `dist/` is gitignored, so no archive is ever committed. Building them locally with `./scripts/package-release.sh` works too.
 
 ```bash
 gemini skills install ./BUILD-HTML-SLIDES-GEMINI-vX.Y.Z.skill
