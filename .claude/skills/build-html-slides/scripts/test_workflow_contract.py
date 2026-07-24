@@ -323,6 +323,21 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("dedicated refinement pass", cover)
         self.assertIn("generated-only depiction of an existing named subject", reviewer)
 
+    def test_high_volume_sourced_media_uses_batched_candidate_review(self) -> None:
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        workflow = (ROOT / "references" / "high-volume-media-workflow.md").read_text(encoding="utf-8")
+        builder = (ROOT / "scripts" / "build_media_contact_sheet.js").read_text(encoding="utf-8")
+        prompt = (ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
+        self.assertIn("references/high-volume-media-workflow.md", skill)
+        self.assertIn("products, food, artworks, athletes", skill)
+        self.assertIn("Deep-research and regenerate only flagged candidates", skill)
+        self.assertIn("## 1. Freeze a media roster", workflow)
+        self.assertIn("up to twelve", workflow)
+        self.assertIn("Quick Draft", workflow)
+        self.assertIn("Full Validation", workflow)
+        self.assertIn("duplicate_hashes", builder)
+        self.assertIn("up to twelve labeled candidates", prompt)
+
     def test_idol_editorial_index_is_optional_job_based_vocabulary(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         gallery = (ROOT / "references" / "theme-gallery.md").read_text(encoding="utf-8")
